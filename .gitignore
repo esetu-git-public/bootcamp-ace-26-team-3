@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.env
+
+# Databases
+*.db
+*.sqlite3
+
+# Node (Frontend)
+node_modules/
+dist/
+.env.local
+.env.production
+.env.development
+
+# Editor & System
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Temporary PDF extraction scripts/outputs
+extract.py
+extract_pdfs.py
+Requirements.txt
+PRODUCT_REQUIREMENTS_DOCUMENT.txt

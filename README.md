@@ -47,18 +47,24 @@ bootcamp-ace-26-team-3/
 2. Create and activate a Python virtual environment:
    * **Windows (PowerShell):**
      ```powershell
-     python -m venv .venv
-     .venv\Scripts\activate
+     python -m venv venv
+     venv\Scripts\activate
      ```
    * **macOS/Linux:**
      ```bash
-     python3 -m venv .venv
-     source .venv/bin/activate
+     python3 -m venv venv
+     source venv/bin/activate
      ```
 3. Install the required Python libraries:
    ```bash
    pip install -r ../requirements.txt
    ```
+
+### 1.1. Editor & Linting Setup (Pyrefly)
+If you use Pyrefly for import resolution/linting, the environment paths are configured in:
+* **Root [pyrefly.toml](file:///c:/Users/user/Downloads/Subscription%20Cancellation%20Prediction%20System%20(OTTSaaS)/bootcamp-ace-26-team-3/pyrefly.toml)**: Points to `backend/venv/Scripts/python.exe`
+* **Backend [backend/pyrefly.toml](file:///c:/Users/user/Downloads/Subscription%20Cancellation%20Prediction%20System%20(OTTSaaS)/bootcamp-ace-26-team-3/backend/pyrefly.toml)**: Points to `venv/Scripts/python.exe`
+
 4. Run the backend local server:
    ```bash
    uvicorn app.main:app --reload

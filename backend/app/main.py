@@ -80,7 +80,23 @@ try:
             ) p ON c.customer_id = p.customer_id;
         """))
         db.commit()
-        print("Database view 'v_customer_predictions' created/verified.")
+
+        # Create supporting indexes for common analytics and search patterns
+        db.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_customers_lower_customer_id
+            ON customers(LOWER(customer_id));
+
+            CREATE INDEX IF NOT EXISTS idx_predictions_customer_predicted_at
+            ON churn_predictions(customer_id, predicted_at DESC);
+
+            CREATE INDEX IF NOT EXISTS idx_predictions_risk_will
+            ON churn_predictions(risk_category, will_cancel);
+
+            CREATE INDEX IF NOT EXISTS idx_prediction_history_customer_at
+            ON prediction_history(customer_id, evaluated_at DESC);
+        """))
+        db.commit()
+        print("Database index recommendations created/verified.")
 
         # 2. Seed default admin user if none exists
         admin_exists = db.query(User).filter(User.username == "admin").first()

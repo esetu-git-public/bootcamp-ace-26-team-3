@@ -66,11 +66,14 @@ CREATE TABLE model_metrics (
 -- Index on frequently queried columns in Customers
 CREATE INDEX idx_customers_demographics ON customers(income_level, device_type, payment_mode);
 CREATE INDEX idx_customers_satisfaction ON customers(satisfaction_score);
+CREATE INDEX idx_customers_lower_customer_id ON customers(LOWER(customer_id));
 
 -- Indexes on Churn Predictions for faster lookups, sorting and filtering
 CREATE INDEX idx_predictions_customer_id ON churn_predictions(customer_id);
+CREATE INDEX idx_predictions_customer_predicted_at ON churn_predictions(customer_id, predicted_at DESC);
 CREATE INDEX idx_predictions_score ON churn_predictions(churn_probability DESC);
 CREATE INDEX idx_predictions_risk ON churn_predictions(risk_category);
+CREATE INDEX idx_predictions_risk_will ON churn_predictions(risk_category, will_cancel);
 CREATE INDEX idx_predictions_predicted_at ON churn_predictions(predicted_at DESC);
 
 -- ==========================================

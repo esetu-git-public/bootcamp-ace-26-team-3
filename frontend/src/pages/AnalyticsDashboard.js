@@ -189,6 +189,11 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
             </div>
             <p style={styles.helperText}>{bulkJob.processed_records || 0} of {bulkJob.total_records || 0} records processed</p>
             {bulkJob.error_message ? <p style={styles.errorText}>{bulkJob.error_message}</p> : null}
+            {bulkJob.status === 'COMPLETED' && bulkJob.download_url ? (
+              <div style={{ marginTop: '10px' }}>
+                <a href={`${backendOrigin}${bulkJob.download_url}`} target="_blank" rel="noreferrer" style={styles.link}>Download report CSV</a>
+              </div>
+            ) : null}
             {bulkPreview.length ? (
               <div style={styles.tableWrap}>
                 <table style={styles.table}>

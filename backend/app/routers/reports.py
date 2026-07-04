@@ -4,17 +4,22 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 import io
 import csv
+import os
 from typing import Optional
 from ..database import get_db
 from .auth import get_current_user
 
 router = APIRouter(prefix="/reports", tags=["Reporting & Exports"])
 
+RESULTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bulk_results")
+os.makedirs(RESULTS_DIR, exist_ok=True)
+
 @router.get("/export")
 async def export_report(
     format: str = Query("csv", regex="^(csv|pdf|xlsx)$"),
     risk_category: Optional[str] = Query(None),
     recommendation_type: Optional[str] = Query(None),
+    job_id: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user: str = Depends(get_current_user)
 ):
@@ -24,6 +29,15 @@ async def export_report(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
             detail=f"{format.upper()} report generation is currently in development. Please export as CSV."
         )
+
+    if job_id:
+        file_path = os.path.join(RESULTS_DIR, f"{job_id}.csv")
+        if os.path.exists(file_path):
+            return StreamingResponse(
+                open(file_path, "rb"),
+                media_type="text/csv",
+                headers={"Content-Disposition": f"attachment; filename=bulk_predictions_{job_id}.csv"}
+            )
 
     # In-memory text stream
     output = io.StringIO()

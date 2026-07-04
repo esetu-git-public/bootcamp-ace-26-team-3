@@ -1,0 +1,28 @@
+{
+  "model_version": "v1.2.0-catboost",
+  "accuracy": 0.9987,
+  "precision": 1.0,
+  "recall": 0.9957,
+  "f1_score": 0.9978,
+  "roc_auc": 1.0,
+  "confusion_matrix": {
+    "tp": 926,
+    "fp": 0,
+    "tn": 2260,
+    "fn": 4
+  },
+  "feature_importance": {
+    "Age": 0.0,
+    "Income_Level": 0.19554756294718129,
+    "Number_of_Subscriptions": 23.19065993203384,
+    "Avg_Usage_Hours_Per_Week": 11.853556347571603,
+    "App_Switch_Frequency": 24.331681466655194,
+    "Discount_Used": 0.0,
+    "Customer_Support_Interactions": 24.89021987266221,
+    "Payment_Mode": 0.0,
+    "Tenure_Months": 0.0,
+    "Device_Type": 0.0,
+    "Satisfaction_Score": 15.538334818129991,
+    "Monthly_Total_Spend": 0.0
+  }
+}

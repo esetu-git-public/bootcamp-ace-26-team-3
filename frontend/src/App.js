@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Login from './pages/Login';
+import SignUp from './pages/SignUp';
 import AnalyticsDashboard from './pages/AnalyticsDashboard';
 import CustomerProfile from './pages/CustomerProfile';
 
@@ -10,10 +11,10 @@ function App() {
   useEffect(() => {
     if (token) {
       setView('dashboard');
-    } else {
+    } else if (view !== 'signup') {
       setView('login');
     }
-  }, [token]);
+  }, [token, view]);
 
   const handleLoginSuccess = (newToken) => {
     localStorage.setItem('access_token', newToken);
@@ -28,7 +29,15 @@ function App() {
   return (
     <div className="App">
       {view === 'login' && (
-        <Login onLoginSuccess={handleLoginSuccess} />
+        <Login
+          onLoginSuccess={handleLoginSuccess}
+          onNavigateToSignup={() => setView('signup')}
+        />
+      )}
+      {view === 'signup' && (
+        <SignUp
+          onNavigateToLogin={() => setView('login')}
+        />
       )}
       {view === 'dashboard' && (
         <AnalyticsDashboard onViewChange={setView} onLogout={handleLogout} />

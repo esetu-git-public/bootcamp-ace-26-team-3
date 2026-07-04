@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from sqlalchemy.orm import Session
 from ..schemas import LoginRequest, TokenResponse
+from ..schemas.user import UserCreate, UserResponse
 from ..config import settings
 from ..database import get_db
 from ..models.user import User
@@ -86,3 +87,29 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
         "token_type": "bearer",
         "expires_in": expires_in
     }
+
+@router.post("/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+async def signup(user_data: UserCreate, db: Session = Depends(get_db)):
+    # Check if username or email already exists
+    existing_user = db.query(User).filter(
+        (User.username == user_data.username) | (User.email == user_data.email)
+    ).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username or email already registered."
+        )
+    
+    hashed_pwd = get_password_hash(user_data.password)
+    new_user = User(
+        username=user_data.username,
+        email=user_data.email,
+        full_name=user_data.full_name,
+        hashed_password=hashed_pwd,
+        is_active=True
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return new_user
+

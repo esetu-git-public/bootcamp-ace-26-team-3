@@ -213,15 +213,15 @@ class CustomerValidationSchema(BaseModel):
     customer_id: str = Field(..., min_length=1, max_length=50)
     age: int = Field(..., ge=18, le=100, description="Age must be between 18 and 100")
     income_level: str = Field(..., description="Must be Low, Medium, or High")
-    device_type: str = Field(..., description="Must be Mobile, Smart TV, Desktop, or Tablet")
-    payment_mode: str = Field(..., description="Must be Credit Card, UPI, Debit Card, or Net Banking")
+    device_type: str = Field(..., description="Must be Android, iOS, or Web")
+    payment_mode: str = Field(..., description="Must be Credit Card, UPI, Debit Card, or Wallet")
     number_of_subscriptions: int = Field(..., ge=1)
     tenure_months: int = Field(..., ge=0)
     monthly_total_spend: float = Field(..., ge=0.0)
     avg_usage_hours_per_week: float = Field(..., ge=0.0, le=168.0)
     app_switch_frequency: int = Field(..., ge=0)
     customer_support_interactions: int = Field(..., ge=0)
-    satisfaction_score: int = Field(..., ge=1, le=5, description="Satisfaction must be 1 to 5")
+    satisfaction_score: int = Field(..., ge=1, le=10, description="Satisfaction must be 1 to 10")
     discount_used: bool
 
     @field_validator("income_level")
@@ -234,13 +234,13 @@ class CustomerValidationSchema(BaseModel):
     @field_validator("device_type")
     @classmethod
     def validate_device(cls, v: str) -> str:
-        if v not in ["Mobile", "Smart TV", "Desktop", "Tablet"]:
-            raise ValueError("Device type must be 'Mobile', 'Smart TV', 'Desktop', or 'Tablet'")
+        if v not in ["Android", "iOS", "Web"]:
+            raise ValueError("Device type must be 'Android', 'iOS', or 'Web'")
         return v
 
     @field_validator("payment_mode")
     @classmethod
     def validate_payment(cls, v: str) -> str:
-        if v not in ["Credit Card", "UPI", "Debit Card", "Net Banking"]:
-            raise ValueError("Payment mode must be 'Credit Card', 'UPI', 'Debit Card', or 'Net Banking'")
+        if v not in ["Credit Card", "UPI", "Debit Card", "Wallet"]:
+            raise ValueError("Payment mode must be 'Credit Card', 'UPI', 'Debit Card', or 'Wallet'")
         return v

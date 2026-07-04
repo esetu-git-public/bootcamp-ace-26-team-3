@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 
 const API_BASE_URL = 'http://localhost:8000/api/v1';
 
-function AnalyticsDashboard() {
+function AnalyticsDashboard({ onViewChange, onLogout }) {
   const [kpis, setKpis] = useState(null);
   const [riskDistribution, setRiskDistribution] = useState([]);
   const [incomeData, setIncomeData] = useState([]);
@@ -25,7 +25,7 @@ function AnalyticsDashboard() {
       fetch(`${API_BASE_URL}/customers?page=1&limit=6`, { headers }),
     ])
       .then(async (responses) => {
-        const [kpisRes, riskRes, incomeRes, deviceRes, segmentRes, customersRes] = responses;
+        const [kpisRes, riskRes, incomeRes, deviceRes, customersRes] = responses;
         const kpisData = await kpisRes.json();
         const riskData = await riskRes.json();
         const incomeDataResult = await incomeRes.json();
@@ -46,7 +46,7 @@ function AnalyticsDashboard() {
       })
       .catch((err) => setError(err.message || 'Unable to load analytics data.'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [onLogout]);
 
   const totalRisk = useMemo(() => {
     if (!riskDistribution.length) return 0;
@@ -78,9 +78,8 @@ function AnalyticsDashboard() {
           <p style={styles.subtitle}>Monitor churn risk, segment performance, and customer exposure across the subscription base.</p>
         </div>
         <div style={styles.headerCard}>
-          <span style={styles.headerCardLabel}>Tracked customers</span>
-          <strong style={styles.headerCardValue}>{kpis?.total_customers?.toLocaleString() || '0'}</strong>
-          <span style={styles.headerCardMeta}>{kpis?.predicted_churn_customers || 0} predicted churn</span>
+          <strong>{kpis?.total_customers?.toLocaleString() || '0'}</strong>
+          <span>customers monitored</span>
         </div>
       </header>
 
@@ -227,7 +226,7 @@ function MetricCard({ label, value, tone }) {
 const styles = {
   page: { minHeight: '100vh', background: '#07111f', color: '#f7f8fc', padding: '24px', fontFamily: 'Inter, Arial, sans-serif' },
   center: { minHeight: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#07111f', color: '#f7f8fc' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', gap: '24px', flexWrap: 'wrap' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' },
   eyebrow: { textTransform: 'uppercase', letterSpacing: '0.18em', color: '#7dd3fc', fontSize: '0.75rem', margin: 0 },
   title: { margin: '4px 0 8px', fontSize: '2rem' },
   subtitle: { margin: 0, color: '#94a3b8', maxWidth: '620px', lineHeight: 1.7 },

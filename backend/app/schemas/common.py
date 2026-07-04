@@ -136,12 +136,11 @@ class PaginatedCustomersResponse(BaseModel):
 
 
 class PredictionHistoryItem(BaseModel):
-    prediction_id: int
-    churn_probability: float
+    history_id: int
+    risk_score: float
     risk_category: str
-    will_cancel: int
-    recommendation_type: str
-    predicted_at: datetime
+    prediction_result: int
+    evaluated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 

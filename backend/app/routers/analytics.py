@@ -16,8 +16,14 @@ router = APIRouter(prefix="/analytics", tags=["Analytics & Charts"])
 async def get_risk_distribution(db: Session = Depends(get_db), current_user: str = Depends(get_current_user)):
     try:
         query = text("""
-            SELECT risk_category, COUNT(*) AS customer_count, ROUND((COUNT(*) * 100.0) / SUM(COUNT(*)) OVER(), 2) AS percentage
-            FROM v_customer_predictions GROUP BY risk_category;
+            WITH totals AS (
+                SELECT COUNT(*) AS total_count FROM v_customer_predictions
+            )
+            SELECT risk_category,
+                   COUNT(*) AS customer_count,
+                   ROUND((COUNT(*) * 100.0) / totals.total_count, 2) AS percentage
+            FROM v_customer_predictions, totals
+            GROUP BY risk_category;
         """)
         results = db.execute(query).fetchall()
         if not results:
@@ -120,7 +126,14 @@ async def get_churn_by_spend(db: Session = Depends(get_db), current_user: str = 
                         ELSE 'Over $100'
                     END AS spend_bucket
                 FROM v_customer_predictions
-            ) sub GROUP BY spend_bucket ORDER BY MIN(spend_bucket);
+            ) sub
+            GROUP BY spend_bucket
+            ORDER BY CASE spend_bucket
+                WHEN 'Under $20' THEN 1
+                WHEN '$20 - $50' THEN 2
+                WHEN '$51 - $100' THEN 3
+                ELSE 4
+            END;
         """)
         results = db.execute(query).fetchall()
         if not results:
@@ -154,7 +167,14 @@ async def get_churn_by_tenure(db: Session = Depends(get_db), current_user: str =
                         ELSE '12+ Months (Loyal)'
                     END AS tenure_bucket
                 FROM v_customer_predictions
-            ) sub GROUP BY tenure_bucket;
+            ) sub
+            GROUP BY tenure_bucket
+            ORDER BY CASE tenure_bucket
+                WHEN '0-3 Months (New)' THEN 1
+                WHEN '4-6 Months' THEN 2
+                WHEN '7-12 Months' THEN 3
+                ELSE 4
+            END;
         """)
         results = db.execute(query).fetchall()
         if not results:
@@ -215,10 +235,15 @@ async def get_customer_segmentation(db: Session = Depends(get_db), current_user:
                         ELSE 'Standard'
                     END AS segment
                 FROM v_customer_predictions
+            ), total_count AS (
+                SELECT COUNT(*) AS total_count FROM segmented_customers
             )
-            SELECT segment, COUNT(*) AS customer_count, ROUND((COUNT(*) * 100.0) / SUM(COUNT(*)) OVER(), 2) AS percentage,
+            SELECT segment, COUNT(*) AS customer_count,
+                   ROUND((COUNT(*) * 100.0) / total_count.total_count, 2) AS percentage,
                    ROUND(AVG(churn_probability), 2) AS average_churn_risk
-            FROM segmented_customers GROUP BY segment ORDER BY average_churn_risk DESC;
+            FROM segmented_customers, total_count
+            GROUP BY segment
+            ORDER BY average_churn_risk DESC;
         """)
         results = db.execute(query).fetchall()
         if not results:

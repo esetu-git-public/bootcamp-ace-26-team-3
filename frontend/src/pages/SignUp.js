@@ -2,32 +2,42 @@ import React, { useState } from 'react';
 
 const API_BASE_URL = 'http://localhost:8000/api/v1';
 
-export default function Login({ onLoginSuccess, onNavigateToSignup }) {
+export default function SignUp({ onNavigateToLogin }) {
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [fullName, setFullName] = useState('');
   const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!username || !password) {
-      setError('Please enter both username and password.');
+    if (!username || !email || !password) {
+      setError('Please fill in all required fields (Username, Email, and Password).');
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long.');
       return;
     }
 
     setLoading(true);
     setError('');
+    setSuccess('');
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      const response = await fetch(`${API_BASE_URL}/auth/signup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           username,
+          email,
+          full_name: fullName || null,
           password,
         }),
       });
@@ -35,10 +45,13 @@ export default function Login({ onLoginSuccess, onNavigateToSignup }) {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.detail || 'Incorrect username or password');
+        throw new Error(data.detail || 'Registration failed. Please try again.');
       }
 
-      onLoginSuccess(data.access_token);
+      setSuccess('Account created successfully! Redirecting to login...');
+      setTimeout(() => {
+        onNavigateToLogin();
+      }, 2000);
     } catch (err) {
       setError(err.message || 'Connection error. Please try again.');
     } finally {
@@ -57,15 +70,15 @@ export default function Login({ onLoginSuccess, onNavigateToSignup }) {
 
         <div className="login-showcase-content">
           <div className="login-showcase-tag">
-            🎯 AI-Powered Retention Engine
+            📈 Advanced Predictive Analytics
           </div>
           <h1 className="login-showcase-title">
-            Predict Churn. <br />
-            Retain Customers. <br />
-            <span>Grow Lifetime Value.</span>
+            Join Churn <br />
+            Predictor Hub. <br />
+            <span>Empower Decisions.</span>
           </h1>
           <p className="login-showcase-subtitle">
-            Unleash the power of real-time machine learning predictions, analytical insight dashboards, and customized retention playbook generators for subscription managers.
+            Create an administrator account to upload bulk subscription data, run single-profile predictions, export automated retention PDF reports, and view historical churn probability distributions.
           </p>
 
           <div className="login-kpis-grid">
@@ -85,14 +98,14 @@ export default function Login({ onLoginSuccess, onNavigateToSignup }) {
         </div>
       </div>
 
-      {/* Right Login Panel */}
+      {/* Right Registration Panel */}
       <div className="login-right-panel">
         <div className="login-ambient-glow"></div>
         <div className="login-card-wrapper">
           <div className="login-glass-card">
             <div className="login-card-header">
-              <h2 className="login-card-title">Welcome Back</h2>
-              <p className="login-card-subtitle">Sign in to access your manager dashboard</p>
+              <h2 className="login-card-title">Create Account</h2>
+              <p className="login-card-subtitle">Register to manage prediction dashboards</p>
             </div>
 
             {error && (
@@ -106,42 +119,84 @@ export default function Login({ onLoginSuccess, onNavigateToSignup }) {
               </div>
             )}
 
+            {success && (
+              <div className="login-alert-error" style={{ background: 'rgba(16, 185, 129, 0.08)', borderColor: 'rgba(16, 185, 129, 0.2)', color: '#a7f3d0' }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                  <polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+                <span>{success}</span>
+              </div>
+            )}
+
             <form onSubmit={handleSubmit}>
               <div className="login-form-group">
-                <label className="login-form-label" htmlFor="username">Email or Username</label>
+                <label className="login-form-label" htmlFor="username">Username *</label>
                 <div className="login-input-wrapper">
                   <input
                     id="username"
                     type="text"
-                    placeholder="e.g., admin"
+                    placeholder="e.g., manager123"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     className={`login-form-input ${error && !username ? 'input-has-error' : ''}`}
-                    disabled={loading}
+                    disabled={loading || success}
                     autoComplete="username"
                   />
                 </div>
               </div>
 
               <div className="login-form-group">
-                <label className="login-form-label" htmlFor="password">Password</label>
+                <label className="login-form-label" htmlFor="email">Email Address *</label>
+                <div className="login-input-wrapper">
+                  <input
+                    id="email"
+                    type="email"
+                    placeholder="e.g., manager@company.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className={`login-form-input ${error && !email ? 'input-has-error' : ''}`}
+                    disabled={loading || success}
+                    autoComplete="email"
+                  />
+                </div>
+              </div>
+
+              <div className="login-form-group">
+                <label className="login-form-label" htmlFor="fullName">Full Name</label>
+                <div className="login-input-wrapper">
+                  <input
+                    id="fullName"
+                    type="text"
+                    placeholder="e.g., Jane Doe"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className="login-form-input"
+                    disabled={loading || success}
+                    autoComplete="name"
+                  />
+                </div>
+              </div>
+
+              <div className="login-form-group">
+                <label className="login-form-label" htmlFor="password">Password *</label>
                 <div className="login-input-wrapper">
                   <input
                     id="password"
                     type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
+                    placeholder="•••••••• (Min. 6 chars)"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className={`login-form-input ${error && !password ? 'input-has-error' : ''}`}
-                    disabled={loading}
-                    autoComplete="current-password"
+                    disabled={loading || success}
+                    autoComplete="new-password"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="password-toggle-btn"
                     title={showPassword ? "Hide Password" : "Show Password"}
-                    disabled={loading}
+                    disabled={loading || success}
                   >
                     {showPassword ? (
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -158,53 +213,40 @@ export default function Login({ onLoginSuccess, onNavigateToSignup }) {
                 </div>
               </div>
 
-              <div className="login-form-options">
-                <label className="remember-me-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                  />
-                  <span>Remember me</span>
-                </label>
-                <a href="#forgot" className="forgot-password-link" onClick={(e) => e.preventDefault()}>
-                  Forgot password?
-                </a>
-              </div>
-
               <button
                 type="submit"
                 className="login-submit-btn"
-                disabled={loading}
+                disabled={loading || success}
+                style={{ marginTop: '10px' }}
               >
                 {loading ? (
                   <>
                     <span className="login-spinner"></span>
-                    <span>Signing In...</span>
+                    <span>Creating Account...</span>
                   </>
                 ) : (
-                  <span>Sign In</span>
+                  <span>Register</span>
                 )}
               </button>
             </form>
 
             <div className="login-signup-prompt" style={{ marginTop: '20px', textAlign: 'center', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-              Don't have an account?{' '}
+              Already have an account?{' '}
               <a
-                href="#signup"
+                href="#login"
                 onClick={(e) => {
                   e.preventDefault();
-                  if (onNavigateToSignup) onNavigateToSignup();
+                  onNavigateToLogin();
                 }}
                 style={{ color: 'var(--color-accent)', fontWeight: '600', textDecoration: 'none' }}
               >
-                Sign Up
+                Sign In
               </a>
             </div>
 
             <div className="login-card-footer">
-              Credentials issue? Contact your administrator <br />
-              or systems team lead.
+              Registration allows system administrator access. <br />
+              All actions are logged for audit compliance.
             </div>
           </div>
         </div>

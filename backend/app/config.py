@@ -11,7 +11,7 @@ class Settings:
     # Database
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL", 
-        "postgresql://postgres:postgres@localhost:5432/churn_db"
+        "sqlite:///./app.db"
     )
     
     # Security

@@ -67,20 +67,20 @@ async def get_customers(
         params: Dict[str, Any] = {"limit": limit, "offset": offset}
         
         if search_id:
-            query_str += " AND customer_id ILIKE :search_id"
-            params["search_id"] = f"%{search_id}%"
+            query_str += " AND lower(customer_id) LIKE :search_id"
+            params["search_id"] = f"%{search_id.lower()}%"
         if income_levels:
-            query_str += " AND income_level = ANY(:income_levels)"
-            params["income_levels"] = income_levels
+            query_str += " AND income_level IN :income_levels"
+            params["income_levels"] = tuple(income_levels)
         if device_types:
-            query_str += " AND device_type = ANY(:device_types)"
-            params["device_types"] = device_types
+            query_str += " AND device_type IN :device_types"
+            params["device_types"] = tuple(device_types)
         if payment_modes:
-            query_str += " AND payment_mode = ANY(:payment_modes)"
-            params["payment_modes"] = payment_modes
+            query_str += " AND payment_mode IN :payment_modes"
+            params["payment_modes"] = tuple(payment_modes)
         if risk_categories:
-            query_str += " AND risk_category = ANY(:risk_categories)"
-            params["risk_categories"] = risk_categories
+            query_str += " AND risk_category IN :risk_categories"
+            params["risk_categories"] = tuple(risk_categories)
         if will_cancel is not None:
             query_str += " AND will_cancel = :will_cancel"
             params["will_cancel"] = will_cancel

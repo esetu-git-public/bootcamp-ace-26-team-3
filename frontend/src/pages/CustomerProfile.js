@@ -1,7 +1,7 @@
 // frontend/src/pages/CustomerProfile.js
 import React, { useState, useEffect } from 'react';
 
-export default function CustomerProfile() {
+export default function CustomerProfile({ onViewChange, onLogout }) {
   const [customerId, setCustomerId] = useState('C10239'); // Default ID to start with
   const [searchId, setSearchId] = useState('C10239');
   const [customer, setCustomer] = useState(null);
@@ -19,7 +19,13 @@ export default function CustomerProfile() {
     setError(null);
     setPrediction(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/customers/${id}`);
+      const token = localStorage.getItem('access_token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const response = await fetch(`${API_BASE_URL}/customers/${id}`, { headers });
+      if (response.status === 401) {
+        onLogout();
+        return;
+      }
       if (!response.ok) {
         throw new Error('Customer not found in the database.');
       }
@@ -39,9 +45,19 @@ export default function CustomerProfile() {
     if (!customer) return;
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/predict/${customerId}`, {
+      const token = localStorage.getItem('access_token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const response = await fetch(`${API_BASE_URL}/predictions/single/${customerId}`, {
         method: 'POST',
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json'
+        }
       });
+      if (response.status === 401) {
+        onLogout();
+        return;
+      }
       const data = await response.json();
       setPrediction(data);
       // Refresh history after running a new prediction
@@ -56,9 +72,15 @@ export default function CustomerProfile() {
   // 3. Fetch past Prediction History
   const fetchPredictionHistory = async (id) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/predictions/history/${id}`);
+      const token = localStorage.getItem('access_token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const response = await fetch(`${API_BASE_URL}/customers/${id}/history`, { headers });
+      if (response.status === 401) {
+        onLogout();
+        return;
+      }
       const data = await response.json();
-      setHistory(data.history || []);
+      setHistory(data || []);
     } catch (err) {
       console.error('Failed to load prediction history', err);
     }
@@ -75,7 +97,15 @@ export default function CustomerProfile() {
 
   return (
     <div style={styles.container}>
-      <h1 style={styles.title}>Customer Profile & Churn Insights</h1>
+      <header style={styles.header}>
+        <div>
+          <h1 style={styles.title}>Customer Profile & Churn Insights</h1>
+        </div>
+        <div style={styles.navContainer}>
+          <button onClick={() => onViewChange('dashboard')} style={styles.navBtn}>Executive Dashboard</button>
+          <button onClick={onLogout} style={styles.logoutBtn}>Sign Out</button>
+        </div>
+      </header>
 
       {/* Search Bar */}
       <form onSubmit={handleSearchSubmit} style={styles.searchForm}>
@@ -201,7 +231,11 @@ export default function CustomerProfile() {
 // Simple Inline CSS Object to styled component layout automatically
 const styles = {
   container: { padding: '24px', fontFamily: 'Arial, sans-serif', maxWidth: '1200px', margin: '0 auto', backgroundColor: '#f9f9f9', minHeight: '100vh' },
-  title: { fontSize: '2rem', fontWeight: 'bold', color: '#333', marginBottom: '20px' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid #ccc', paddingBottom: '16px' },
+  navContainer: { display: 'flex', alignItems: 'center', gap: '12px' },
+  navBtn: { background: '#007bff', border: 'none', borderRadius: '4px', padding: '10px 16px', color: '#fff', fontWeight: 'bold', cursor: 'pointer' },
+  logoutBtn: { background: '#dc3545', border: 'none', borderRadius: '4px', padding: '10px 16px', color: '#fff', fontWeight: 'bold', cursor: 'pointer' },
+  title: { fontSize: '2rem', fontWeight: 'bold', color: '#333', marginBottom: '0px' },
   searchForm: { display: 'flex', gap: '10px', marginBottom: '24px' },
   searchInput: { padding: '10px', fontSize: '1rem', border: '1px solid #ccc', borderRadius: '4px', flex: '1', maxWidth: '300px' },
   searchButton: { padding: '10px 20px', fontSize: '1rem', backgroundColor: '#007bff', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' },

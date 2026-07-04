@@ -1,9 +1,6 @@
 # Subscription Cancellation Prediction System (OTT/SaaS)
 
-Bootcamp by ACE students Team 3. This system combines machine learning with business analytics to proactively identify customers at risk of cancelling their subscriptions.
-Here is the updated and complete **`README.md`** file for your repository. It integrates the setup instructions for both the backend and frontend, details how to run the system, and explains how to add test customer data to verify the output.
-
----
+This system combines machine learning with business analytics to proactively identify customers at risk of cancelling their subscriptions. Built by ACE students (Team 3) during the Bootcamp.
 
 ## Project Structure
 
@@ -94,7 +91,7 @@ Ensure you have downloaded and installed **Node.js (LTS version)** on your compu
 Since the backend operates with an in-memory test database, you must manually save a test customer profile on server startup before searching for them in React.
 
 ### Step 1: Add a Test Customer
-1. Open your browser and navigate to: **[http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)** (FastAPI Swagger UI).
+1. Open your browser and navigate to: **[http://127.0.0.1:8000/api/docs](http://127.0.0.1:8000/api/docs)** (FastAPI Swagger UI).
 2. Click on the green **`POST /api/v1/customers`** endpoint.
 3. Click **"Try it out"** on the right side.
 4. Replace the existing body JSON with the following validated mock payload:

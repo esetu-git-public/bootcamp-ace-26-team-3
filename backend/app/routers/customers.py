@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from datetime import datetime, timedelta
 from ..database import get_db
 from ..schemas import PaginatedCustomersResponse, CustomerProfileResponse, PredictionHistoryItem
@@ -19,11 +19,11 @@ def get_mock_customer_profile(customer_id: str):
         "tenure_months": 8,
         "monthly_total_spend": 79.50,
         "avg_usage_hours_per_week": 14.5,
-        "app_switch_frequency": "Medium",
+        "app_switch_frequency": 15,
         "customer_support_interactions": 3,
         "satisfaction_score": 2,
         "discount_used": False,
-        "device_type": "Smart TV",
+        "device_type": "Android",
         "payment_mode": "UPI",
         "created_at": datetime.utcnow(),
         "churn_probability": 89.00,
@@ -38,7 +38,7 @@ def get_mock_customer_profile(customer_id: str):
             "Age": -0.05
         },
         "recommendation_type": "Offer Discount",
-        "recommendation_desc": "Customer has high spend ($79.50) but poor satisfaction (2/5) and low weekly usage. Recommend calling customer support or offering a 20% discount offer for renewal.",
+        "recommendation_desc": "Customer has high spend ($79.50) but poor satisfaction (2/10) and low weekly usage. Recommend calling customer support or offering a 20% discount offer for renewal.",
         "predicted_at": datetime.utcnow()
     }
 
@@ -64,7 +64,7 @@ async def get_customers(
             FROM v_customer_predictions
             WHERE 1=1
         """
-        params = {"limit": limit, "offset": offset}
+        params: Dict[str, Any] = {"limit": limit, "offset": offset}
         
         if search_id:
             query_str += " AND customer_id ILIKE :search_id"
@@ -122,15 +122,16 @@ async def get_customers(
     except Exception:
         # Fallback Mock paginated list
         mock_data = [
-            {"customer_id": "CUST0001", "age": 34, "income_level": "Medium", "tenure_months": 8, "monthly_total_spend": 79.50, "satisfaction_score": 2, "device_type": "Smart TV", "payment_mode": "UPI", "churn_probability": 89.00, "risk_category": "High", "will_cancel": 1, "recommendation_type": "Offer Discount"},
-            {"customer_id": "CUST0002", "age": 45, "income_level": "Low", "tenure_months": 2, "monthly_total_spend": 35.00, "satisfaction_score": 1, "device_type": "Mobile", "payment_mode": "Digital Wallet", "churn_probability": 84.50, "risk_category": "High", "will_cancel": 1, "recommendation_type": "Provide Free Trial"},
-            {"customer_id": "CUST0003", "age": 22, "income_level": "High", "tenure_months": 15, "monthly_total_spend": 120.00, "satisfaction_score": 4, "device_type": "Desktop", "payment_mode": "Credit Card", "churn_probability": 15.30, "risk_category": "Low", "will_cancel": 0, "recommendation_type": "No Action Required"},
-            {"customer_id": "CUST0004", "age": 58, "income_level": "Medium", "tenure_months": 24, "monthly_total_spend": 55.00, "satisfaction_score": 5, "device_type": "Smart TV", "payment_mode": "Debit Card", "churn_probability": 4.10, "risk_category": "Low", "will_cancel": 0, "recommendation_type": "No Action Required"},
-            {"customer_id": "CUST0005", "age": 29, "income_level": "Low", "tenure_months": 5, "monthly_total_spend": 45.00, "satisfaction_score": 3, "device_type": "Tablet", "payment_mode": "Net Banking", "churn_probability": 52.40, "risk_category": "Medium", "will_cancel": 1, "recommendation_type": "Subscription Upgrade"}
+            {"customer_id": "CUST0001", "age": 34, "income_level": "Medium", "tenure_months": 8, "monthly_total_spend": 79.50, "satisfaction_score": 2, "device_type": "Android", "payment_mode": "UPI", "churn_probability": 89.00, "risk_category": "High", "will_cancel": 1, "recommendation_type": "Offer Discount"},
+            {"customer_id": "CUST0002", "age": 45, "income_level": "Low", "tenure_months": 2, "monthly_total_spend": 35.00, "satisfaction_score": 1, "device_type": "Web", "payment_mode": "Wallet", "churn_probability": 84.50, "risk_category": "High", "will_cancel": 1, "recommendation_type": "Provide Free Trial"},
+            {"customer_id": "CUST0003", "age": 22, "income_level": "High", "tenure_months": 15, "monthly_total_spend": 120.00, "satisfaction_score": 4, "device_type": "iOS", "payment_mode": "Credit Card", "churn_probability": 15.30, "risk_category": "Low", "will_cancel": 0, "recommendation_type": "No Action Required"},
+            {"customer_id": "CUST0004", "age": 58, "income_level": "Medium", "tenure_months": 24, "monthly_total_spend": 55.00, "satisfaction_score": 5, "device_type": "Android", "payment_mode": "Debit Card", "churn_probability": 4.10, "risk_category": "Low", "will_cancel": 0, "recommendation_type": "No Action Required"},
+            {"customer_id": "CUST0005", "age": 29, "income_level": "Low", "tenure_months": 5, "monthly_total_spend": 45.00, "satisfaction_score": 3, "device_type": "iOS", "payment_mode": "Wallet", "churn_probability": 52.40, "risk_category": "Medium", "will_cancel": 1, "recommendation_type": "Subscription Upgrade"}
         ]
         # Filter if search provided in mock
         if search_id:
-            mock_data = [x for x in mock_data if search_id.upper() in x["customer_id"].upper()]
+            search_str = str(search_id).upper()
+            mock_data = [x for x in mock_data if search_str in str(x["customer_id"]).upper()]
         return {
             "total": len(mock_data),
             "page": page,

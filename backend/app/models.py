@@ -13,7 +13,7 @@ class Customer(Base):
     tenure_months = Column(Integer, nullable=False)
     monthly_total_spend = Column(Numeric(10, 2), nullable=False)
     avg_usage_hours_per_week = Column(Numeric(5, 2), nullable=False)
-    app_switch_frequency = Column(String(10), nullable=False)
+    app_switch_frequency = Column(Integer, nullable=False)
     customer_support_interactions = Column(Integer, nullable=False, default=0)
     satisfaction_score = Column(Integer, nullable=False)
     discount_used = Column(Boolean, nullable=False, default=False)

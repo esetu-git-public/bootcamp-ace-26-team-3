@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 
 const API_BASE_URL = 'http://localhost:8000/api/v1';
 
-function AnalyticsDashboard() {
+function AnalyticsDashboard({ onViewChange, onLogout }) {
   const [kpis, setKpis] = useState(null);
   const [riskDistribution, setRiskDistribution] = useState([]);
   const [incomeData, setIncomeData] = useState([]);
@@ -23,6 +23,10 @@ function AnalyticsDashboard() {
       fetch(`${API_BASE_URL}/customers?page=1&limit=6`, { headers }),
     ])
       .then(async (responses) => {
+        if (responses.some(r => r.status === 401)) {
+          onLogout();
+          throw new Error('Session expired. Redirecting to login...');
+        }
         const [kpisRes, riskRes, incomeRes, deviceRes, customersRes] = responses;
         const kpisData = await kpisRes.json();
         const riskData = await riskRes.json();
@@ -42,7 +46,7 @@ function AnalyticsDashboard() {
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [onLogout]);
 
   const totalRisk = useMemo(() => {
     if (!riskDistribution.length) return 0;
@@ -64,9 +68,13 @@ function AnalyticsDashboard() {
           <p style={styles.eyebrow}>Subscription Churn Intelligence</p>
           <h1 style={styles.title}>Executive analytics dashboard</h1>
         </div>
-        <div style={styles.headerCard}>
-          <strong>{kpis?.total_customers?.toLocaleString() || '0'}</strong>
-          <span>customers monitored</span>
+        <div style={styles.navContainer}>
+          <button onClick={() => onViewChange('profile')} style={styles.navBtn}>Search & Profiles</button>
+          <button onClick={onLogout} style={styles.logoutBtn}>Sign Out</button>
+          <div style={styles.headerCard}>
+            <strong>{kpis?.total_customers?.toLocaleString() || '0'}</strong>
+            <span>customers monitored</span>
+          </div>
         </div>
       </header>
 
@@ -180,6 +188,9 @@ const styles = {
   page: { minHeight: '100vh', background: '#07111f', color: '#f7f8fc', padding: '24px', fontFamily: 'Inter, Arial, sans-serif' },
   center: { minHeight: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#07111f', color: '#f7f8fc' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' },
+  navContainer: { display: 'flex', alignItems: 'center', gap: '12px' },
+  navBtn: { background: '#2563eb', border: 'none', borderRadius: '8px', padding: '10px 16px', color: '#fff', fontWeight: '600', cursor: 'pointer', transition: 'background-color 0.2s' },
+  logoutBtn: { background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '8px', padding: '10px 16px', color: '#fca5a5', fontWeight: '600', cursor: 'pointer', transition: 'background 0.2s' },
   eyebrow: { textTransform: 'uppercase', letterSpacing: '0.18em', color: '#7dd3fc', fontSize: '0.75rem', margin: 0 },
   title: { margin: '4px 0 0', fontSize: '2rem' },
   headerCard: { background: 'rgba(17,24,39,0.8)', border: '1px solid rgba(255,255,255,0.08)', padding: '14px 18px', borderRadius: '12px', display: 'flex', flexDirection: 'column', minWidth: '180px' },

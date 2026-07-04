@@ -11,6 +11,12 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
   const [customerRows, setCustomerRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [bulkFile, setBulkFile] = useState(null);
+  const [bulkUploading, setBulkUploading] = useState(false);
+  const [bulkError, setBulkError] = useState('');
+  const [bulkJob, setBulkJob] = useState(null);
+  const [bulkPreview, setBulkPreview] = useState([]);
+  const backendOrigin = API_BASE_URL.replace('/api/v1', '');
 
   useEffect(() => {
     const token = localStorage.getItem('access_token');
@@ -25,7 +31,7 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
       fetch(`${API_BASE_URL}/customers?page=1&limit=6`, { headers }),
     ])
       .then(async (responses) => {
-        const [kpisRes, riskRes, incomeRes, deviceRes, customersRes] = responses;
+        const [kpisRes, riskRes, incomeRes, deviceRes, segmentRes, customersRes] = responses;
         const kpisData = await kpisRes.json();
         const riskData = await riskRes.json();
         const incomeDataResult = await incomeRes.json();
@@ -48,18 +54,89 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
       .finally(() => setLoading(false));
   }, [onLogout]);
 
+  useEffect(() => {
+    if (!bulkJob?.job_id || ['COMPLETED', 'FAILED'].includes(bulkJob.status)) {
+      return undefined;
+    }
+
+    const token = localStorage.getItem('access_token');
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const timer = window.setInterval(async () => {
+      try {
+        const statusRes = await fetch(`${API_BASE_URL}/predictions/bulk/status/${bulkJob.job_id}`, { headers });
+        const statusData = await statusRes.json();
+
+        if (statusRes.ok) {
+          setBulkJob(statusData);
+          if (statusData.status === 'COMPLETED') {
+            const previewRes = await fetch(`${API_BASE_URL}/predictions/bulk/preview/${bulkJob.job_id}`, { headers });
+            if (previewRes.ok) {
+              setBulkPreview(await previewRes.json());
+            }
+          }
+        }
+      } catch (err) {
+        setBulkError('Unable to refresh bulk prediction progress right now.');
+      }
+    }, 2000);
+
+    return () => window.clearInterval(timer);
+  }, [bulkJob?.job_id, bulkJob?.status]);
+
   const totalRisk = useMemo(() => {
     if (!riskDistribution.length) return 0;
     return riskDistribution.reduce((sum, item) => sum + item.customer_count, 0);
   }, [riskDistribution]);
 
+  const progressPercent = useMemo(() => {
+    if (!bulkJob?.total_records || !bulkJob?.processed_records) return 0;
+    return Math.min(100, Math.round((bulkJob.processed_records / bulkJob.total_records) * 100));
+  }, [bulkJob]);
+
   const topSegment = useMemo(() => {
     if (!segmentData.length) return null;
-    return segmentData.reduce((best, current) => {
-      if (!best || current.customer_count > best.customer_count) return current;
+    return segmentData.reduce((best, item) => {
+      if (!best || item.percentage > best.percentage) return item;
       return best;
     }, null);
   }, [segmentData]);
+
+  const handleBulkUpload = async (event) => {
+    event.preventDefault();
+    if (!bulkFile) {
+      setBulkError('Please select a CSV file before uploading.');
+      return;
+    }
+
+    setBulkError('');
+    setBulkUploading(true);
+
+    try {
+      const token = localStorage.getItem('access_token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const formData = new FormData();
+      formData.append('file', bulkFile);
+
+      const response = await fetch(`${API_BASE_URL}/predictions/bulk`, {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Bulk upload failed.');
+      }
+
+      const result = await response.json();
+      setBulkJob(result);
+      setBulkPreview([]);
+    } catch (uploadError) {
+      setBulkError(uploadError.message || 'Unable to upload bulk predictions.');
+    } finally {
+      setBulkUploading(false);
+    }
+  };
 
   if (loading) {
     return <div style={styles.center}>Loading analytics dashboard…</div>;
@@ -82,6 +159,70 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
           <span>customers monitored</span>
         </div>
       </header>
+
+      <section style={styles.card}>
+        <div style={styles.sectionHeader}>
+          <div>
+            <h3 style={styles.cardTitle}>Bulk prediction studio</h3>
+            <p style={styles.helperText}>Upload a CSV of customer records to queue asynchronous churn scoring and inspect a preview of results.</p>
+          </div>
+        </div>
+        <form onSubmit={handleBulkUpload} style={styles.uploadRow}>
+          <input
+            type="file"
+            accept=".csv"
+            onChange={(event) => setBulkFile(event.target.files?.[0] || null)}
+            style={styles.uploadInput}
+          />
+          <button type="submit" disabled={bulkUploading} style={styles.primaryButton}>
+            {bulkUploading ? 'Uploading…' : 'Run bulk prediction'}
+          </button>
+        </form>
+        <p style={styles.helperText}>Expected columns include customer_id, age, income_level, device_type, payment_mode, number_of_subscriptions, tenure_months, monthly_total_spend, avg_usage_hours_per_week, app_switch_frequency, customer_support_interactions, satisfaction_score, and discount_used.</p>
+        {bulkError ? <p style={styles.errorText}>{bulkError}</p> : null}
+        {bulkJob ? (
+          <div style={styles.jobPanel}>
+            <div style={styles.jobHeader}>
+              <div>
+                <strong>Job {bulkJob.job_id}</strong>
+                <p style={styles.helperText}>Status: {bulkJob.status}</p>
+              </div>
+              {bulkJob.download_url ? (
+                <a href={`${backendOrigin}${bulkJob.download_url}`} target="_blank" rel="noreferrer" style={styles.link}>Download CSV</a>
+              ) : null}
+            </div>
+            <div style={styles.progressTrack}>
+              <div style={{ ...styles.progressFill, width: `${progressPercent}%` }} />
+            </div>
+            <p style={styles.helperText}>{bulkJob.processed_records || 0} of {bulkJob.total_records || 0} records processed</p>
+            {bulkJob.error_message ? <p style={styles.errorText}>{bulkJob.error_message}</p> : null}
+            {bulkPreview.length ? (
+              <div style={styles.tableWrap}>
+                <table style={styles.table}>
+                  <thead>
+                    <tr>
+                      <th style={styles.th}>Customer</th>
+                      <th style={styles.th}>Risk</th>
+                      <th style={styles.th}>Probability</th>
+                      <th style={styles.th}>Recommendation</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bulkPreview.map((row) => (
+                      <tr key={row.customer_id}>
+                        <td style={styles.td}>{row.customer_id}</td>
+                        <td style={styles.td}>{row.risk_category}</td>
+                        <td style={styles.td}>{row.churn_probability.toFixed(1)}%</td>
+                        <td style={styles.td}>{row.recommendation_type}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </section>
 
       <section style={styles.grid}>
         <div style={styles.card}>
@@ -237,6 +378,16 @@ const styles = {
   grid: { display: 'grid', gap: '16px', gridTemplateColumns: '2fr 1fr', marginBottom: '16px' },
   card: { background: 'rgba(17,24,39,0.8)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '18px', boxShadow: '0 12px 34px rgba(0,0,0,0.25)' },
   cardTitle: { marginTop: 0, marginBottom: '12px' },
+  sectionHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' },
+  uploadRow: { display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '8px' },
+  uploadInput: { flex: 1, minWidth: '260px', color: '#f7f8fc' },
+  primaryButton: { background: '#10b981', color: '#07111f', border: 'none', borderRadius: '999px', padding: '10px 16px', fontWeight: 700, cursor: 'pointer' },
+  errorText: { color: '#fca5a5', marginTop: '8px' },
+  jobPanel: { marginTop: '14px', padding: '14px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' },
+  jobHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '8px' },
+  progressTrack: { height: '8px', width: '100%', background: 'rgba(255,255,255,0.08)', borderRadius: '999px', overflow: 'hidden', marginBottom: '6px' },
+  progressFill: { height: '100%', background: 'linear-gradient(90deg, #10b981, #22d3ee)', borderRadius: '999px' },
+  link: { color: '#7dd3fc', textDecoration: 'none' },
   metricGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' },
   metricCard: { border: '1px solid', borderRadius: '12px', padding: '14px', background: 'rgba(255,255,255,0.03)' },
   metricLabel: { display: 'block', color: '#cbd5e1', fontSize: '0.9rem', marginBottom: '6px' },

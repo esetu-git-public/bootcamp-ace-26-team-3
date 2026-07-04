@@ -1,1 +1,1 @@
-python-interpreter-path = ".venv/Scripts/python.exe"
+python-interpreter-path = "backend/venv/Scripts/python.exe"

@@ -16,9 +16,15 @@ bootcamp-ace-26-team-3/
 ├── backend/                  # FastAPI backend and routers
 │   └── app/
 │       ├── main.py           # Application entrypoint
+│       ├── database.py       # SQLAlchemy engine and session setup
+│       ├── models/           # SQLAlchemy database models package
+│       │   ├── __init__.py   # Consolidated Customer, ChurnPrediction, ModelMetric models
+│       │   └── user.py       # User database model
 │       ├── routers/          # Analytics, auth, customer, dashboard, prediction, and report APIs
-│       ├── schemas.py        # API response/request models
-│       └── database.py       # SQLAlchemy engine and session setup
+│       └── schemas/          # Pydantic response/request validation schemas package
+│           ├── __init__.py
+│           ├── common.py
+│           └── user.py
 ├── frontend/                 # React frontend
 │   └── src/
 │       ├── App.js            # App wrapper

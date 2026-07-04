@@ -13,6 +13,7 @@ from ..schemas import (
     SinglePredictionResponse, BulkPredictionUploadResponse, 
     BulkPredictionStatusResponse
 )
+from ..core.risk_score import build_risk_profile
 from .auth import get_current_user
 
 router = APIRouter(prefix="/predictions", tags=["ML Predictions"])
@@ -85,35 +86,20 @@ async def predict_single(
             usage = 14.5
             monthly_spend = 79.50
 
-        # Implement a deterministic mock rule-based classifier model
-        # Pushes probability up: support interactions, high spend
-        # Pulls probability down: high satisfaction, high usage
-        score = 30.0 + (support_interactions * 15.0) - (satisfaction * 10.0) + (monthly_spend * 0.20) - (usage * 0.8)
-        score = max(0.0, min(100.0, score))  # Clip between 0 and 100
-        
-        # Categorize risk
-        if score >= 70.0:
-            risk = "High"
-            will_cancel = 1
-            rec_type = "Offer Discount"
-            rec_desc = "Apply 20% discount on renewal to mitigate high interaction friction."
-        elif score >= 30.0:
-            risk = "Medium"
-            will_cancel = 1
-            rec_type = "Subscription Upgrade"
-            rec_desc = "Provide subscription upgrade incentive for premium benefits."
-        else:
-            risk = "Low"
-            will_cancel = 0
-            rec_type = "No Action Required"
-            rec_desc = "Customer behavior shows stable engagement."
+        # Use centralized rule-based risk profiling logic
+        profile = build_risk_profile(
+            customer_support_interactions=support_interactions,
+            satisfaction_score=satisfaction,
+            monthly_total_spend=monthly_spend,
+            avg_usage_hours_per_week=usage,
+        )
 
-        explainability = {
-            "Customer_Support_Interactions": round(support_interactions * 0.1, 2),
-            "Satisfaction_Score": round((6 - satisfaction) * 0.1, 2),
-            "Avg_Usage_Hours_Per_Week": round(-usage * 0.02, 2),
-            "Monthly_Total_Spend": round(monthly_spend * 0.002, 2)
-        }
+        score = profile["risk_score"]
+        risk = profile["risk_category"]
+        will_cancel = profile["will_cancel"]
+        rec_type = profile["recommendation_type"]
+        rec_desc = profile["recommendation_desc"]
+        explainability = profile["explainability_json"]
 
         # Save to database if customer is database-backed
         if customer:

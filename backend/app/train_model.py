@@ -1,9 +1,13 @@
 import os
+import sys
 import json
 import pandas as pd
 from catboost import CatBoostClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix
+
+# Add backend directory to sys.path to enable imports of app modules
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # 1. Define paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -99,3 +103,29 @@ print(f"Model saved to: {MODEL_SAVE_PATH}")
 with open(METRICS_SAVE_PATH, "w") as f:
     json.dump(metrics, f, indent=2)
 print(f"Metrics saved to: {METRICS_SAVE_PATH}")
+
+# Save metrics to database
+print("Saving model evaluation metrics to database...")
+try:
+    from app.database import SessionLocal
+    from app.models import ModelMetric
+
+    db = SessionLocal()
+    db_metric = ModelMetric(
+        model_version=metrics["model_version"],
+        accuracy=metrics["accuracy"],
+        precision=metrics["precision"],
+        recall=metrics["recall"],
+        f1_score=metrics["f1_score"],
+        roc_auc=metrics["roc_auc"],
+        confusion_matrix=metrics["confusion_matrix"],
+        feature_importance=metrics["feature_importance"]
+    )
+    db.add(db_metric)
+    db.commit()
+    print("Successfully saved model evaluation metrics to database.")
+except Exception as e:
+    print(f"Failed to save metrics to database: {e}")
+finally:
+    if 'db' in locals():
+        db.close()

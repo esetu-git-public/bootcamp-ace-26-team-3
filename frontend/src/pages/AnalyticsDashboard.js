@@ -7,6 +7,7 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
   const [riskDistribution, setRiskDistribution] = useState([]);
   const [incomeData, setIncomeData] = useState([]);
   const [deviceData, setDeviceData] = useState([]);
+  const [segmentData, setSegmentData] = useState([]);
   const [customerRows, setCustomerRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -26,21 +27,19 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
       fetch(`${API_BASE_URL}/analytics/churn-risk-distribution`, { headers }),
       fetch(`${API_BASE_URL}/analytics/churn-by-income`, { headers }),
       fetch(`${API_BASE_URL}/analytics/churn-by-device`, { headers }),
+      fetch(`${API_BASE_URL}/analytics/customer-segmentation`, { headers }),
       fetch(`${API_BASE_URL}/customers?page=1&limit=6`, { headers }),
     ])
       .then(async (responses) => {
-        if (responses.some(r => r.status === 401)) {
-          onLogout();
-          throw new Error('Session expired. Redirecting to login...');
-        }
-        const [kpisRes, riskRes, incomeRes, deviceRes, customersRes] = responses;
+        const [kpisRes, riskRes, incomeRes, deviceRes, segmentRes, customersRes] = responses;
         const kpisData = await kpisRes.json();
         const riskData = await riskRes.json();
         const incomeDataResult = await incomeRes.json();
         const deviceDataResult = await deviceRes.json();
+        const segmentDataResult = await segmentRes.json();
         const customersData = await customersRes.json();
 
-        if (!kpisRes.ok || !riskRes.ok || !incomeRes.ok || !deviceRes.ok || !customersRes.ok) {
+        if (!kpisRes.ok || !riskRes.ok || !incomeRes.ok || !deviceRes.ok || !segmentRes.ok || !customersRes.ok) {
           throw new Error('Unable to load analytics data right now.');
         }
 
@@ -48,9 +47,10 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
         setRiskDistribution(riskData);
         setIncomeData(incomeDataResult);
         setDeviceData(deviceDataResult);
+        setSegmentData(segmentDataResult);
         setCustomerRows(customersData.results || []);
       })
-      .catch((err) => setError(err.message))
+      .catch((err) => setError(err.message || 'Unable to load analytics data.'))
       .finally(() => setLoading(false));
   }, [onLogout]);
 
@@ -88,41 +88,51 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
     return riskDistribution.reduce((sum, item) => sum + item.customer_count, 0);
   }, [riskDistribution]);
 
-  const progressPercent = bulkJob?.total_records
-    ? Math.min(100, Math.round(((bulkJob.processed_records || 0) / Math.max(1, bulkJob.total_records)) * 100))
-    : 0;
+  const progressPercent = useMemo(() => {
+    if (!bulkJob?.total_records || !bulkJob?.processed_records) return 0;
+    return Math.min(100, Math.round((bulkJob.processed_records / bulkJob.total_records) * 100));
+  }, [bulkJob]);
+
+  const topSegment = useMemo(() => {
+    if (!segmentData.length) return null;
+    return segmentData.reduce((best, item) => {
+      if (!best || item.percentage > best.percentage) return item;
+      return best;
+    }, null);
+  }, [segmentData]);
 
   const handleBulkUpload = async (event) => {
     event.preventDefault();
     if (!bulkFile) {
-      setBulkError('Choose a CSV file to begin a bulk prediction run.');
+      setBulkError('Please select a CSV file before uploading.');
       return;
     }
 
-    setBulkUploading(true);
     setBulkError('');
-
-    const token = localStorage.getItem('access_token');
-    const headers = token ? { Authorization: `Bearer ${token}` } : {};
-    const formData = new FormData();
-    formData.append('file', bulkFile);
+    setBulkUploading(true);
 
     try {
+      const token = localStorage.getItem('access_token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const formData = new FormData();
+      formData.append('file', bulkFile);
+
       const response = await fetch(`${API_BASE_URL}/predictions/bulk`, {
         method: 'POST',
         headers,
         body: formData,
       });
-      const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.detail || 'Bulk prediction upload failed.');
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Bulk upload failed.');
       }
 
-      setBulkJob(data);
+      const result = await response.json();
+      setBulkJob(result);
       setBulkPreview([]);
-    } catch (err) {
-      setBulkError(err.message || 'Bulk prediction upload failed.');
+    } catch (uploadError) {
+      setBulkError(uploadError.message || 'Unable to upload bulk predictions.');
     } finally {
       setBulkUploading(false);
     }
@@ -142,14 +152,11 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
         <div>
           <p style={styles.eyebrow}>Subscription Churn Intelligence</p>
           <h1 style={styles.title}>Executive analytics dashboard</h1>
+          <p style={styles.subtitle}>Monitor churn risk, segment performance, and customer exposure across the subscription base.</p>
         </div>
-        <div style={styles.navContainer}>
-          <button onClick={() => onViewChange('profile')} style={styles.navBtn}>Search & Profiles</button>
-          <button onClick={onLogout} style={styles.logoutBtn}>Sign Out</button>
-          <div style={styles.headerCard}>
-            <strong>{kpis?.total_customers?.toLocaleString() || '0'}</strong>
-            <span>customers monitored</span>
-          </div>
+        <div style={styles.headerCard}>
+          <strong>{kpis?.total_customers?.toLocaleString() || '0'}</strong>
+          <span>customers monitored</span>
         </div>
       </header>
 
@@ -234,16 +241,52 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
         </div>
 
         <div style={styles.card}>
+          <h3 style={styles.cardTitle}>Top customer segment</h3>
+          {topSegment ? (
+            <div style={styles.segmentPanel}>
+              <span style={styles.segmentName}>{topSegment.segment}</span>
+              <p style={styles.segmentDetail}>{topSegment.customer_count.toLocaleString()} customers • {topSegment.percentage}% of base</p>
+              <div style={styles.segmentBarTrack}>
+                <div style={{ ...styles.segmentBarFill, width: `${Math.min(topSegment.percentage, 100)}%` }} />
+              </div>
+              <div style={styles.segmentMeta}>Average churn risk: {topSegment.average_churn_risk}%</div>
+            </div>
+          ) : (
+            <p style={styles.helperText}>Segmentation data is unavailable.</p>
+          )}
+        </div>
+      </section>
+
+      <section style={styles.grid}>
+        <div style={styles.card}>
           <h3 style={styles.cardTitle}>Risk distribution</h3>
           <div style={styles.listGroup}>
             {riskDistribution.map((item) => (
-              <div key={item.risk_category} style={styles.listRow}>
-                <span>{item.risk_category}</span>
-                <strong>{item.customer_count}</strong>
+              <div key={item.risk_category} style={styles.riskRow}>
+                <div>
+                  <strong>{item.risk_category}</strong>
+                  <div style={styles.smallText}>{item.percentage}% of customers</div>
+                </div>
+                <div style={styles.riskCount}>{item.customer_count.toLocaleString()}</div>
               </div>
             ))}
           </div>
-          <p style={styles.helperText}>Across {totalRisk} customers in the active view</p>
+          <p style={styles.helperText}>Total customers represented: {totalRisk.toLocaleString()}</p>
+        </div>
+
+        <div style={styles.card}>
+          <h3 style={styles.cardTitle}>Customer segments</h3>
+          <div style={styles.listGroup}>
+            {segmentData.map((segment) => (
+              <div key={segment.segment} style={styles.segmentRow}>
+                <div>
+                  <strong>{segment.segment}</strong>
+                  <div style={styles.smallText}>{segment.customer_count.toLocaleString()} customers</div>
+                </div>
+                <div style={styles.segmentValue}>{segment.percentage}%</div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -252,31 +295,27 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
           <h3 style={styles.cardTitle}>Income vs churn</h3>
           {incomeData.map((item) => (
             <div key={item.income_level} style={styles.barRow}>
-              <div style={{ flex: 1 }}>
-                <div style={styles.barLabelRow}>
-                  <span>{item.income_level}</span>
-                  <span>{item.churn_rate}%</span>
-                </div>
-                <div style={styles.barTrack}>
-                  <div style={{ ...styles.barFill, width: `${Math.min(item.churn_rate * 2.2, 100)}%` }} />
-                </div>
+              <div style={styles.barHeader}>
+                <span>{item.income_level}</span>
+                <strong>{item.churn_rate}%</strong>
+              </div>
+              <div style={styles.barTrack}>
+                <div style={{ ...styles.barFill, width: `${Math.min(item.churn_rate * 2.2, 100)}%` }} />
               </div>
             </div>
           ))}
         </div>
 
         <div style={styles.card}>
-          <h3 style={styles.cardTitle}>Device split</h3>
+          <h3 style={styles.cardTitle}>Device churn rate</h3>
           {deviceData.map((item) => (
             <div key={item.device_type} style={styles.barRow}>
-              <div style={{ flex: 1 }}>
-                <div style={styles.barLabelRow}>
-                  <span>{item.device_type}</span>
-                  <span>{item.churn_rate}%</span>
-                </div>
-                <div style={styles.barTrack}>
-                  <div style={{ ...styles.barFill, width: `${Math.min(item.churn_rate * 2.2, 100)}%` }} />
-                </div>
+              <div style={styles.barHeader}>
+                <span>{item.device_type}</span>
+                <strong>{item.churn_rate}%</strong>
+              </div>
+              <div style={styles.barTrack}>
+                <div style={{ ...styles.barFill, width: `${Math.min(item.churn_rate * 2.2, 100)}%` }} />
               </div>
             </div>
           ))}
@@ -293,6 +332,7 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
                 <th style={styles.th}>Risk</th>
                 <th style={styles.th}>Spend</th>
                 <th style={styles.th}>Tenure</th>
+                <th style={styles.th}>Satisfaction</th>
               </tr>
             </thead>
             <tbody>
@@ -302,6 +342,7 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
                   <td style={styles.td}>{row.risk_category || 'Pending'}</td>
                   <td style={styles.td}>${Number(row.monthly_total_spend || 0).toFixed(2)}</td>
                   <td style={styles.td}>{row.tenure_months} months</td>
+                  <td style={styles.td}>{row.satisfaction_score ?? '-'}</td>
                 </tr>
               ))}
             </tbody>
@@ -332,12 +373,13 @@ const styles = {
   page: { minHeight: '100vh', background: '#07111f', color: '#f7f8fc', padding: '24px', fontFamily: 'Inter, Arial, sans-serif' },
   center: { minHeight: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#07111f', color: '#f7f8fc' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' },
-  navContainer: { display: 'flex', alignItems: 'center', gap: '12px' },
-  navBtn: { background: '#2563eb', border: 'none', borderRadius: '8px', padding: '10px 16px', color: '#fff', fontWeight: '600', cursor: 'pointer', transition: 'background-color 0.2s' },
-  logoutBtn: { background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '8px', padding: '10px 16px', color: '#fca5a5', fontWeight: '600', cursor: 'pointer', transition: 'background 0.2s' },
   eyebrow: { textTransform: 'uppercase', letterSpacing: '0.18em', color: '#7dd3fc', fontSize: '0.75rem', margin: 0 },
-  title: { margin: '4px 0 0', fontSize: '2rem' },
-  headerCard: { background: 'rgba(17,24,39,0.8)', border: '1px solid rgba(255,255,255,0.08)', padding: '14px 18px', borderRadius: '12px', display: 'flex', flexDirection: 'column', minWidth: '180px' },
+  title: { margin: '4px 0 8px', fontSize: '2rem' },
+  subtitle: { margin: 0, color: '#94a3b8', maxWidth: '620px', lineHeight: 1.7 },
+  headerCard: { background: 'rgba(17,24,39,0.85)', border: '1px solid rgba(255,255,255,0.08)', padding: '20px', borderRadius: '22px', minWidth: '240px', display: 'flex', flexDirection: 'column', gap: '10px' },
+  headerCardLabel: { color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.14em', fontSize: '0.75rem' },
+  headerCardValue: { fontSize: '2.25rem', lineHeight: 1.05, margin: 0 },
+  headerCardMeta: { color: '#cbd5e1', fontSize: '0.95rem' },
   grid: { display: 'grid', gap: '16px', gridTemplateColumns: '2fr 1fr', marginBottom: '16px' },
   card: { background: 'rgba(17,24,39,0.8)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '18px', boxShadow: '0 12px 34px rgba(0,0,0,0.25)' },
   cardTitle: { marginTop: 0, marginBottom: '12px' },
@@ -357,7 +399,18 @@ const styles = {
   metricValue: { fontSize: '1.2rem' },
   listGroup: { display: 'flex', flexDirection: 'column', gap: '8px' },
   listRow: { display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.08)' },
+  riskRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0', borderBottom: '1px solid rgba(255,255,255,0.08)' },
+  riskCount: { fontWeight: 700, color: '#f8fafc' },
+  smallText: { color: '#94a3b8', fontSize: '0.85rem', marginTop: '4px' },
   helperText: { color: '#94a3b8', fontSize: '0.85rem', marginTop: '8px' },
+  segmentPanel: { display: 'grid', gap: '14px' },
+  segmentName: { color: '#38bdf8', fontSize: '1.1rem', fontWeight: 700 },
+  segmentDetail: { margin: 0, color: '#cbd5e1' },
+  segmentBarTrack: { background: 'rgba(255,255,255,0.08)', height: '12px', borderRadius: '999px', overflow: 'hidden' },
+  segmentBarFill: { height: '100%', background: 'linear-gradient(90deg, #6366f1, #22d3ee)', borderRadius: '999px' },
+  segmentMeta: { color: '#94a3b8', fontSize: '0.9rem' },
+  segmentRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0', borderBottom: '1px solid rgba(255,255,255,0.08)' },
+  segmentValue: { fontWeight: 700, color: '#f7f8fc' },
   barRow: { marginBottom: '10px' },
   barLabelRow: { display: 'flex', justifyContent: 'space-between', marginBottom: '6px', color: '#cbd5e1' },
   barTrack: { height: '8px', width: '100%', background: 'rgba(255,255,255,0.08)', borderRadius: '999px', overflow: 'hidden' },

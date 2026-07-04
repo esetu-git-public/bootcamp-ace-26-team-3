@@ -50,6 +50,14 @@ pip install -r requirements.txt
 pip install -r backend\requirements.txt
 ```
 
+> Note: The React frontend requires Node.js and npm. `npm` is not included in the Python virtual environment.
+> If you see `npm : The term 'npm' is not recognized`, install Node.js from https://nodejs.org, restart PowerShell, and verify with:
+>
+> ```powershell
+> node -v
+> npm -v
+> ```
+
 ### 3. Start the backend
 
 From the repository root, run:

@@ -6,14 +6,14 @@ from datetime import datetime
 from typing import Optional
 import os
 import csv
-from catboost import CatBoostClassifier
-import shap
+import pandas as pd
 from ..database import get_db
 from ..schemas import (
     SinglePredictionResponse, BulkPredictionUploadResponse, 
     BulkPredictionStatusResponse
 )
 from ..core.risk_score import build_risk_profile
+from ..core.model_service import model_service
 from .auth import get_current_user
 
 router = APIRouter(prefix="/predictions", tags=["ML Predictions"])
@@ -31,21 +31,55 @@ RESULTS_DIR = os.path.join(
 )
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
-_model = None
-_shap_explainer = None
+def _normalize_bool(value: Optional[object]) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        return value.strip().lower() in ["true", "yes", "1", "t", "y"]
+    return False
 
-def get_model():
-    global _model, _shap_explainer
-    if _model is None:
-        if os.path.exists(MODEL_PATH):
-            try:
-                m = CatBoostClassifier()
-                m.load_model(MODEL_PATH)
-                _model = m
-                _shap_explainer = shap.TreeExplainer(m)
-            except Exception as e:
-                print(f"Failed to load CatBoost model: {e}")
-    return _model, _shap_explainer
+
+def _build_prediction_input(data: dict) -> pd.DataFrame:
+    input_row = {
+        "Income_Level": data.get("income_level", "Medium"),
+        "Satisfaction_Score": int(data.get("satisfaction_score", 3)),
+        "Discount_Used": _normalize_bool(data.get("discount_used", False)),
+        "Age": int(data.get("age", 35)),
+        "Number_of_Subscriptions": int(data.get("number_of_subscriptions", 1)),
+        "Tenure_Months": int(data.get("tenure_months", 12)),
+        "Monthly_Total_Spend": float(data.get("monthly_total_spend", 75.0)),
+        "Avg_Usage_Hours_Per_Week": float(data.get("avg_usage_hours_per_week", 15.0)),
+        "App_Switch_Frequency": int(data.get("app_switch_frequency", 5)),
+        "Customer_Support_Interactions": int(data.get("customer_support_interactions", 3)),
+        "Device_Type": data.get("device_type", "Mobile"),
+        "Payment_Mode": data.get("payment_mode", "UPI"),
+    }
+    return pd.DataFrame([input_row])
+
+
+def _risk_from_probability(prob: float) -> tuple[str, int, str, str]:
+    if prob >= 0.7:
+        return (
+            "High",
+            1,
+            "Offer Discount",
+            "Apply 20% discount on renewal to mitigate high interaction friction.",
+        )
+    if prob >= 0.3:
+        return (
+            "Medium",
+            1,
+            "Subscription Upgrade",
+            "Provide subscription upgrade incentive for premium benefits.",
+        )
+    return (
+        "Low",
+        0,
+        "No Action Required",
+        "Customer behavior shows stable engagement.",
+    )
 
 # Global dictionary to track bulk job status in-memory for prototype
 BULK_JOBS_DB = {}
@@ -86,20 +120,55 @@ async def predict_single(
             usage = 14.5
             monthly_spend = 79.50
 
-        # Use centralized rule-based risk profiling logic
-        profile = build_risk_profile(
-            customer_support_interactions=support_interactions,
-            satisfaction_score=satisfaction,
-            monthly_total_spend=monthly_spend,
-            avg_usage_hours_per_week=usage,
-        )
+        input_data = {
+            "income_level": customer.income_level if customer else "Medium",
+            "satisfaction_score": customer.satisfaction_score if customer else 2,
+            "discount_used": customer.discount_used if customer else False,
+            "age": customer.age if customer else 35,
+            "number_of_subscriptions": customer.number_of_subscriptions if customer else 1,
+            "tenure_months": customer.tenure_months if customer else 12,
+            "monthly_total_spend": float(customer.monthly_total_spend) if customer else 79.50,
+            "avg_usage_hours_per_week": float(customer.avg_usage_hours_per_week) if customer else 14.5,
+            "app_switch_frequency": customer.app_switch_frequency if customer else 5,
+            "customer_support_interactions": customer.customer_support_interactions if customer else 3,
+            "device_type": customer.device_type if customer else "Mobile",
+            "payment_mode": customer.payment_mode if customer else "UPI",
+        }
 
-        score = profile["risk_score"]
-        risk = profile["risk_category"]
-        will_cancel = profile["will_cancel"]
-        rec_type = profile["recommendation_type"]
-        rec_desc = profile["recommendation_desc"]
-        explainability = profile["explainability_json"]
+        if model_service.is_ready:
+            try:
+                df_input = _build_prediction_input(input_data)
+                output = model_service.predict_and_explain(df_input)
+                score = round(output["probability"] * 100.0, 2)
+                risk, will_cancel, rec_type, rec_desc = _risk_from_probability(score / 100.0)
+                explainability = output["explainability_json"]
+            except Exception as exc:
+                print(f"Model prediction failed, falling back to rule-based predictor: {exc}")
+                profile = build_risk_profile(
+                    customer_support_interactions=support_interactions,
+                    satisfaction_score=satisfaction,
+                    monthly_total_spend=monthly_spend,
+                    avg_usage_hours_per_week=usage,
+                )
+                score = profile["risk_score"]
+                risk = profile["risk_category"]
+                will_cancel = profile["will_cancel"]
+                rec_type = profile["recommendation_type"]
+                rec_desc = profile["recommendation_desc"]
+                explainability = profile["explainability_json"]
+        else:
+            profile = build_risk_profile(
+                customer_support_interactions=support_interactions,
+                satisfaction_score=satisfaction,
+                monthly_total_spend=monthly_spend,
+                avg_usage_hours_per_week=usage,
+            )
+            score = profile["risk_score"]
+            risk = profile["risk_category"]
+            will_cancel = profile["will_cancel"]
+            rec_type = profile["recommendation_type"]
+            rec_desc = profile["recommendation_desc"]
+            explainability = profile["explainability_json"]
 
         # Save to database if customer is database-backed
         if customer:

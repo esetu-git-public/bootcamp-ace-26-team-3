@@ -31,5 +31,4 @@ Thumbs.db
 # Temporary PDF extraction scripts/outputs
 /extract.py
 /extract_pdfs.py
-/Requirements.txt
 /PRODUCT_REQUIREMENTS_DOCUMENT.txt

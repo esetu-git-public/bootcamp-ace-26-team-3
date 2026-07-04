@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, Header, status
 from fastapi.security import OAuth2PasswordBearer
-import jwt
-from jwt import InvalidTokenError
+from jose import jwt
+from jose.exceptions import JWTError
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 from typing import Optional
@@ -51,7 +51,7 @@ async def get_current_user(token: str | None = None, authorization: str | None =
         if username is None:
             raise credentials_exception
         return username
-    except InvalidTokenError:
+    except JWTError:
         raise credentials_exception
 
 @router.post("/login", response_model=TokenResponse)

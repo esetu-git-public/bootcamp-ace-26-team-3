@@ -138,7 +138,7 @@ def process_bulk_predictions_task(job_id: str, file_content: bytes):
                             VALUES 
                             (:customer_id, :age, :income_level, :number_of_subscriptions, :tenure_months, :monthly_total_spend, 
                              :avg_usage_hours_per_week, :app_switch_frequency, :customer_support_interactions, :satisfaction_score, 
-                             :discount_used, :device_type, :payment_mode, NOW())
+                             :discount_used, :device_type, :payment_mode, CURRENT_TIMESTAMP)
                         """)
                         db.execute(insert_cust, {
                             "customer_id": customer_id, "age": age, "income_level": income_level,
@@ -154,7 +154,7 @@ def process_bulk_predictions_task(job_id: str, file_content: bytes):
                     insert_pred = text("""
                         INSERT INTO churn_predictions 
                         (customer_id, churn_probability, risk_category, will_cancel, explainability_json, recommendation_type, recommendation_desc, predicted_at)
-                        VALUES (:cust_id, :prob, :risk, :cancel, :explain, :rec_type, :rec_desc, NOW())
+                        VALUES (:cust_id, :prob, :risk, :cancel, :explain, :rec_type, :rec_desc, CURRENT_TIMESTAMP)
                     """)
                     db.execute(insert_pred, {
                         "cust_id": customer_id,
@@ -246,7 +246,7 @@ async def predict_single(
             insert_query = text("""
                 INSERT INTO churn_predictions 
                 (customer_id, churn_probability, risk_category, will_cancel, explainability_json, recommendation_type, recommendation_desc, predicted_at)
-                VALUES (:cust_id, :prob, :risk, :cancel, :explain, :rec_type, :rec_desc, NOW())
+                VALUES (:cust_id, :prob, :risk, :cancel, :explain, :rec_type, :rec_desc, CURRENT_TIMESTAMP)
             """)
             db.execute(insert_query, {
                 "cust_id": customer_id,
@@ -278,7 +278,7 @@ async def predict_bulk(
     file: UploadFile = File(...),
     current_user: str = Depends(get_current_user)
 ):
-    if not file.filename.endswith('.csv'):
+    if not file.filename or not file.filename.endswith('.csv'):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid file format. Only CSV files are accepted."

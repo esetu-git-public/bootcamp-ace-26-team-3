@@ -2,10 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Optional
+from datetime import datetime, timedelta
 from ..database import get_db
 from ..schemas import PaginatedCustomersResponse, CustomerProfileResponse, PredictionHistoryItem
 from .auth import get_current_user
-from datetime import datetime
 
 router = APIRouter(prefix="/customers", tags=["Customer Management"])
 
@@ -164,7 +164,7 @@ async def get_customer_profile(
             "customer_support_interactions": result.customer_support_interactions,
             "satisfaction_score": result.satisfaction_score,
             "discount_used": result.discount_used,
-            "device_type": r.device_type if hasattr(result, "device_type") else result[11], # SQLite tuple unpack safety
+            "device_type": getattr(result, "device_type", None) or (result[11] if hasattr(result, "__getitem__") else None),
             "payment_mode": result.payment_mode,
             "created_at": result.created_at,
             "churn_probability": float(result.churn_probability or 0.0) if result.churn_probability else None,
@@ -207,4 +207,3 @@ async def get_customer_prediction_history(
             {"prediction_id": 92, "churn_probability": 65.20, "risk_category": "Medium", "will_cancel": 1, "recommendation_type": "Offer Discount", "predicted_at": datetime.utcnow() - timedelta(days=30)},
             {"prediction_id": 71, "churn_probability": 45.00, "risk_category": "Medium", "will_cancel": 0, "recommendation_type": "No Action Required", "predicted_at": datetime.utcnow() - timedelta(days=60)}
         ]
-from datetime import timedelta

@@ -117,10 +117,11 @@ async def predict_single(
 
         # Save to database if customer is database-backed
         if customer:
+            now_time = datetime.utcnow()
             insert_query = text("""
                 INSERT INTO churn_predictions 
                 (customer_id, churn_probability, risk_category, will_cancel, explainability_json, recommendation_type, recommendation_desc, predicted_at)
-                VALUES (:cust_id, :prob, :risk, :cancel, :explain, :rec_type, :rec_desc, NOW())
+                VALUES (:cust_id, :prob, :risk, :cancel, :explain, :rec_type, :rec_desc, :predicted_at)
             """)
             db.execute(insert_query, {
                 "cust_id": customer_id,
@@ -129,7 +130,21 @@ async def predict_single(
                 "cancel": will_cancel,
                 "explain": explainability,
                 "rec_type": rec_type,
-                "rec_desc": rec_desc
+                "rec_desc": rec_desc,
+                "predicted_at": now_time
+            })
+            
+            history_query = text("""
+                INSERT INTO prediction_history 
+                (customer_id, risk_score, risk_category, prediction_result, evaluated_at)
+                VALUES (:cust_id, :risk_score, :risk_cat, :pred_res, :evaluated_at)
+            """)
+            db.execute(history_query, {
+                "cust_id": customer_id,
+                "risk_score": score,
+                "risk_cat": risk,
+                "pred_res": will_cancel,
+                "evaluated_at": now_time
             })
             db.commit()
 

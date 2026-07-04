@@ -24,6 +24,7 @@ class Customer(Base):
 
     # Relationships
     predictions = relationship("ChurnPrediction", back_populates="customer", cascade="all, delete-orphan")
+    history = relationship("PredictionHistory", back_populates="customer", cascade="all, delete-orphan")
 
 class ChurnPrediction(Base):
     __tablename__ = "churn_predictions"
@@ -54,3 +55,16 @@ class ModelMetric(Base):
     confusion_matrix = Column(JSON, nullable=False)
     feature_importance = Column(JSON, nullable=False)
     evaluated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+class PredictionHistory(Base):
+    __tablename__ = "prediction_history"
+
+    history_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    customer_id = Column(String(50), ForeignKey("customers.customer_id", ondelete="CASCADE"), nullable=False)
+    risk_score = Column(Numeric(5, 2), nullable=False)
+    risk_category = Column(String(20), nullable=False)
+    prediction_result = Column(Integer, nullable=False)
+    evaluated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    # Relationships
+    customer = relationship("Customer", back_populates="history")

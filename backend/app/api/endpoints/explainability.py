@@ -11,14 +11,13 @@ from sqlalchemy import text
 import pandas as pd
 from typing import Optional, Dict, List
 
-from ..database import get_db
-from ..core.model_service import model_service
-from ..schemas.common import DashboardKPIsResponse
-from .auth import get_current_user
+from ...database import get_db
+from ...core.model_service import model_service
+from ...schemas.common import DashboardKPIsResponse
 
 # Try to import SHAP visualization utilities
 try:
-    from ..core.shap_visualizer import SHAPVisualizer, InteractiveExplainationGenerator
+    from ...core.shap_visualizer import SHAPVisualizer, InteractiveExplainationGenerator
     SHAP_AVAILABLE = True
 except Exception as e:
     print(f"Warning: SHAP visualization utilities not available: {e}")

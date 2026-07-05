@@ -46,17 +46,26 @@ class ModelService:
         if not os.path.exists(PREPROCESSOR_PATH) or not os.path.exists(MODEL_PATH):
             return
 
-        with open(PREPROCESSOR_PATH, "rb") as f:
-            self.preprocessor = pickle.load(f)
+        try:
+            with open(PREPROCESSOR_PATH, "rb") as f:
+                self.preprocessor = pickle.load(f)
+        except (ModuleNotFoundError, AttributeError, pickle.UnpicklingError) as e:
+            print(f"Warning: Could not load preprocessor pickle: {e}. Continuing without it.")
+            self.preprocessor = None
 
-        self.model = CatBoostClassifier()
-        self.model.load_model(MODEL_PATH)
+        try:
+            self.model = CatBoostClassifier()
+            self.model.load_model(MODEL_PATH)
+        except Exception as e:
+            print(f"Warning: Could not load CatBoost model: {e}")
+            self.model = None
+            return
 
         if hasattr(self.preprocessor, "feature_names_"):
             self.feature_names = list(self.preprocessor.feature_names_)
 
-        # Only initialize SHAP if available
-        if SHAP_AVAILABLE and shap is not None:
+        # Only initialize SHAP if available and model loaded
+        if self.model is not None and SHAP_AVAILABLE and shap is not None:
             try:
                 self.explainer = shap.TreeExplainer(self.model)
                 # Initialize enhanced SHAP explainer
@@ -68,12 +77,15 @@ class ModelService:
                 self.shap_explainer = None
                 self.is_ready = False
                 print(f"Warning: Could not initialize SHAP explainer: {str(e)}")
-        else:
+        elif self.model is not None:
             # SHAP not available, but core model is still ready
             self.explainer = None
             self.shap_explainer = None
             self.is_ready = True
             print("Warning: SHAP not available, core model features will work but SHAP explainability disabled")
+        else:
+            self.is_ready = False
+            print("Warning: Model not loaded")
 
     def _shap_values(self, processed_features: pd.DataFrame) -> np.ndarray:
         raw_values = self.explainer.shap_values(processed_features)

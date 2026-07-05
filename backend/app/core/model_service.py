@@ -4,7 +4,14 @@ from typing import Dict, Optional, List
 
 import numpy as np
 import pandas as pd
-from catboost import CatBoostClassifier
+
+try:
+    from catboost import CatBoostClassifier
+    CATBOOST_AVAILABLE = True
+except Exception as e:
+    print(f"Warning: CatBoost not available due to: {e}")
+    CatBoostClassifier = None
+    CATBOOST_AVAILABLE = False
 
 # Try to import SHAP, but make it optional if there are compatibility issues
 try:
@@ -52,6 +59,12 @@ class ModelService:
         except (ModuleNotFoundError, AttributeError, pickle.UnpicklingError) as e:
             print(f"Warning: Could not load preprocessor pickle: {e}. Continuing without it.")
             self.preprocessor = None
+
+        if not CATBOOST_AVAILABLE or CatBoostClassifier is None:
+            print("Warning: CatBoost not available, ML model service disabled.")
+            self.model = None
+            self.is_ready = False
+            return
 
         try:
             self.model = CatBoostClassifier()

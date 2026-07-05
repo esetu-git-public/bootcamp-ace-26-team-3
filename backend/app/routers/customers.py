@@ -27,9 +27,11 @@ def get_mock_customer_profile(customer_id: str):
         "payment_mode": "UPI",
         "created_at": datetime.utcnow(),
         "churn_probability": 89.00,
+        "probability_confidence_lower": 84.50,
+        "probability_confidence_upper": 93.50,
         "risk_category": "High",
         "will_cancel": 1,
-        "explainability_json": {
+        "explainability": {
             "Customer_Support_Interactions": 0.42,
             "Satisfaction_Score": 0.38,
             "Avg_Usage_Hours_Per_Week": 0.22,

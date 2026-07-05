@@ -148,9 +148,11 @@ class PredictionHistoryItem(BaseModel):
 class CustomerProfileResponse(CustomerBase):
     created_at: datetime
     churn_probability: Optional[float] = None
+    probability_confidence_lower: Optional[float] = None
+    probability_confidence_upper: Optional[float] = None
     risk_category: Optional[str] = None
     will_cancel: Optional[int] = None
-    explainability_json: Optional[Dict[str, float]] = None
+    explainability: Optional[Dict[str, float]] = Field(None, description="SHAP feature importance scores")
     recommendation_type: Optional[str] = None
     recommendation_desc: Optional[str] = None
     predicted_at: Optional[datetime] = None

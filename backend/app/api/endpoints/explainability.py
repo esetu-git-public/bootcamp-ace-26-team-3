@@ -13,9 +13,18 @@ from typing import Optional, Dict, List
 
 from ..database import get_db
 from ..core.model_service import model_service
-from ..core.shap_visualizer import SHAPVisualizer, InteractiveExplainationGenerator
 from ..schemas.common import DashboardKPIsResponse
 from .auth import get_current_user
+
+# Try to import SHAP visualization utilities
+try:
+    from ..core.shap_visualizer import SHAPVisualizer, InteractiveExplainationGenerator
+    SHAP_AVAILABLE = True
+except Exception as e:
+    print(f"Warning: SHAP visualization utilities not available: {e}")
+    SHAPVisualizer = None
+    InteractiveExplainationGenerator = None
+    SHAP_AVAILABLE = False
 
 
 router = APIRouter(prefix="/explainability", tags=["SHAP Explainability"])

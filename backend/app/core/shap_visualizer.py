@@ -13,7 +13,15 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
-import shap
+
+# Try to import SHAP, but make it optional
+try:
+    import shap
+    SHAP_AVAILABLE = True
+except Exception as e:
+    print(f"Warning: SHAP import failed: {e}")
+    shap = None
+    SHAP_AVAILABLE = False
 
 
 class SHAPVisualizer:

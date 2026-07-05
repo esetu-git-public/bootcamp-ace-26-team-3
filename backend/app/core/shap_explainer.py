@@ -11,8 +11,16 @@ import numpy as np
 import pandas as pd
 from typing import Dict, List, Tuple, Optional
 from catboost import CatBoostClassifier
-import shap
 import pickle
+
+# Try to import SHAP, but make it optional
+try:
+    import shap
+    SHAP_AVAILABLE = True
+except Exception as e:
+    print(f"Warning: SHAP import failed: {e}")
+    shap = None
+    SHAP_AVAILABLE = False
 
 
 class SHAPExplainer:

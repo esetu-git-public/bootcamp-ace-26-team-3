@@ -4,10 +4,26 @@ from typing import Dict, Optional, List
 
 import numpy as np
 import pandas as pd
-import shap
 from catboost import CatBoostClassifier
 
-from .shap_explainer import SHAPExplainer
+# Try to import SHAP, but make it optional if there are compatibility issues
+try:
+    import shap
+    SHAP_AVAILABLE = True
+except Exception as e:
+    print(f"Warning: SHAP not available due to: {e}")
+    shap = None
+    SHAP_AVAILABLE = False
+
+# Only import SHAPExplainer if SHAP is available
+if SHAP_AVAILABLE:
+    try:
+        from .shap_explainer import SHAPExplainer
+    except Exception as e:
+        print(f"Warning: SHAPExplainer not available: {e}")
+        SHAPExplainer = None
+else:
+    SHAPExplainer = None
 
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
@@ -39,17 +55,25 @@ class ModelService:
         if hasattr(self.preprocessor, "feature_names_"):
             self.feature_names = list(self.preprocessor.feature_names_)
 
-        try:
-            self.explainer = shap.TreeExplainer(self.model)
-            # Initialize enhanced SHAP explainer
-            if self.feature_names:
-                self.shap_explainer = SHAPExplainer(self.model, self.preprocessor, self.feature_names)
-            self.is_ready = True
-        except Exception as e:
+        # Only initialize SHAP if available
+        if SHAP_AVAILABLE and shap is not None:
+            try:
+                self.explainer = shap.TreeExplainer(self.model)
+                # Initialize enhanced SHAP explainer
+                if self.feature_names and SHAPExplainer is not None:
+                    self.shap_explainer = SHAPExplainer(self.model, self.preprocessor, self.feature_names)
+                self.is_ready = True
+            except Exception as e:
+                self.explainer = None
+                self.shap_explainer = None
+                self.is_ready = False
+                print(f"Warning: Could not initialize SHAP explainer: {str(e)}")
+        else:
+            # SHAP not available, but core model is still ready
             self.explainer = None
             self.shap_explainer = None
-            self.is_ready = False
-            print(f"Warning: Could not initialize SHAP explainer: {str(e)}")
+            self.is_ready = True
+            print("Warning: SHAP not available, core model features will work but SHAP explainability disabled")
 
     def _shap_values(self, processed_features: pd.DataFrame) -> np.ndarray:
         raw_values = self.explainer.shap_values(processed_features)

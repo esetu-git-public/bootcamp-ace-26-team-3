@@ -140,8 +140,10 @@ async def predict_single(
                 df_input = _build_prediction_input(input_data)
                 output = model_service.predict_and_explain(df_input)
                 score = round(output["probability"] * 100.0, 2)
+                score_lower = round(output["probability_confidence_lower"] * 100.0, 2)
+                score_upper = round(output["probability_confidence_upper"] * 100.0, 2)
                 risk, will_cancel, rec_type, rec_desc = _risk_from_probability(score / 100.0)
-                explainability = output["explainability_json"]
+                explainability = output["explainability"]
             except Exception as exc:
                 print(f"Model prediction failed, falling back to rule-based predictor: {exc}")
                 profile = build_risk_profile(
@@ -151,11 +153,13 @@ async def predict_single(
                     avg_usage_hours_per_week=usage,
                 )
                 score = profile["risk_score"]
+                score_lower = max(0, score - 5.0)  # ±5% confidence bounds for rule-based
+                score_upper = min(100, score + 5.0)
                 risk = profile["risk_category"]
                 will_cancel = profile["will_cancel"]
                 rec_type = profile["recommendation_type"]
                 rec_desc = profile["recommendation_desc"]
-                explainability = profile["explainability_json"]
+                explainability = profile.get("explainability_json", {})
         else:
             profile = build_risk_profile(
                 customer_support_interactions=support_interactions,
@@ -164,11 +168,13 @@ async def predict_single(
                 avg_usage_hours_per_week=usage,
             )
             score = profile["risk_score"]
+            score_lower = max(0, score - 5.0)  # ±5% confidence bounds for rule-based
+            score_upper = min(100, score + 5.0)
             risk = profile["risk_category"]
             will_cancel = profile["will_cancel"]
             rec_type = profile["recommendation_type"]
             rec_desc = profile["recommendation_desc"]
-            explainability = profile["explainability_json"]
+            explainability = profile.get("explainability_json", {})
 
         # Save to database if customer is database-backed
         if customer:
@@ -206,9 +212,11 @@ async def predict_single(
         return {
             "customer_id": customer_id,
             "churn_probability": round(score, 2),
+            "probability_confidence_lower": score_lower,
+            "probability_confidence_upper": score_upper,
             "risk_category": risk,
             "will_cancel": will_cancel,
-            "explainability_json": explainability,
+            "explainability": explainability,
             "recommendation_type": rec_type,
             "recommendation_desc": rec_desc
         }

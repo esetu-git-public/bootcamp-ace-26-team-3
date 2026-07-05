@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 from datetime import datetime, timedelta
 from ..database import get_db
 from ..schemas import PaginatedCustomersResponse, CustomerProfileResponse, PredictionHistoryItem
@@ -189,7 +189,7 @@ async def get_customer_prediction_history(
         
         return [{
             "history_id": r.history_id,
-            "risk_score": float(r.risk_score),
+            "risk_score": float(cast(Any, r.risk_score)),
             "risk_category": r.risk_category,
             "prediction_result": r.prediction_result,
             "evaluated_at": r.evaluated_at

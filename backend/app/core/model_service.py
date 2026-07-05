@@ -1,11 +1,13 @@
 import os
 import pickle
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 import numpy as np
 import pandas as pd
 import shap
 from catboost import CatBoostClassifier
+
+from .shap_explainer import SHAPExplainer
 
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
@@ -19,6 +21,7 @@ class ModelService:
         self.preprocessor = None
         self.model = None
         self.explainer = None
+        self.shap_explainer = None  # Enhanced SHAP explainer
         self.feature_names = []
         self.is_ready = False
         self._load_artifacts()
@@ -38,10 +41,15 @@ class ModelService:
 
         try:
             self.explainer = shap.TreeExplainer(self.model)
+            # Initialize enhanced SHAP explainer
+            if self.feature_names:
+                self.shap_explainer = SHAPExplainer(self.model, self.preprocessor, self.feature_names)
             self.is_ready = True
-        except Exception:
+        except Exception as e:
             self.explainer = None
+            self.shap_explainer = None
             self.is_ready = False
+            print(f"Warning: Could not initialize SHAP explainer: {str(e)}")
 
     def _shap_values(self, processed_features: pd.DataFrame) -> np.ndarray:
         raw_values = self.explainer.shap_values(processed_features)
@@ -52,6 +60,7 @@ class ModelService:
         return np.array(shap_values)
 
     def predict_and_explain(self, raw_features: pd.DataFrame) -> Dict[str, object]:
+        """Legacy method for backward compatibility."""
         if not self.is_ready:
             raise RuntimeError("Model artifacts are not available.")
 
@@ -70,6 +79,52 @@ class ModelService:
             "probability": probability,
             "explainability_json": explainability,
         }
+
+    def predict_with_advanced_explanation(self, raw_features: pd.DataFrame) -> Dict[str, object]:
+        """Enhanced prediction with detailed SHAP explanations."""
+        if not self.is_ready:
+            raise RuntimeError("Model artifacts are not available.")
+        
+        if self.shap_explainer is None:
+            # Fallback to legacy method
+            return self.predict_and_explain(raw_features)
+        
+        return self.shap_explainer.explain_prediction(raw_features, return_base_value=True)
+
+    def get_global_importance(self, processed_features: Optional[pd.DataFrame] = None) -> Dict:
+        """Get global feature importance using SHAP."""
+        if not self.is_ready or self.shap_explainer is None:
+            raise RuntimeError("Model artifacts are not available or SHAP explainer not initialized.")
+        
+        # If no data provided, return empty but valid structure
+        if processed_features is None:
+            return {
+                "global_importance": [],
+                "total_features": len(self.feature_names),
+                "base_value": 0.0,
+                "importance_percentiles": {}
+            }
+        
+        return self.shap_explainer.global_feature_importance(processed_features)
+
+    def get_feature_interaction(
+        self, 
+        raw_features: pd.DataFrame,
+        feature1: str, 
+        feature2: str
+    ) -> Dict:
+        """Analyze interaction between two features."""
+        if not self.is_ready or self.shap_explainer is None:
+            raise RuntimeError("Model artifacts are not available or SHAP explainer not initialized.")
+        
+        return self.shap_explainer.feature_interaction_analysis(raw_features, feature1, feature2)
+
+    def get_shap_summary_statistics(self, processed_features: pd.DataFrame) -> Dict:
+        """Get SHAP statistics for dataset."""
+        if not self.is_ready or self.shap_explainer is None:
+            raise RuntimeError("Model artifacts are not available or SHAP explainer not initialized.")
+        
+        return self.shap_explainer.summary_statistics(processed_features)
 
 
 model_service = ModelService()

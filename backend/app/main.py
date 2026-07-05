@@ -7,6 +7,7 @@ from .models.user import User
 from .core.risk_score import build_risk_profile
 from . import models
 from .routers import analytics, auth, customers, dashboard, model, predictions, reports
+from .api.endpoints import explainability
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -198,6 +199,7 @@ app.include_router(customers.router, prefix="/api/v1")
 app.include_router(predictions.router, prefix="/api/v1")
 app.include_router(reports.router, prefix="/api/v1")
 app.include_router(model.router, prefix="/api/v1")
+app.include_router(explainability.router, prefix="/api/v1")
 
 
 @app.get("/")

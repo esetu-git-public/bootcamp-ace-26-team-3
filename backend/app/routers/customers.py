@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 from datetime import datetime, timedelta
 from ..database import get_db
 from ..schemas import PaginatedCustomersResponse, CustomerProfileResponse, PredictionHistoryItem
@@ -27,9 +27,11 @@ def get_mock_customer_profile(customer_id: str):
         "payment_mode": "UPI",
         "created_at": datetime.utcnow(),
         "churn_probability": 89.00,
+        "probability_confidence_lower": 84.50,
+        "probability_confidence_upper": 93.50,
         "risk_category": "High",
         "will_cancel": 1,
-        "explainability_json": {
+        "explainability": {
             "Customer_Support_Interactions": 0.42,
             "Satisfaction_Score": 0.38,
             "Avg_Usage_Hours_Per_Week": 0.22,
@@ -167,9 +169,11 @@ async def get_customer_profile(
             "payment_mode": result.payment_mode,
             "created_at": result.created_at,
             "churn_probability": float(result.churn_probability or 0.0) if result.churn_probability else None,
+            "probability_confidence_lower": max(0.0, float(result.churn_probability or 0.0) - 5.0) if result.churn_probability else None,
+            "probability_confidence_upper": min(100.0, float(result.churn_probability or 0.0) + 5.0) if result.churn_probability else None,
             "risk_category": result.risk_category,
             "will_cancel": result.will_cancel,
-            "explainability_json": result.explainability_json,
+            "explainability": result.explainability_json,
             "recommendation_type": result.recommendation_type,
             "recommendation_desc": result.recommendation_desc,
             "predicted_at": result.predicted_at
@@ -189,7 +193,7 @@ async def get_customer_prediction_history(
         
         return [{
             "history_id": r.history_id,
-            "risk_score": float(r.risk_score),
+            "risk_score": float(cast(Any, r.risk_score)),
             "risk_category": r.risk_category,
             "prediction_result": r.prediction_result,
             "evaluated_at": r.evaluated_at

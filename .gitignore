@@ -32,3 +32,8 @@ Thumbs.db
 /extract.py
 /extract_pdfs.py
 /PRODUCT_REQUIREMENTS_DOCUMENT.txt
+
+# Machine Learning temporary folders
+catboost_info/
+**/catboost_info/
+

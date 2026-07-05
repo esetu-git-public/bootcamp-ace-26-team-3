@@ -38,8 +38,10 @@ export default function CustomerProfile({ onViewChange, onLogout, selectedCustom
         setPrediction({
           will_cancel: data.will_cancel,
           churn_probability: data.churn_probability,
+          probability_confidence_lower: data.probability_confidence_lower,
+          probability_confidence_upper: data.probability_confidence_upper,
           risk_category: data.risk_category,
-          explainability_json: data.explainability_json,
+          explainability: data.explainability,
           recommendation_type: data.recommendation_type,
           recommendation_desc: data.recommendation_desc
         });
@@ -200,6 +202,11 @@ export default function CustomerProfile({ onViewChange, onLogout, selectedCustom
                     <strong style={{ fontSize: '1.4rem', color: '#f8fafc' }}>
                       {prediction.churn_probability.toFixed(2)}%
                     </strong>
+                    {prediction.probability_confidence_lower !== undefined && prediction.probability_confidence_upper !== undefined && (
+                      <span style={{ fontSize: '0.9rem', color: '#cbd5e1', marginLeft: '1rem' }}>
+                        (95% CI: {prediction.probability_confidence_lower.toFixed(2)}% - {prediction.probability_confidence_upper.toFixed(2)}%)
+                      </span>
+                    )}
                   </div>
                   <div style={styles.metricRow}>
                     <span>Risk Category:</span>
@@ -214,12 +221,12 @@ export default function CustomerProfile({ onViewChange, onLogout, selectedCustom
             </div>
 
             {/* Explainable AI / Local SHAP Indicators */}
-            {prediction && prediction.explainability_json && (
+            {prediction && prediction.explainability && (
               <div style={styles.card}>
                 <h3 style={styles.cardTitle}>Local Model Explainability (SHAP Factors)</h3>
                 <p style={styles.helperText}>Calculated weights indicating how features influenced the model risk score upward (red) or downward (green):</p>
                 <div style={styles.factorList}>
-                  {Object.entries(prediction.explainability_json).map(([key, val]) => {
+                  {Object.entries(prediction.explainability).map(([key, val]) => {
                     const isIncrease = val > 0;
                     return (
                       <div key={key} style={styles.factorRow}>

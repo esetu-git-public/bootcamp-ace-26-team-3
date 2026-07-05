@@ -5,7 +5,6 @@ import pandas as pd
 from catboost import CatBoostClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix
-
 # Add backend directory to sys.path to enable imports of app modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -106,6 +105,7 @@ print(f"Metrics saved to: {METRICS_SAVE_PATH}")
 
 # Save metrics to database
 print("Saving model evaluation metrics to database...")
+db = None
 try:
     from app.database import SessionLocal
     from app.models import ModelMetric
@@ -127,5 +127,6 @@ try:
 except Exception as e:
     print(f"Failed to save metrics to database: {e}")
 finally:
-    if 'db' in locals():
+    if db is not None:
         db.close()
+

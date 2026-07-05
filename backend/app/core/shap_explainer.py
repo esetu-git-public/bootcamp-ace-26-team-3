@@ -9,7 +9,7 @@ import os
 import json
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Optional
 from catboost import CatBoostClassifier
 import pickle
 
@@ -52,10 +52,32 @@ class SHAPExplainer:
     
     def _initialize_explainer(self):
         """Initialize SHAP TreeExplainer."""
+        if not SHAP_AVAILABLE or shap is None:
+            raise RuntimeError("SHAP is not installed or could not be imported.")
+
         try:
             self.explainer = shap.TreeExplainer(self.model)
         except Exception as e:
             raise RuntimeError(f"Failed to initialize SHAP TreeExplainer: {str(e)}")
+
+    @staticmethod
+    def _as_shap_array(raw_values) -> np.ndarray:
+        """Normalize SHAP output to a 2D array for the positive class."""
+        if isinstance(raw_values, list):
+            raw_values = raw_values[1] if len(raw_values) > 1 else raw_values[0]
+
+        values = np.asarray(raw_values)
+        if values.ndim == 1:
+            values = values.reshape(1, -1)
+        return values
+
+    def _expected_value(self) -> float:
+        """Return the expected value for the positive class when available."""
+        expected = self.explainer.expected_value
+        if isinstance(expected, (list, tuple, np.ndarray)):
+            expected_array = np.asarray(expected).flatten()
+            expected = expected_array[1] if expected_array.size > 1 else expected_array[0]
+        return float(expected)
     
     def explain_prediction(
         self, 
@@ -80,13 +102,8 @@ class SHAPExplainer:
         probability = float(probabilities[0, 1])  # Class 1 probability
         
         # Get SHAP values
-        shap_values = self.explainer.shap_values(processed)
-        
-        # Handle case where SHAP returns list (multiclass)
-        if isinstance(shap_values, list):
-            shap_row = shap_values[1] if len(shap_values) > 1 else shap_values[0]
-        else:
-            shap_row = shap_values[0]
+        shap_values = self._as_shap_array(self.explainer.shap_values(processed))
+        shap_row = shap_values[0]
         
         # Build feature contributions
         feature_contributions = self._build_feature_contributions(
@@ -101,9 +118,7 @@ class SHAPExplainer:
         }
         
         if return_base_value:
-            result["base_value"] = float(self.explainer.expected_value[1] 
-                                        if isinstance(self.explainer.expected_value, (list, tuple))
-                                        else self.explainer.expected_value)
+            result["base_value"] = self._expected_value()
         
         return result
     
@@ -155,12 +170,7 @@ class SHAPExplainer:
             Dictionary with feature importance statistics
         """
         # Calculate SHAP values for all samples
-        shap_values = self.explainer.shap_values(processed_features)
-        
-        if isinstance(shap_values, list):
-            shap_array = shap_values[1] if len(shap_values) > 1 else shap_values[0]
-        else:
-            shap_array = shap_values
+        shap_array = self._as_shap_array(self.explainer.shap_values(processed_features))
         
         # Calculate mean absolute SHAP values
         mean_abs_shap = np.mean(np.abs(shap_array), axis=0)
@@ -176,9 +186,7 @@ class SHAPExplainer:
         result = {
             "global_importance": importance_df.head(top_n).to_dict(orient="records"),
             "total_features": len(self.feature_names),
-            "base_value": float(self.explainer.expected_value[1] 
-                               if isinstance(self.explainer.expected_value, (list, tuple))
-                               else self.explainer.expected_value),
+            "base_value": self._expected_value(),
         }
         
         # Add percentile information
@@ -215,12 +223,7 @@ class SHAPExplainer:
         idx2 = self.feature_names.index(feature2)
         
         processed = self.preprocessor.transform(raw_features)
-        shap_values = self.explainer.shap_values(processed)
-        
-        if isinstance(shap_values, list):
-            shap_array = shap_values[1] if len(shap_values) > 1 else shap_values[0]
-        else:
-            shap_array = shap_values
+        shap_array = self._as_shap_array(self.explainer.shap_values(processed))
         
         # Calculate correlation between SHAP values of two features
         shap_corr = np.corrcoef(shap_array[:, idx1], shap_array[:, idx2])[0, 1]
@@ -283,12 +286,7 @@ class SHAPExplainer:
         Returns:
             Dictionary with summary statistics
         """
-        shap_values = self.explainer.shap_values(processed_features)
-        
-        if isinstance(shap_values, list):
-            shap_array = shap_values[1] if len(shap_values) > 1 else shap_values[0]
-        else:
-            shap_array = shap_values
+        shap_array = self._as_shap_array(self.explainer.shap_values(processed_features))
         
         stats = {}
         for i, feature_name in enumerate(self.feature_names):

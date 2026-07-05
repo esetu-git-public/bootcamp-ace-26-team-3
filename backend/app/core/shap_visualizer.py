@@ -311,7 +311,7 @@ class SHAPVisualizer:
         return summary
 
 
-class InteractiveExplainationGenerator:
+class InteractiveExplanationGenerator:
     """Generate interactive explanations combining multiple visualization types."""
     
     @staticmethod
@@ -357,3 +357,7 @@ class InteractiveExplainationGenerator:
             "feature_importance": global_importance or {},
             "summary": visualizer.create_explanation_summary(probability, shap_values, feature_names),
         }
+
+
+# Backward-compatible alias for the original misspelled class name.
+InteractiveExplainationGenerator = InteractiveExplanationGenerator

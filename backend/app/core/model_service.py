@@ -136,7 +136,7 @@ class ModelService:
         
         return self.shap_explainer.explain_prediction(raw_features, return_base_value=True)
 
-    def get_global_importance(self, processed_features: Optional[pd.DataFrame] = None) -> Dict:
+    def get_global_importance(self, processed_features: Optional[pd.DataFrame] = None, top_n: int = 10) -> Dict:
         """Get global feature importance using SHAP."""
         if not self.is_ready or self.shap_explainer is None:
             raise RuntimeError("Model artifacts are not available or SHAP explainer not initialized.")
@@ -150,7 +150,7 @@ class ModelService:
                 "importance_percentiles": {}
             }
         
-        return self.shap_explainer.global_feature_importance(processed_features)
+        return self.shap_explainer.global_feature_importance(processed_features, top_n=top_n)
 
     def get_feature_interaction(
         self, 

@@ -8,21 +8,22 @@ feature importance, and interactive visualizations.
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+import numpy as np
 import pandas as pd
 from typing import Optional, Dict, List
 
 from ...database import get_db
 from ...core.model_service import model_service
-from ...schemas.common import DashboardKPIsResponse
+from ...routers.auth import get_current_user
 
 # Try to import SHAP visualization utilities
 try:
-    from ...core.shap_visualizer import SHAPVisualizer, InteractiveExplainationGenerator
+    from ...core.shap_visualizer import SHAPVisualizer, InteractiveExplanationGenerator
     SHAP_AVAILABLE = True
 except Exception as e:
     print(f"Warning: SHAP visualization utilities not available: {e}")
     SHAPVisualizer = None
-    InteractiveExplainationGenerator = None
+    InteractiveExplanationGenerator = None
     SHAP_AVAILABLE = False
 
 
@@ -68,6 +69,45 @@ def _build_prediction_input(data: dict) -> pd.DataFrame:
     return pd.DataFrame([input_row])
 
 
+def _customer_row_to_input(customer) -> pd.DataFrame:
+    """Build model input from a database customer row."""
+    return _build_prediction_input({
+        "income_level": customer.income_level,
+        "satisfaction_score": customer.satisfaction_score,
+        "discount_used": customer.discount_used,
+        "age": customer.age,
+        "number_of_subscriptions": customer.number_of_subscriptions,
+        "tenure_months": customer.tenure_months,
+        "monthly_total_spend": float(customer.monthly_total_spend),
+        "avg_usage_hours_per_week": float(customer.avg_usage_hours_per_week),
+        "app_switch_frequency": customer.app_switch_frequency,
+        "customer_support_interactions": customer.customer_support_interactions,
+        "device_type": customer.device_type,
+        "payment_mode": customer.payment_mode,
+    })
+
+
+def _customer_rows_to_input(results) -> pd.DataFrame:
+    """Build model input DataFrame from selected customer query rows."""
+    rows = []
+    for row in results:
+        rows.append({
+            "Income_Level": row.income_level,
+            "Satisfaction_Score": int(row.satisfaction_score),
+            "Discount_Used": bool(row.discount_used),
+            "Age": int(row.age),
+            "Number_of_Subscriptions": int(row.number_of_subscriptions),
+            "Tenure_Months": int(row.tenure_months),
+            "Monthly_Total_Spend": float(row.monthly_total_spend),
+            "Avg_Usage_Hours_Per_Week": float(row.avg_usage_hours_per_week),
+            "App_Switch_Frequency": int(row.app_switch_frequency),
+            "Customer_Support_Interactions": int(row.customer_support_interactions),
+            "Device_Type": row.device_type,
+            "Payment_Mode": row.payment_mode,
+        })
+    return pd.DataFrame(rows)
+
+
 @router.post("/explain-prediction/{customer_id}")
 async def explain_prediction(
     customer_id: str,
@@ -94,23 +134,7 @@ async def explain_prediction(
         if not customer:
             raise HTTPException(status_code=404, detail="Customer not found")
         
-        # Build input
-        input_data = {
-            "income_level": customer.income_level,
-            "satisfaction_score": customer.satisfaction_score,
-            "discount_used": customer.discount_used,
-            "age": customer.age,
-            "number_of_subscriptions": customer.number_of_subscriptions,
-            "tenure_months": customer.tenure_months,
-            "monthly_total_spend": float(customer.monthly_total_spend),
-            "avg_usage_hours_per_week": float(customer.avg_usage_hours_per_week),
-            "app_switch_frequency": customer.app_switch_frequency,
-            "customer_support_interactions": customer.customer_support_interactions,
-            "device_type": customer.device_type,
-            "payment_mode": customer.payment_mode,
-        }
-        
-        df_input = _build_prediction_input(input_data)
+        df_input = _customer_row_to_input(customer)
         
         # Get advanced explanation
         explanation = model_service.predict_with_advanced_explanation(df_input)
@@ -166,19 +190,13 @@ async def get_feature_importance(
             return model_service.get_global_importance(None)
         
         # Convert to DataFrame
-        columns = [
-            "income_level", "satisfaction_score", "discount_used", "age",
-            "number_of_subscriptions", "tenure_months", "monthly_total_spend",
-            "avg_usage_hours_per_week", "app_switch_frequency",
-            "customer_support_interactions", "device_type", "payment_mode"
-        ]
-        df = pd.DataFrame(results, columns=columns)
+        df = _customer_rows_to_input(results)
         
         # Process features
         processed_df = model_service.preprocessor.transform(df)
         
         # Get importance
-        importance = model_service.get_global_importance(processed_df)
+        importance = model_service.get_global_importance(processed_df, top_n=top_n)
         
         return importance
     
@@ -225,13 +243,7 @@ async def get_feature_interaction(
         if not results:
             raise HTTPException(status_code=400, detail="Insufficient customer data for analysis")
         
-        columns = [
-            "income_level", "satisfaction_score", "discount_used", "age",
-            "number_of_subscriptions", "tenure_months", "monthly_total_spend",
-            "avg_usage_hours_per_week", "app_switch_frequency",
-            "customer_support_interactions", "device_type", "payment_mode"
-        ]
-        df = pd.DataFrame(results, columns=columns)
+        df = _customer_rows_to_input(results)
         
         # Get interaction
         interaction = model_service.get_feature_interaction(df, feature1, feature2)
@@ -270,39 +282,27 @@ async def get_interactive_explanation(
         if not customer:
             raise HTTPException(status_code=404, detail="Customer not found")
         
-        # Build input
-        input_data = {
-            "income_level": customer.income_level,
-            "satisfaction_score": customer.satisfaction_score,
-            "discount_used": customer.discount_used,
-            "age": customer.age,
-            "number_of_subscriptions": customer.number_of_subscriptions,
-            "tenure_months": customer.tenure_months,
-            "monthly_total_spend": float(customer.monthly_total_spend),
-            "avg_usage_hours_per_week": float(customer.avg_usage_hours_per_week),
-            "app_switch_frequency": customer.app_switch_frequency,
-            "customer_support_interactions": customer.customer_support_interactions,
-            "device_type": customer.device_type,
-            "payment_mode": customer.payment_mode,
-        }
-        
-        df_input = _build_prediction_input(input_data)
+        df_input = _customer_row_to_input(customer)
         
         # Get explanation
         explanation = model_service.predict_with_advanced_explanation(df_input)
         probability = explanation["probability"]
         
-        # Extract SHAP values from feature contributions
         feature_names = model_service.feature_names
-        shap_values = [contrib["shap_value"] for contrib in explanation["feature_contributions"]]
+        shap_by_feature = {
+            contrib["feature"]: contrib["shap_value"]
+            for contrib in explanation["feature_contributions"]
+        }
+        shap_values = np.array([shap_by_feature.get(feature, 0.0) for feature in feature_names])
         base_value = explanation.get("base_value", 0.0)
+        processed_features = model_service.preprocessor.transform(df_input)
         
         # Generate interactive explanation
-        interactive_explanation = InteractiveExplainationGenerator.generate_full_explanation(
+        interactive_explanation = InteractiveExplanationGenerator.generate_full_explanation(
             probability=probability,
-            shap_values=import_numpy_values(shap_values),
+            shap_values=shap_values,
             feature_names=feature_names,
-            features=df_input,
+            features=processed_features,
             explainer_base_value=base_value
         )
         
@@ -315,12 +315,6 @@ async def get_interactive_explanation(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Interactive explanation generation failed: {str(e)}")
-
-
-def import_numpy_values(values: List) -> List:
-    """Convert values to numpy array for SHAP visualization."""
-    import numpy as np
-    return np.array(values)
 
 
 @router.get("/available-features")

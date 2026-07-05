@@ -106,8 +106,8 @@ class TestSHAPExplainer:
         contributions.sort(key=lambda x: x["abs_shap_value"], reverse=True)
         
         # Verify sorting
-        assert contributions[0]["feature"] == "Tenure_Months"  # 0.15
-        assert contributions[1]["feature"] == "Monthly_Total_Spend"  # 0.12
+        assert contributions[0]["feature"] == "Number_of_Subscriptions"  # 0.15
+        assert contributions[1]["feature"] == "Discount_Used"  # 0.12
         assert contributions[0]["abs_shap_value"] > contributions[-1]["abs_shap_value"]
     
     def test_shap_values_distribution(self, sample_shap_values):

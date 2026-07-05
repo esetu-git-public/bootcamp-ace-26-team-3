@@ -161,9 +161,11 @@ class CustomerProfileResponse(CustomerBase):
 class SinglePredictionResponse(BaseModel):
     customer_id: str
     churn_probability: float
+    probability_confidence_lower: float = Field(..., description="Lower bound of probability confidence interval (0.0-100.0)")
+    probability_confidence_upper: float = Field(..., description="Upper bound of probability confidence interval (0.0-100.0)")
     risk_category: str
     will_cancel: int
-    explainability_json: Optional[Dict[str, float]] = None
+    explainability: Optional[Dict[str, float]] = Field(None, description="SHAP feature importance scores")
     recommendation_type: str
     recommendation_desc: str
 

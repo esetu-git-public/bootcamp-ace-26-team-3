@@ -65,10 +65,19 @@ class ModelService:
             feature: float(value)
             for feature, value in zip(self.feature_names, shap_row.tolist())
         }
+        
+        # Calculate confidence interval (95% CI approximation)
+        # Using binomial proportion confidence interval
+        z_score = 1.96  # 95% confidence
+        margin_of_error = z_score * np.sqrt((probability * (1 - probability)) / 100)
+        confidence_lower = max(0.0, probability - margin_of_error)
+        confidence_upper = min(1.0, probability + margin_of_error)
 
         return {
             "probability": probability,
-            "explainability_json": explainability,
+            "probability_confidence_lower": confidence_lower,
+            "probability_confidence_upper": confidence_upper,
+            "explainability": explainability,
         }
 
 

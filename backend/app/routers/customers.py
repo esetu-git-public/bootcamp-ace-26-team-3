@@ -169,9 +169,11 @@ async def get_customer_profile(
             "payment_mode": result.payment_mode,
             "created_at": result.created_at,
             "churn_probability": float(result.churn_probability or 0.0) if result.churn_probability else None,
+            "probability_confidence_lower": max(0.0, float(result.churn_probability or 0.0) - 5.0) if result.churn_probability else None,
+            "probability_confidence_upper": min(100.0, float(result.churn_probability or 0.0) + 5.0) if result.churn_probability else None,
             "risk_category": result.risk_category,
             "will_cancel": result.will_cancel,
-            "explainability_json": result.explainability_json,
+            "explainability": result.explainability_json,
             "recommendation_type": result.recommendation_type,
             "recommendation_desc": result.recommendation_desc,
             "predicted_at": result.predicted_at

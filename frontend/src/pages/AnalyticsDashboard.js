@@ -7,6 +7,10 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
   const [riskDistribution, setRiskDistribution] = useState([]);
   const [incomeData, setIncomeData] = useState([]);
   const [deviceData, setDeviceData] = useState([]);
+  const [paymentData, setPaymentData] = useState([]);
+  const [spendData, setSpendData] = useState([]);
+  const [tenureData, setTenureData] = useState([]);
+  const [satisfactionData, setSatisfactionData] = useState([]);
   const [segmentData, setSegmentData] = useState([]);
   const [customerRows, setCustomerRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -27,24 +31,38 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
       fetch(`${API_BASE_URL}/analytics/churn-risk-distribution`, { headers }),
       fetch(`${API_BASE_URL}/analytics/churn-by-income`, { headers }),
       fetch(`${API_BASE_URL}/analytics/churn-by-device`, { headers }),
+      fetch(`${API_BASE_URL}/analytics/churn-by-payment`, { headers }),
+      fetch(`${API_BASE_URL}/analytics/churn-by-spend`, { headers }),
+      fetch(`${API_BASE_URL}/analytics/churn-by-tenure`, { headers }),
+      fetch(`${API_BASE_URL}/analytics/churn-by-satisfaction`, { headers }),
       fetch(`${API_BASE_URL}/analytics/customer-segmentation`, { headers }),
       fetch(`${API_BASE_URL}/customers?page=1&limit=6`, { headers }),
     ])
       .then(async (responses) => {
-        if (responses.some(res => res.status === 401)) {
-          if (onLogout) onLogout();
-          return;
-        }
-
         const [kpisRes, riskRes, incomeRes, deviceRes, segmentRes, customersRes] = responses;
         const kpisData = await kpisRes.json();
         const riskData = await riskRes.json();
         const incomeDataResult = await incomeRes.json();
         const deviceDataResult = await deviceRes.json();
+        const paymentDataResult = await paymentRes.json();
+        const spendDataResult = await spendRes.json();
+        const tenureDataResult = await tenureRes.json();
+        const satisfactionDataResult = await satisfactionRes.json();
         const segmentDataResult = await segmentRes.json();
         const customersData = await customersRes.json();
 
-        if (!kpisRes.ok || !riskRes.ok || !incomeRes.ok || !deviceRes.ok || !segmentRes.ok || !customersRes.ok) {
+        if (
+          !kpisRes.ok ||
+          !riskRes.ok ||
+          !incomeRes.ok ||
+          !deviceRes.ok ||
+          !paymentRes.ok ||
+          !spendRes.ok ||
+          !tenureRes.ok ||
+          !satisfactionRes.ok ||
+          !segmentRes.ok ||
+          !customersRes.ok
+        ) {
           throw new Error('Unable to load analytics data right now.');
         }
 
@@ -52,6 +70,10 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
         setRiskDistribution(riskData);
         setIncomeData(incomeDataResult);
         setDeviceData(deviceDataResult);
+        setPaymentData(paymentDataResult);
+        setSpendData(spendDataResult);
+        setTenureData(tenureDataResult);
+        setSatisfactionData(satisfactionDataResult);
         setSegmentData(segmentDataResult);
         setCustomerRows(customersData.results || []);
       })
@@ -330,6 +352,70 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
             <div key={item.device_type} style={styles.barRow}>
               <div style={styles.barHeader}>
                 <span>{item.device_type}</span>
+                <strong>{item.churn_rate}%</strong>
+              </div>
+              <div style={styles.barTrack}>
+                <div style={{ ...styles.barFill, width: `${Math.min(item.churn_rate * 2.2, 100)}%` }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section style={styles.grid}>
+        <div style={styles.card}>
+          <h3 style={styles.cardTitle}>Payment churn</h3>
+          {paymentData.map((item) => (
+            <div key={item.payment_mode} style={styles.barRow}>
+              <div style={styles.barHeader}>
+                <span>{item.payment_mode}</span>
+                <strong>{item.churn_rate}%</strong>
+              </div>
+              <div style={styles.barTrack}>
+                <div style={{ ...styles.barFill, width: `${Math.min(item.churn_rate * 2.2, 100)}%` }} />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={styles.card}>
+          <h3 style={styles.cardTitle}>Spend-based churn</h3>
+          {spendData.map((item) => (
+            <div key={item.spend_bucket} style={styles.barRow}>
+              <div style={styles.barHeader}>
+                <span>{item.spend_bucket}</span>
+                <strong>{item.churn_rate}%</strong>
+              </div>
+              <div style={styles.barTrack}>
+                <div style={{ ...styles.barFill, width: `${Math.min(item.churn_rate * 2.2, 100)}%` }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section style={styles.grid}>
+        <div style={styles.card}>
+          <h3 style={styles.cardTitle}>Tenure churn profile</h3>
+          {tenureData.map((item) => (
+            <div key={item.tenure_bucket} style={styles.barRow}>
+              <div style={styles.barHeader}>
+                <span>{item.tenure_bucket}</span>
+                <strong>{item.churn_rate}%</strong>
+              </div>
+              <div style={styles.barTrack}>
+                <div style={{ ...styles.barFill, width: `${Math.min(item.churn_rate * 2.2, 100)}%` }} />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={styles.card}>
+          <h3 style={styles.cardTitle}>Satisfaction vs churn</h3>
+          {satisfactionData.map((item) => (
+            <div key={item.satisfaction_score} style={styles.barRow}>
+              <div style={styles.barHeader}>
+                <span>Score {item.satisfaction_score}</span>
                 <strong>{item.churn_rate}%</strong>
               </div>
               <div style={styles.barTrack}>

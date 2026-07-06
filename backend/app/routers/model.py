@@ -24,6 +24,15 @@ async def get_model_metrics(
         if not result:
             raise Exception("No metrics")
             
+        import json
+        matrix_data = result.confusion_matrix
+        if isinstance(matrix_data, str):
+            matrix_data = json.loads(matrix_data)
+            
+        importance_data = result.feature_importance
+        if isinstance(importance_data, str):
+            importance_data = json.loads(importance_data)
+            
         return {
             "model_version": result.model_version,
             "accuracy": float(result.accuracy),
@@ -31,8 +40,8 @@ async def get_model_metrics(
             "recall": float(result.recall),
             "f1_score": float(result.f1_score),
             "roc_auc": float(result.roc_auc),
-            "confusion_matrix": result.confusion_matrix,
-            "feature_importance": result.feature_importance,
+            "confusion_matrix": matrix_data,
+            "feature_importance": importance_data,
             "evaluated_at": result.evaluated_at
         }
     except Exception:

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+import * as apiService from '../services/api';
 
 export default function CustomerDirectory({ onViewChange, onSelectCustomer, onLogout }) {
   const [customers, setCustomers] = useState([]);
@@ -22,41 +21,27 @@ export default function CustomerDirectory({ onViewChange, onSelectCustomer, onLo
     setLoading(true);
     setError('');
     try {
-      const token = localStorage.getItem('access_token');
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      
-      // Build query string
-      let url = `${API_BASE_URL}/customers?page=${page}&limit=${limit}`;
-      if (searchId) url += `&search_id=${encodeURIComponent(searchId)}`;
-      if (willCancel !== null) url += `&will_cancel=${willCancel}`;
-      
-      // Handle multi-select arrays
-      selectedRisk.forEach(risk => url += `&risk_categories=${encodeURIComponent(risk)}`);
-      selectedIncome.forEach(inc => url += `&income_levels=${encodeURIComponent(inc)}`);
-      selectedDevice.forEach(dev => url += `&device_types=${encodeURIComponent(dev)}`);
-      selectedPayment.forEach(pay => url += `&payment_modes=${encodeURIComponent(pay)}`);
-
-      const response = await fetch(url, { headers });
-      if (response.status === 401) {
-        // Handle token expiration
+      const data = await apiService.getCustomers(page, limit, {
+        searchId,
+        willCancel,
+        riskCategories: selectedRisk,
+        incomeLevels: selectedIncome,
+        deviceTypes: selectedDevice,
+        paymentModes: selectedPayment
+      });
+      setCustomers(data.results || []);
+      setTotal(data.total || 0);
+    } catch (err) {
+      if (err.status === 401) {
         if (onLogout) {
           onLogout();
         } else {
           localStorage.removeItem('access_token');
           onViewChange('login');
         }
-        return;
+      } else {
+        setError(err.message || 'Error fetching customer list.');
       }
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch customers from database.');
-      }
-      
-      const data = await response.json();
-      setCustomers(data.results || []);
-      setTotal(data.total || 0);
-    } catch (err) {
-      setError(err.message || 'Error fetching customer list.');
     } finally {
       setLoading(false);
     }

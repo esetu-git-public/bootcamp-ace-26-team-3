@@ -132,13 +132,24 @@ export async function getCustomers(page = 1, limit = 20, filters = {}) {
   });
 
   if (filters.searchId) params.append('search_id', filters.searchId);
-  if (filters.incomeLevel) params.append('income_levels', filters.incomeLevel);
-  if (filters.deviceType) params.append('device_types', filters.deviceType);
-  if (filters.paymentMode) params.append('payment_modes', filters.paymentMode);
-  if (filters.riskCategory) params.append('risk_categories', filters.riskCategory);
   if (filters.willCancel !== undefined && filters.willCancel !== null) {
     params.append('will_cancel', filters.willCancel);
   }
+
+  // Handle singular or array filter values
+  const appendFilter = (paramName, value) => {
+    if (value === undefined || value === null) return;
+    if (Array.isArray(value)) {
+      value.forEach(val => params.append(paramName, val));
+    } else {
+      params.append(paramName, value);
+    }
+  };
+
+  appendFilter('income_levels', filters.incomeLevel || filters.incomeLevels);
+  appendFilter('device_types', filters.deviceType || filters.deviceTypes);
+  appendFilter('payment_modes', filters.paymentMode || filters.paymentModes);
+  appendFilter('risk_categories', filters.riskCategory || filters.riskCategories);
 
   return request(`/customers?${params.toString()}`);
 }
@@ -215,6 +226,13 @@ export async function exportReport(format = 'csv', filters = {}) {
   if (filters.recommendationType) params.append('recommendation_type', filters.recommendationType);
 
   return request(`/reports/export?${params.toString()}`);
+}
+
+/**
+ * Get model performance metrics
+ */
+export async function getModelMetrics() {
+  return request('/model/metrics');
 }
 
 /**

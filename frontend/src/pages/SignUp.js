@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+import * as apiService from '../services/api';
 
 export default function SignUp({ onNavigateToLogin }) {
   const [username, setUsername] = useState('');
@@ -29,24 +28,7 @@ export default function SignUp({ onNavigateToLogin }) {
     setSuccess('');
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/signup`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username,
-          email,
-          full_name: fullName || null,
-          password,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.detail || 'Registration failed. Please try again.');
-      }
+      await apiService.signup(username, email, password, fullName || null);
 
       setSuccess('Account created successfully! Redirecting to login...');
       setTimeout(() => {

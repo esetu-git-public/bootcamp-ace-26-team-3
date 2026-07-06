@@ -116,12 +116,14 @@ async function loadDashboard() {
 - ✅ Environment configuration support added
 - ✅ Bulk prediction polling improved
 - ✅ Error handling standardized
+- ✅ Login.js migrated to centralized API service
+- ✅ SignUp.js migrated to centralized API service
+- ✅ CustomerDirectory.js migrated to centralized API service
+- ✅ CustomerProfile.js migrated to centralized API service
+- ✅ ModelPerformance.js migrated to centralized API service
 
 ### Remaining Components (Future)
-- [ ] Login.js — migrate to api service
-- [ ] SignUp.js — migrate to api service
-- [ ] CustomerDirectory.js — migrate to api service
-- [ ] CustomerProfile.js — migrate to api service
+* None (All pages have been fully integrated with the centralized API service)*
 
 ## Authentication Flow
 

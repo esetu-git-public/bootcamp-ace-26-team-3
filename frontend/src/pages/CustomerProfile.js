@@ -169,27 +169,6 @@ export default function CustomerProfile({ onViewChange, onLogout, selectedCustom
 
             {/* Prediction History Timeline */}
             <PredictionTimeline predictions={history} />
-                    <span>Churn Probability:</span>
-                    <strong style={{ fontSize: '1.4rem', color: '#f8fafc' }}>
-                      {prediction.churn_probability.toFixed(2)}%
-                    </strong>
-                    {prediction.probability_confidence_lower !== undefined && prediction.probability_confidence_upper !== undefined && (
-                      <span style={{ fontSize: '0.9rem', color: '#cbd5e1', marginLeft: '1rem' }}>
-                        (95% CI: {prediction.probability_confidence_lower.toFixed(2)}% - {prediction.probability_confidence_upper.toFixed(2)}%)
-                      </span>
-                    )}
-                  </div>
-                  <div style={styles.metricRow}>
-                    <span>Risk Category:</span>
-                    <span style={styles.riskBadge(prediction.risk_category)}>
-                      {prediction.risk_category} Risk
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                <div style={styles.placeholderText}>No active churn model outputs loaded. Click the prediction button to evaluate this customer profile.</div>
-              )}
-            </div>
 
             {/* Explainable AI / Local SHAP Indicators */}
             {prediction && prediction.explainability && (

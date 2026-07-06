@@ -24,73 +24,37 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
   const backendOrigin = apiService.getBackendOrigin();
 
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
-    const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
     Promise.all([
-      fetch(`${API_BASE_URL}/dashboard/kpis`, { headers }),
-      fetch(`${API_BASE_URL}/analytics/churn-risk-distribution`, { headers }),
-      fetch(`${API_BASE_URL}/analytics/churn-by-income`, { headers }),
-      fetch(`${API_BASE_URL}/analytics/churn-by-device`, { headers }),
-      fetch(`${API_BASE_URL}/analytics/churn-by-payment`, { headers }),
-      fetch(`${API_BASE_URL}/analytics/churn-by-spend`, { headers }),
-      fetch(`${API_BASE_URL}/analytics/churn-by-tenure`, { headers }),
-      fetch(`${API_BASE_URL}/analytics/churn-by-satisfaction`, { headers }),
-      fetch(`${API_BASE_URL}/analytics/customer-segmentation`, { headers }),
-      fetch(`${API_BASE_URL}/customers?page=1&limit=6`, { headers }),
+      apiService.getDashboardKPIs(),
+      apiService.getChurnRiskDistribution(),
+      apiService.getChurnByIncome(),
+      apiService.getChurnByDevice(),
+      apiService.getChurnByPayment(),
+      apiService.getChurnBySpend(),
+      apiService.getChurnByTenure(),
+      apiService.getChurnBySatisfaction(),
+      apiService.getCustomerSegmentation(),
+      apiService.getCustomers(1, 6),
     ])
-      .then(async (responses) => {
-        if (responses.some(res => res.status === 401)) {
-          if (onLogout) onLogout();
-          return;
-        }
-
-        const [
-          kpisRes,
-          riskRes,
-          incomeRes,
-          deviceRes,
-          paymentRes,
-          spendRes,
-          tenureRes,
-          satisfactionRes,
-          segmentRes,
-          customersRes,
-        ] = responses;
-        const kpisData = await kpisRes.json();
-        const riskData = await riskRes.json();
-        const incomeDataResult = await incomeRes.json();
-        const deviceDataResult = await deviceRes.json();
-        const paymentDataResult = await paymentRes.json();
-        const spendDataResult = await spendRes.json();
-        const tenureDataResult = await tenureRes.json();
-        const satisfactionDataResult = await satisfactionRes.json();
-        const segmentDataResult = await segmentRes.json();
-        const customersData = await customersRes.json();
-
-        if (
-          !kpisRes.ok ||
-          !riskRes.ok ||
-          !incomeRes.ok ||
-          !deviceRes.ok ||
-          !paymentRes.ok ||
-          !spendRes.ok ||
-          !tenureRes.ok ||
-          !satisfactionRes.ok ||
-          !segmentRes.ok ||
-          !customersRes.ok
-        ) {
-          throw new Error('Unable to load analytics data right now.');
-        }
-
+      .then(([kpisData, riskData, incomeDataResult, deviceDataResult, paymentDataResult, spendDataResult, tenureDataResult, satisfactionDataResult, segmentDataResult, customersData]) => {
         setKpis(kpisData);
-        setRiskDistribution(riskData);
-        setIncomeData(incomeDataResult);
-        setDeviceData(deviceDataResult);
-        setSegmentData(segmentDataResult);
-        setCustomerRows(customersData.results || []);
+        setRiskDistribution(asArray(riskData));
+        setIncomeData(asArray(incomeDataResult));
+        setDeviceData(asArray(deviceDataResult));
+        setPaymentData(asArray(paymentDataResult));
+        setSpendData(asArray(spendDataResult));
+        setTenureData(asArray(tenureDataResult));
+        setSatisfactionData(asArray(satisfactionDataResult));
+        setSegmentData(asArray(segmentDataResult));
+        setCustomerRows(customersData?.results || []);
       })
-      .catch((err) => setError(err.message || 'Unable to load analytics data.'))
+      .catch((err) => {
+        if (err.status === 401) {
+          if (onLogout) onLogout();
+        } else {
+          setError(err.message || 'Unable to load analytics data.');
+        }
+      })
       .finally(() => setLoading(false));
   }, [onLogout]);
 

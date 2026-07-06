@@ -16,8 +16,20 @@ describe('AnalyticsDashboard', () => {
       if (url.includes('/analytics/churn-by-device')) {
         return Promise.resolve({ ok: true, json: async () => [{ device_type: 'Mobile', churn_rate: 20 }, { device_type: 'Desktop', churn_rate: 15 }] });
       }
+      if (url.includes('/analytics/churn-by-payment')) {
+        return Promise.resolve({ ok: true, json: async () => [{ payment_mode: 'Credit Card', churn_rate: 14 }, { payment_mode: 'UPI', churn_rate: 18 }] });
+      }
+      if (url.includes('/analytics/churn-by-spend')) {
+        return Promise.resolve({ ok: true, json: async () => [{ spend_bucket: 'Under $20', churn_rate: 9 }, { spend_bucket: '$20 - $50', churn_rate: 12 }] });
+      }
+      if (url.includes('/analytics/churn-by-tenure')) {
+        return Promise.resolve({ ok: true, json: async () => [{ tenure_bucket: '0-3 Months (New)', churn_rate: 28 }, { tenure_bucket: '12+ Months (Loyal)', churn_rate: 3 }] });
+      }
+      if (url.includes('/analytics/churn-by-satisfaction')) {
+        return Promise.resolve({ ok: true, json: async () => [{ satisfaction_score: 5, churn_rate: 2 }, { satisfaction_score: 1, churn_rate: 85 }] });
+      }
       if (url.includes('/customers?page=1&limit=6')) {
-        return Promise.resolve({ ok: true, json: async () => ({ results: [{ customer_id: 'C1001', risk_category: 'High', monthly_total_spend: 80, tenure_months: 8 }] }) });
+        return Promise.resolve({ ok: true, json: async () => ({ results: [{ customer_id: 'C1001', risk_category: 'High', monthly_total_spend: 80, tenure_months: 8, satisfaction_score: 6 }] }) });
       }
       return Promise.resolve({ ok: true, json: async () => ({}) });
     });

@@ -5,7 +5,10 @@ This project combines analytics, customer profiling, and churn prediction into a
 ## What’s included
 
 - A FastAPI backend with customer, analytics, report, and prediction endpoints
-- A React dashboard for KPI monitoring and customer risk review
+- A React dashboard including:
+  - **Executive Analytics Dashboard** for KPI monitoring and churn risk overview
+  - **Customer Directory** for paginated listings, ID searches, and multi-select filtering
+  - **Profile Explorer** for detailed customer audit, on-demand prediction execution, local SHAP explainability weights, and model audit logging
 - A bulk prediction studio that accepts CSV uploads and runs asynchronous churn scoring
 - Rule-based churn scoring with recommendation outputs and preview/download support
 
@@ -93,15 +96,32 @@ The UI will be available at:
 
 ## Using the app
 
-### Analytics dashboard
+### Analytics Dashboard
 
 Open the dashboard at http://localhost:3000 to view:
-- KPI summaries
-- Churn risk distribution
-- Income and device split charts
-- A high-risk customer queue
+- KPI summaries (total customers, active predictions, monthly spend, average risk score, etc.).
+- Churn risk distribution.
+- Income level split and Device type split analytics charts.
+- A high-risk customer queue displaying details of at-risk users.
 
-### Bulk prediction studio
+### Customer Directory
+
+The **Customer Directory** tab allows you to browse, search, and dynamically filter registered customer profiles:
+- Search bar to filter by partial Customer ID.
+- Multi-select filters for Risk Level, Income Level, Device Type, and Payment Mode.
+- Will Cancel status toggling (Stable vs. Churn).
+- Quick links to jump directly to any user's profile.
+
+### Profile Explorer
+
+The **Profile Explorer** tab provides granular behavioral audits and diagnostics for individual customer profiles:
+- Detailed breakdown of demographic attributes and subscription activity metrics.
+- On-demand **Generate Model Prediction** execution.
+- Local model explainability rendering **SHAP factor progress bars** (highlighting feature contributions to the prediction score).
+- Personalized **Retention Action Recommendations** (e.g., promotional discounts, support calls, upgrades).
+- Live prediction run history logs auditing model predictions over time.
+
+### Bulk Prediction Studio
 
 The dashboard includes a Bulk Prediction Studio where you can upload a CSV file containing customer records and run asynchronous churn predictions.
 
@@ -112,13 +132,27 @@ customer_id,age,income_level,device_type,payment_mode,number_of_subscriptions,te
 ```
 
 After upload, the UI will show:
-- job status and progress
-- a preview of predicted results
-- a download link for the generated CSV report
+- Job status and progress.
+- A preview of predicted results.
+- A download link for the generated CSV report.
+
+## Running Tests
+
+### Frontend Tests
+
+To run the React unit test suite, navigate to the `frontend` folder and run:
+
+```powershell
+cd frontend
+npm test
+```
 
 ## API notes
 
 The backend exposes prediction and analytics routes under `/api/v1`, including:
+- `/api/v1/customers` (paginated lists, search, and filters)
+- `/api/v1/customers/{customer_id}` (detailed demographic profile details)
+- `/api/v1/customers/{customer_id}/history` (prediction run logs)
 - `/api/v1/predictions/single/{customer_id}`
 - `/api/v1/predictions/bulk`
 - `/api/v1/predictions/bulk/status/{job_id}`
@@ -129,4 +163,3 @@ The backend exposes prediction and analytics routes under `/api/v1`, including:
 - If the frontend cannot reach the backend, confirm that the backend server is still running on port 8000.
 - If you want to switch away from the SQLite local setup, set `DATABASE_URL` to your preferred database connection string before starting the backend.
 - If `npm start` shows a build warning, the app should still run locally in development mode.
-- If your linter/import checker (**`pyrefly`**) reports that it cannot find modules such as `fastapi` or `sqlalchemy`, check that `python-interpreter-path` in [pyrefly.toml](file:///d:/Team-3/pyrefly.toml) and [backend/pyrefly.toml](file:///d:/Team-3/backend/pyrefly.toml) matches your active virtual environment path (e.g. `.venv/Scripts/python.exe` or `backend/.venv/Scripts/python.exe`).

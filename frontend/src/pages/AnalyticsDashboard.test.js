@@ -17,6 +17,15 @@ describe('AnalyticsDashboard', () => {
       if (url.includes('/analytics/churn-by-device')) {
         return Promise.resolve({ ok: true, json: async () => [{ device_type: 'Mobile', churn_rate: 20 }, { device_type: 'Desktop', churn_rate: 15 }] });
       }
+      if (url.includes('/analytics/customer-segmentation')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => [
+            { segment: 'High Risk', customer_count: 5, percentage: 10.0, average_churn_risk: 80.0 },
+            { segment: 'Loyal', customer_count: 45, percentage: 90.0, average_churn_risk: 5.0 }
+          ]
+        });
+      }
       if (url.includes('/customers?page=1&limit=6')) {
         return Promise.resolve({ ok: true, json: async () => ({ results: [{ customer_id: 'C1001', risk_category: 'High', monthly_total_spend: 80, tenure_months: 8, satisfaction_score: 6 }] }) });
       }

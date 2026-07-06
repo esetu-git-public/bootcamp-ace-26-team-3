@@ -107,8 +107,8 @@ print(f"Metrics saved to: {METRICS_SAVE_PATH}")
 print("Saving model evaluation metrics to database...")
 db = None
 try:
-    from app.database import SessionLocal
-    from app.models import ModelMetric
+    from backend.app.database import SessionLocal
+    from backend.app.models import ModelMetric
 
     db = SessionLocal()
     db_metric = ModelMetric(

@@ -4,6 +4,7 @@ import SignUp from './pages/SignUp';
 import AnalyticsDashboard from './pages/AnalyticsDashboard';
 import CustomerProfile from './pages/CustomerProfile';
 import CustomerDirectory from './pages/CustomerDirectory';
+import ModelPerformance from './pages/ModelPerformance';
 
 function App() {
   const [view, setView] = useState('login');
@@ -31,7 +32,7 @@ function App() {
     setView('login');
   };
 
-  const isAuth = token && ['dashboard', 'directory', 'profile'].includes(view);
+  const isAuth = token && ['dashboard', 'directory', 'profile', 'model'].includes(view);
 
   return (
     <div className="App" style={styles.appContainer}>
@@ -60,6 +61,12 @@ function App() {
               style={view === 'profile' ? styles.activeNavLink : styles.navLink}
             >
               Profile Explorer
+            </button>
+            <button
+              onClick={() => setView('model')}
+              style={view === 'model' ? styles.activeNavLink : styles.navLink}
+            >
+              Model Performance
             </button>
           </div>
           <button onClick={handleLogout} style={styles.signOutBtn}>
@@ -96,6 +103,12 @@ function App() {
             onLogout={handleLogout}
             selectedCustomerId={selectedCustomerId}
             setSelectedCustomerId={setSelectedCustomerId}
+          />
+        )}
+        {view === 'model' && (
+          <ModelPerformance
+            onViewChange={setView}
+            onLogout={handleLogout}
           />
         )}
       </main>

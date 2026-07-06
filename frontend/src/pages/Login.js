@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+import * as apiService from '../services/api';
 
 export default function Login({ onLoginSuccess, onNavigateToSignup }) {
   const [username, setUsername] = useState('');
@@ -21,23 +20,7 @@ export default function Login({ onLoginSuccess, onNavigateToSignup }) {
     setError('');
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username,
-          password,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.detail || 'Incorrect username or password');
-      }
-
+      const data = await apiService.login(username, password);
       onLoginSuccess(data.access_token);
     } catch (err) {
       setError(err.message || 'Connection error. Please try again.');

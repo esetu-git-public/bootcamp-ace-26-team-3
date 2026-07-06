@@ -95,7 +95,7 @@ class CustomerBase(BaseModel):
     tenure_months: int
     monthly_total_spend: float
     avg_usage_hours_per_week: float
-    app_switch_frequency: str
+    app_switch_frequency: int
     customer_support_interactions: int
     satisfaction_score: int
     discount_used: bool

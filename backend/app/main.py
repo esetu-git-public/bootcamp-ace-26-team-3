@@ -2,10 +2,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
-from .database import Base, engine
-from .models.user import User
-from .core.risk_score import build_risk_profile
+from .database import Base, SessionLocal, engine
 from . import models
+from .db_init import initialize_database
 from .routers import analytics, auth, customers, dashboard, model, predictions, reports
 from .api.endpoints import explainability
 
@@ -26,13 +25,6 @@ app.add_middleware(
 
 try:
     Base.metadata.create_all(bind=engine)
-    
-    from .database import SessionLocal
-    from passlib.context import CryptContext
-    from sqlalchemy import text
-    import csv
-    import os
-    from .models import Customer, ChurnPrediction
 
     db = SessionLocal()
     try:
@@ -83,25 +75,19 @@ try:
         db.commit()
 
         # Create supporting indexes for common analytics and search patterns
-        for index_statement in [
-            """
+        db.execute(text("""
             CREATE INDEX IF NOT EXISTS idx_customers_lower_customer_id
-            ON customers(LOWER(customer_id))
-            """,
-            """
+            ON customers(LOWER(customer_id));
+
             CREATE INDEX IF NOT EXISTS idx_predictions_customer_predicted_at
-            ON churn_predictions(customer_id, predicted_at DESC)
-            """,
-            """
+            ON churn_predictions(customer_id, predicted_at DESC);
+
             CREATE INDEX IF NOT EXISTS idx_predictions_risk_will
-            ON churn_predictions(risk_category, will_cancel)
-            """,
-            """
+            ON churn_predictions(risk_category, will_cancel);
+
             CREATE INDEX IF NOT EXISTS idx_prediction_history_customer_at
-            ON prediction_history(customer_id, evaluated_at DESC)
-            """,
-        ]:
-            db.execute(text(index_statement))
+            ON prediction_history(customer_id, evaluated_at DESC);
+        """))
         db.commit()
         print("Database index recommendations created/verified.")
 

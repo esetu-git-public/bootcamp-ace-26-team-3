@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+import * as apiService from '../services/api';
+import * as mlModel from '../services/mlModel';
+import { ModelPredictionCard, RiskGauge, PredictionTimeline } from '../components/ModelPredictionCard';
 
 export default function CustomerProfile({ onViewChange, onLogout, selectedCustomerId, setSelectedCustomerId }) {
   const [customerId, setCustomerId] = useState(selectedCustomerId || 'C10239');
@@ -17,20 +18,7 @@ export default function CustomerProfile({ onViewChange, onLogout, selectedCustom
     setError(null);
     setPrediction(null);
     try {
-      const token = localStorage.getItem('access_token');
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      
-      const response = await fetch(`${API_BASE_URL}/customers/${id}`, { headers });
-      if (response.status === 401) {
-        onLogout();
-        return;
-      }
-      
-      if (!response.ok) {
-        throw new Error('Customer ID not found in database.');
-      }
-      
-      const data = await response.json();
+      const data = await apiService.getCustomerProfile(id);
       setCustomer(data);
       
       // If customer has a prediction in the view result, set it
@@ -49,7 +37,11 @@ export default function CustomerProfile({ onViewChange, onLogout, selectedCustom
       
       fetchPredictionHistory(id);
     } catch (err) {
-      setError(err.message);
+      if (err.status === 401) {
+        onLogout();
+      } else {
+        setError(err.message || 'Failed to load customer details');
+      }
       setCustomer(null);
     } finally {
       setLoading(false);
@@ -59,32 +51,17 @@ export default function CustomerProfile({ onViewChange, onLogout, selectedCustom
   const runChurnPrediction = async () => {
     if (!customer) return;
     setPredicting(true);
+    setError(null);
     try {
-      const token = localStorage.getItem('access_token');
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      
-      const response = await fetch(`${API_BASE_URL}/predictions/single/${customerId}`, {
-        method: 'POST',
-        headers: {
-          ...headers,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (response.status === 401) {
-        onLogout();
-        return;
-      }
-      
-      if (!response.ok) {
-        throw new Error('Error running prediction.');
-      }
-      
-      const data = await response.json();
+      const data = await mlModel.getSinglePrediction(customerId);
       setPrediction(data);
       fetchPredictionHistory(customerId);
     } catch (err) {
-      setError(err.message || 'Failed to run churn prediction model.');
+      if (err.status === 401) {
+        onLogout();
+      } else {
+        setError(err.message || 'Failed to run churn prediction model.');
+      }
     } finally {
       setPredicting(false);
     }
@@ -92,19 +69,12 @@ export default function CustomerProfile({ onViewChange, onLogout, selectedCustom
 
   const fetchPredictionHistory = async (id) => {
     try {
-      const token = localStorage.getItem('access_token');
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      
-      const response = await fetch(`${API_BASE_URL}/customers/${id}/history`, { headers });
-      if (response.status === 401) {
-        onLogout();
-        return;
-      }
-      
-      const data = await response.json();
+      const data = await mlModel.getPredictionHistory(id);
       setHistory(data || []);
     } catch (err) {
-      console.error('Failed to load prediction history', err);
+      if (err.status !== 401) {
+        console.error('Failed to load prediction history', err);
+      }
     }
   };
 
@@ -189,36 +159,16 @@ export default function CustomerProfile({ onViewChange, onLogout, selectedCustom
 
           {/* Right Column: Model Output and Local SHAP Explainability */}
           <div style={styles.rightCol}>
-            {/* Churn Prediction Output Badge */}
-            <div style={styles.card}>
-              <h3 style={styles.cardTitle}>Churn Model Inference Output</h3>
-              {prediction ? (
-                <div>
-                  <div style={styles.predictionBox(prediction.will_cancel)}>
-                    {prediction.will_cancel === 1 ? 'PREDICTED TO CANCEL (CHURN)' : 'PREDICTED TO RETAIN (STABLE)'}
-                  </div>
-                  <div style={styles.metricRow}>
-                    <span>Churn Probability:</span>
-                    <strong style={{ fontSize: '1.4rem', color: '#f8fafc' }}>
-                      {prediction.churn_probability.toFixed(2)}%
-                    </strong>
-                    {prediction.probability_confidence_lower !== undefined && prediction.probability_confidence_upper !== undefined && (
-                      <span style={{ fontSize: '0.9rem', color: '#cbd5e1', marginLeft: '1rem' }}>
-                        (95% CI: {prediction.probability_confidence_lower.toFixed(2)}% - {prediction.probability_confidence_upper.toFixed(2)}%)
-                      </span>
-                    )}
-                  </div>
-                  <div style={styles.metricRow}>
-                    <span>Risk Category:</span>
-                    <span style={styles.riskBadge(prediction.risk_category)}>
-                      {prediction.risk_category} Risk
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                <div style={styles.placeholderText}>No active churn model outputs loaded. Click the prediction button to evaluate this customer profile.</div>
-              )}
-            </div>
+            {/* Model Prediction Card with SHAP Explainability */}
+            <ModelPredictionCard
+              prediction={prediction}
+              loading={predicting}
+              error={error}
+              onRegenerate={runChurnPrediction}
+            />
+
+            {/* Prediction History Timeline */}
+            <PredictionTimeline predictions={history} />
 
             {/* Explainable AI / Local SHAP Indicators */}
             {prediction && prediction.explainability && (

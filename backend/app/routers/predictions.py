@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Backgro
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 import uuid
+import json
 from datetime import datetime
 from typing import Optional
 from io import StringIO
@@ -311,7 +312,7 @@ async def predict_single(
                 "prob": score,
                 "risk": risk,
                 "cancel": will_cancel,
-                "explain": explainability,
+                "explain": json.dumps(explainability) if isinstance(explainability, dict) else explainability,
                 "rec_type": rec_type,
                 "rec_desc": rec_desc,
                 "predicted_at": now_time

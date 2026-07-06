@@ -50,6 +50,20 @@ PREPROCESSOR_PATH = os.path.join(ARTIFACT_DIR, "preprocessor.pkl")
 MODEL_PATH = os.path.join(ARTIFACT_DIR, "catboost_model.cbm")
 
 
+def _install_pickle_module_aliases() -> None:
+    """Allow older artifacts pickled as app.core.* to load as backend.app.core.*."""
+    try:
+        import backend.app as backend_app
+        import backend.app.core as backend_core
+        from backend.app.core import preprocessing
+    except Exception:
+        return
+
+    sys.modules.setdefault("app", backend_app)
+    sys.modules.setdefault("app.core", backend_core)
+    sys.modules.setdefault("app.core.preprocessing", preprocessing)
+
+
 class ModelService:
     def __init__(self):
         self.preprocessor = None
@@ -65,6 +79,7 @@ class ModelService:
             return
 
         try:
+            _install_pickle_module_aliases()
             with open(PREPROCESSOR_PATH, "rb") as f:
                 self.preprocessor = pickle.load(f)
         except (ModuleNotFoundError, AttributeError, pickle.UnpicklingError) as e:

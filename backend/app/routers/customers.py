@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 from typing import Any, Dict, List, Optional, cast
 from datetime import datetime, timedelta
 from ..database import get_db
@@ -44,6 +44,13 @@ def get_mock_customer_profile(customer_id: str):
         "predicted_at": datetime.utcnow()
     }
 
+
+def _expand_list_params(query, params: Dict[str, Any]):
+    for key in ("income_levels", "device_types", "payment_modes", "risk_categories"):
+        if key in params:
+            query = query.bindparams(bindparam(key, expanding=True))
+    return query
+
 @router.get("", response_model=PaginatedCustomersResponse)
 async def get_customers(
     page: int = Query(1, ge=1),
@@ -73,29 +80,30 @@ async def get_customers(
             params["search_id"] = f"%{search_id.lower()}%"
         if income_levels:
             query_str += " AND income_level IN :income_levels"
-            params["income_levels"] = tuple(income_levels)
+            params["income_levels"] = income_levels
         if device_types:
             query_str += " AND device_type IN :device_types"
-            params["device_types"] = tuple(device_types)
+            params["device_types"] = device_types
         if payment_modes:
             query_str += " AND payment_mode IN :payment_modes"
-            params["payment_modes"] = tuple(payment_modes)
+            params["payment_modes"] = payment_modes
         if risk_categories:
             query_str += " AND risk_category IN :risk_categories"
-            params["risk_categories"] = tuple(risk_categories)
+            params["risk_categories"] = risk_categories
         if will_cancel is not None:
             query_str += " AND will_cancel = :will_cancel"
             params["will_cancel"] = will_cancel
 
         # Run count query first
         count_query_str = f"SELECT COUNT(*) FROM ({query_str}) AS sub"
-        total = db.execute(text(count_query_str), {k: v for k, v in params.items() if k not in ["limit", "offset"]}).scalar() or 0
+        count_params = {k: v for k, v in params.items() if k not in ["limit", "offset"]}
+        total = db.execute(_expand_list_params(text(count_query_str), count_params), count_params).scalar() or 0
 
         rows = []
         if total > 0:
             # Run paginated list query
             query_str += " ORDER BY churn_probability DESC LIMIT :limit OFFSET :offset"
-            results = db.execute(text(query_str), params).fetchall()
+            results = db.execute(_expand_list_params(text(query_str), params), params).fetchall()
             
             for r in results:
                 rows.append({
@@ -188,7 +196,7 @@ async def get_customer_prediction_history(
     current_user: str = Depends(get_current_user)
 ):
     try:
-        from app.models import PredictionHistory
+        from ..models import PredictionHistory
         results = db.query(PredictionHistory).filter(PredictionHistory.customer_id == customer_id).order_by(PredictionHistory.evaluated_at.desc()).all()
         
         return [{

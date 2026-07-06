@@ -4,8 +4,10 @@ from sqlalchemy import text
 import uuid
 from datetime import datetime
 from typing import Optional
+from io import StringIO
 import os
 import csv
+import re
 import pandas as pd
 from ..database import get_db
 from ..schemas import (
@@ -41,22 +43,43 @@ def _normalize_bool(value: Optional[object]) -> bool:
     return False
 
 
+def _get_first(data: dict, *keys: str, default: Optional[object] = None) -> Optional[object]:
+    for key in keys:
+        if key in data and data[key] not in (None, ""):
+            return data[key]
+    return default
+
+
+def _to_int(value: Optional[object], default: int) -> int:
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return default
+
+
+def _to_float(value: Optional[object], default: float) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def _build_prediction_input(data: dict) -> pd.DataFrame:
     input_row = {
-        "Income_Level": data.get("income_level", "Medium"),
-        "Satisfaction_Score": int(data.get("satisfaction_score", 3)),
-        "Discount_Used": _normalize_bool(data.get("discount_used", False)),
-        "Age": int(data.get("age", 35)),
-        "Number_of_Subscriptions": int(data.get("number_of_subscriptions", 1)),
-        "Tenure_Months": int(data.get("tenure_months", 12)),
-        "Monthly_Total_Spend": float(data.get("monthly_total_spend", 75.0)),
-        "Avg_Usage_Hours_Per_Week": float(data.get("avg_usage_hours_per_week", 15.0)),
-        "App_Switch_Frequency": int(data.get("app_switch_frequency", 5)),
-        "Customer_Support_Interactions": int(data.get("customer_support_interactions", 3)),
-        "Device_Type": data.get("device_type", "Mobile"),
-        "Payment_Mode": data.get("payment_mode", "UPI"),
+        "Income_Level": _get_first(data, "income_level", "Income_Level", "Income Level", default="Medium"),
+        "Satisfaction_Score": _to_int(_get_first(data, "satisfaction_score", "Satisfaction_Score", "Satisfaction (1-5)", default=3), 3),
+        "Discount_Used": _normalize_bool(_get_first(data, "discount_used", "Discount_Used", "Discount Used", default=False)),
+        "Age": _to_int(_get_first(data, "age", "Age", default=35), 35),
+        "Number_of_Subscriptions": _to_int(_get_first(data, "number_of_subscriptions", "Number_of_Subscriptions", "Number of Subscriptions", default=1), 1),
+        "Tenure_Months": _to_int(_get_first(data, "tenure_months", "Tenure_Months", "Tenure (Months)", default=12), 12),
+        "Monthly_Total_Spend": _to_float(_get_first(data, "monthly_total_spend", "Monthly_Total_Spend", "Monthly Spend ($)", default=75.0), 75.0),
+        "Avg_Usage_Hours_Per_Week": _to_float(_get_first(data, "avg_usage_hours_per_week", "Avg_Usage_Hours_Per_Week", "Weekly Usage (Hrs)", default=15.0), 15.0),
+        "App_Switch_Frequency": _to_int(_get_first(data, "app_switch_frequency", "App_Switch_Frequency", default=5), 5),
+        "Customer_Support_Interactions": _to_int(_get_first(data, "customer_support_interactions", "Customer_Support_Interactions", "Support Tickets", default=3), 3),
+        "Device_Type": _get_first(data, "device_type", "Device_Type", "Device Type", default="Mobile"),
+        "Payment_Mode": _get_first(data, "payment_mode", "Payment_Mode", "Payment Mode", default="UPI"),
     }
-    return pd.DataFrame([input_row])
+    return pd.DataFrame([input_row], dtype=object)
 
 
 def _risk_from_probability(prob: float) -> tuple[str, int, str, str]:
@@ -84,17 +107,116 @@ def _risk_from_probability(prob: float) -> tuple[str, int, str, str]:
 # Global dictionary to track bulk job status in-memory for prototype
 BULK_JOBS_DB = {}
 
+
+def _is_valid_job_id(job_id: str) -> bool:
+    return bool(re.fullmatch(r"[A-Za-z0-9_-]+", job_id))
+
+
+def _score_prediction_row(row: dict) -> dict:
+    df_input = _build_prediction_input(row)
+    try:
+        if not model_service.is_ready:
+            raise RuntimeError("Model artifacts are not available.")
+
+        output = model_service.predict_and_explain(df_input)
+        score = round(output["probability"] * 100.0, 2)
+        score_lower = round(output["probability_confidence_lower"] * 100.0, 2)
+        score_upper = round(output["probability_confidence_upper"] * 100.0, 2)
+        risk, will_cancel, rec_type, rec_desc = _risk_from_probability(score / 100.0)
+    except Exception as exc:
+        print(f"Bulk model prediction failed, falling back to rule-based predictor: {exc}")
+        profile = build_risk_profile(
+            customer_support_interactions=_to_int(_get_first(row, "customer_support_interactions", "Customer_Support_Interactions", "Support Tickets", default=3), 3),
+            satisfaction_score=_to_int(_get_first(row, "satisfaction_score", "Satisfaction_Score", "Satisfaction (1-5)", default=3), 3),
+            monthly_total_spend=_to_float(_get_first(row, "monthly_total_spend", "Monthly_Total_Spend", "Monthly Spend ($)", default=75.0), 75.0),
+            avg_usage_hours_per_week=_to_float(_get_first(row, "avg_usage_hours_per_week", "Avg_Usage_Hours_Per_Week", "Weekly Usage (Hrs)", default=15.0), 15.0),
+        )
+        score = round(float(profile["risk_score"]), 2)
+        score_lower = round(max(0, score - 5.0), 2)
+        score_upper = round(min(100, score + 5.0), 2)
+        risk = profile["risk_category"]
+        will_cancel = profile["will_cancel"]
+        rec_type = profile["recommendation_type"]
+        rec_desc = profile["recommendation_desc"]
+
+    return {
+        "customer_id": str(_get_first(row, "customer_id", "Customer ID", "Customer_ID", default="")).strip() or "UNKNOWN",
+        "age": _to_int(_get_first(row, "age", "Age", default=35), 35),
+        "tenure_months": _to_int(_get_first(row, "tenure_months", "Tenure_Months", "Tenure (Months)", default=12), 12),
+        "monthly_total_spend": _to_float(_get_first(row, "monthly_total_spend", "Monthly_Total_Spend", "Monthly Spend ($)", default=75.0), 75.0),
+        "avg_usage_hours_per_week": _to_float(_get_first(row, "avg_usage_hours_per_week", "Avg_Usage_Hours_Per_Week", "Weekly Usage (Hrs)", default=15.0), 15.0),
+        "customer_support_interactions": _to_int(_get_first(row, "customer_support_interactions", "Customer_Support_Interactions", "Support Tickets", default=3), 3),
+        "satisfaction_score": _to_int(_get_first(row, "satisfaction_score", "Satisfaction_Score", "Satisfaction (1-5)", default=3), 3),
+        "churn_probability": score,
+        "probability_confidence_lower": score_lower,
+        "probability_confidence_upper": score_upper,
+        "risk_category": risk,
+        "will_cancel": will_cancel,
+        "recommendation_type": rec_type,
+        "recommendation_desc": rec_desc,
+    }
+
+
 def process_bulk_predictions_task(job_id: str, file_content: bytes):
-    # Simulates asynchronous background parsing and inference
-    import time
-    time.sleep(5)  # Simulate processing delay
-    
-    if job_id in BULK_JOBS_DB:
+    if job_id not in BULK_JOBS_DB or not _is_valid_job_id(job_id):
+        return
+
+    BULK_JOBS_DB[job_id]["status"] = "PROCESSING"
+    output_path = os.path.join(RESULTS_DIR, f"{job_id}.csv")
+
+    try:
+        decoded = file_content.decode("utf-8-sig", errors="ignore")
+        reader = csv.DictReader(StringIO(decoded))
+        if not reader.fieldnames:
+            raise ValueError("CSV file must include a header row.")
+
+        fieldnames = [
+            "Customer ID", "Age", "Tenure (Months)", "Monthly Spend ($)",
+            "Weekly Usage (Hrs)", "Support Tickets", "Satisfaction (1-5)",
+            "Churn Probability", "Confidence Lower", "Confidence Upper",
+            "Will Cancel", "Risk Category", "Recommended Offer", "Action Description"
+        ]
+
+        with open(output_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+
+            for row in reader:
+                if not any(str(value).strip() for value in row.values() if value is not None):
+                    continue
+
+                try:
+                    result = _score_prediction_row(row)
+                    writer.writerow({
+                        "Customer ID": result["customer_id"],
+                        "Age": result["age"],
+                        "Tenure (Months)": result["tenure_months"],
+                        "Monthly Spend ($)": result["monthly_total_spend"],
+                        "Weekly Usage (Hrs)": result["avg_usage_hours_per_week"],
+                        "Support Tickets": result["customer_support_interactions"],
+                        "Satisfaction (1-5)": result["satisfaction_score"],
+                        "Churn Probability": f"{result['churn_probability']}%",
+                        "Confidence Lower": f"{result['probability_confidence_lower']}%",
+                        "Confidence Upper": f"{result['probability_confidence_upper']}%",
+                        "Will Cancel": result["will_cancel"],
+                        "Risk Category": result["risk_category"],
+                        "Recommended Offer": result["recommendation_type"],
+                        "Action Description": result["recommendation_desc"],
+                    })
+                    BULK_JOBS_DB[job_id]["successful_records"] += 1
+                except Exception as row_exc:
+                    print(f"Failed to process bulk row for job {job_id}: {row_exc}")
+                    BULK_JOBS_DB[job_id]["failed_records"] += 1
+                finally:
+                    BULK_JOBS_DB[job_id]["processed_records"] += 1
+
         BULK_JOBS_DB[job_id]["status"] = "COMPLETED"
-        BULK_JOBS_DB[job_id]["processed_records"] = BULK_JOBS_DB[job_id]["total_records"]
-        BULK_JOBS_DB[job_id]["successful_records"] = BULK_JOBS_DB[job_id]["total_records"]
         BULK_JOBS_DB[job_id]["completed_at"] = datetime.utcnow()
         BULK_JOBS_DB[job_id]["download_url"] = f"/api/v1/reports/export?format=csv&job_id={job_id}"
+    except Exception as exc:
+        BULK_JOBS_DB[job_id]["status"] = "FAILED"
+        BULK_JOBS_DB[job_id]["error_message"] = str(exc)
+        BULK_JOBS_DB[job_id]["completed_at"] = datetime.utcnow()
 
 @router.post("/single/{customer_id}", response_model=SinglePredictionResponse)
 async def predict_single(
@@ -232,17 +354,30 @@ async def predict_bulk(
     file: UploadFile = File(...),
     current_user: str = Depends(get_current_user)
 ):
-    if not file.filename or not file.filename.endswith('.csv'):
+    if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid file format. Only CSV files are accepted."
         )
     
     file_content = await file.read()
-    # Simple parse to count lines
-    lines = file_content.decode('utf-8', errors='ignore').split('\n')
-    lines = [l for l in lines if l.strip()]
-    total_records = max(0, len(lines) - 1)  # Subtract header row
+    decoded = file_content.decode("utf-8-sig", errors="ignore")
+    reader = csv.DictReader(StringIO(decoded))
+    if not reader.fieldnames:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="CSV file must include a header row."
+        )
+    total_records = sum(
+        1
+        for row in reader
+        if any(str(value).strip() for value in row.values() if value is not None)
+    )
+    if total_records == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="CSV file must include at least one customer record."
+        )
     
     job_id = str(uuid.uuid4())
     
@@ -256,7 +391,8 @@ async def predict_bulk(
         "failed_records": 0,
         "created_at": datetime.utcnow(),
         "completed_at": None,
-        "download_url": None
+        "download_url": None,
+        "error_message": None,
     }
     BULK_JOBS_DB[job_id] = job_info
     
@@ -275,18 +411,11 @@ async def get_bulk_status(
     job_id: str,
     current_user: str = Depends(get_current_user)
 ):
-    if job_id not in BULK_JOBS_DB:
-        # Generate a mock response for dynamic prototype demo in case job is simulated
-        return {
-            "job_id": job_id,
-            "status": "COMPLETED",
-            "total_records": 500,
-            "processed_records": 500,
-            "successful_records": 500,
-            "failed_records": 0,
-            "completed_at": datetime.utcnow(),
-            "download_url": f"/api/v1/reports/export?format=csv&job_id={job_id}"
-        }
+    if not _is_valid_job_id(job_id) or job_id not in BULK_JOBS_DB:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Bulk prediction job not found."
+        )
     return BULK_JOBS_DB[job_id]
 
 @router.get("/bulk/preview/{job_id}")
@@ -294,15 +423,19 @@ async def get_bulk_preview(
     job_id: str,
     current_user: str = Depends(get_current_user)
 ):
+    if not _is_valid_job_id(job_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Bulk prediction job not found."
+        )
+
     # Preview endpoint to fetch the first 15 predictions of the job results
     file_path = os.path.join(RESULTS_DIR, f"{job_id}.csv")
     if not os.path.exists(file_path):
-        # Return fallback mockup preview records if job not in file system (for prototype consistency)
-        return [
-            {"customer_id": "CUST0001", "age": 34, "tenure_months": 8, "monthly_total_spend": 79.50, "avg_usage_hours_per_week": 14.5, "customer_support_interactions": 3, "satisfaction_score": 2, "churn_probability": 89.0, "risk_category": "High", "recommendation_type": "Offer Discount", "recommendation_desc": "Apply 20% discount on renewal to mitigate high interaction friction."},
-            {"customer_id": "CUST0002", "age": 45, "tenure_months": 2, "monthly_total_spend": 35.00, "avg_usage_hours_per_week": 8.2, "customer_support_interactions": 5, "satisfaction_score": 1, "churn_probability": 84.5, "risk_category": "High", "recommendation_type": "Provide Free Trial", "recommendation_desc": "Offer a 14-day premium free trial extension."},
-            {"customer_id": "CUST0008", "age": 28, "tenure_months": 4, "monthly_total_spend": 95.00, "avg_usage_hours_per_week": 6.0, "customer_support_interactions": 4, "satisfaction_score": 2, "churn_probability": 78.2, "risk_category": "High", "recommendation_type": "Offer Discount", "recommendation_desc": "Recommend a 15% discount for a 6-month contract."}
-        ]
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Bulk prediction results are not available."
+        )
         
     preview_data = []
     try:
@@ -315,6 +448,8 @@ async def get_bulk_preview(
                 # Map headers from output file
                 # Customer ID, Age, Tenure (Months), Monthly Spend ($), Weekly Usage (Hrs), Support Tickets, Satisfaction (1-5), Churn Probability, Risk Category, Recommended Offer, Action Description
                 prob_str = row.get("Churn Probability", "0%").replace("%", "")
+                lower_str = row.get("Confidence Lower", "0%").replace("%", "")
+                upper_str = row.get("Confidence Upper", "0%").replace("%", "")
                 preview_data.append({
                     "customer_id": row.get("Customer ID", ""),
                     "age": int(row.get("Age", 0)),
@@ -324,6 +459,9 @@ async def get_bulk_preview(
                     "customer_support_interactions": int(row.get("Support Tickets", 0)),
                     "satisfaction_score": int(row.get("Satisfaction (1-5)", 0)),
                     "churn_probability": float(prob_str),
+                    "probability_confidence_lower": float(lower_str),
+                    "probability_confidence_upper": float(upper_str),
+                    "will_cancel": int(row.get("Will Cancel", 0)),
                     "risk_category": row.get("Risk Category", ""),
                     "recommendation_type": row.get("Recommended Offer", ""),
                     "recommendation_desc": row.get("Action Description", "")

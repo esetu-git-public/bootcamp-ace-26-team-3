@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 
 const API_BASE_URL = 'http://localhost:8000/api/v1';
+const asArray = (value) => (Array.isArray(value) ? value : []);
 
 function AnalyticsDashboard({ onViewChange, onLogout }) {
   const [kpis, setKpis] = useState(null);
@@ -86,10 +87,6 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
         setRiskDistribution(riskData);
         setIncomeData(incomeDataResult);
         setDeviceData(deviceDataResult);
-        setPaymentData(paymentDataResult);
-        setSpendData(spendDataResult);
-        setTenureData(tenureDataResult);
-        setSatisfactionData(satisfactionDataResult);
         setSegmentData(segmentDataResult);
         setCustomerRows(customersData.results || []);
       })
@@ -195,7 +192,7 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
   };
 
   if (loading) {
-    return <div style={styles.center}>Loading analytics dashboard…</div>;
+    return <div style={styles.center}>Loading analytics dashboard...</div>;
   }
 
   if (error) {
@@ -225,13 +222,14 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
         </div>
         <form onSubmit={handleBulkUpload} style={styles.uploadRow}>
           <input
+            aria-label="Bulk prediction CSV"
             type="file"
             accept=".csv"
             onChange={(event) => setBulkFile(event.target.files?.[0] || null)}
             style={styles.uploadInput}
           />
           <button type="submit" disabled={bulkUploading} style={styles.primaryButton}>
-            {bulkUploading ? 'Uploading…' : 'Run bulk prediction'}
+            {bulkUploading ? 'Uploading...' : 'Run bulk prediction'}
           </button>
         </form>
         <p style={styles.helperText}>Expected columns include customer_id, age, income_level, device_type, payment_mode, number_of_subscriptions, tenure_months, monthly_total_spend, avg_usage_hours_per_week, app_switch_frequency, customer_support_interactions, satisfaction_score, and discount_used.</p>
@@ -265,6 +263,7 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
                       <th style={styles.th}>Customer</th>
                       <th style={styles.th}>Risk</th>
                       <th style={styles.th}>Probability</th>
+                      <th style={styles.th}>Confidence</th>
                       <th style={styles.th}>Recommendation</th>
                     </tr>
                   </thead>
@@ -274,6 +273,9 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
                         <td style={styles.td}>{row.customer_id}</td>
                         <td style={styles.td}>{row.risk_category}</td>
                         <td style={styles.td}>{row.churn_probability.toFixed(1)}%</td>
+                        <td style={styles.td}>
+                          {Number(row.probability_confidence_lower || 0).toFixed(1)}%-{Number(row.probability_confidence_upper || 0).toFixed(1)}%
+                        </td>
                         <td style={styles.td}>{row.recommendation_type}</td>
                       </tr>
                     ))}
@@ -301,7 +303,7 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
           {topSegment ? (
             <div style={styles.segmentPanel}>
               <span style={styles.segmentName}>{topSegment.segment}</span>
-              <p style={styles.segmentDetail}>{topSegment.customer_count.toLocaleString()} customers • {topSegment.percentage}% of base</p>
+              <p style={styles.segmentDetail}>{topSegment.customer_count.toLocaleString()} customers - {topSegment.percentage}% of base</p>
               <div style={styles.segmentBarTrack}>
                 <div style={{ ...styles.segmentBarFill, width: `${Math.min(topSegment.percentage, 100)}%` }} />
               </div>
@@ -532,6 +534,7 @@ const styles = {
   segmentRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0', borderBottom: '1px solid rgba(255,255,255,0.08)' },
   segmentValue: { fontWeight: 700, color: '#f7f8fc' },
   barRow: { marginBottom: '10px' },
+  barHeader: { display: 'flex', justifyContent: 'space-between', marginBottom: '6px', color: '#cbd5e1' },
   barLabelRow: { display: 'flex', justifyContent: 'space-between', marginBottom: '6px', color: '#cbd5e1' },
   barTrack: { height: '8px', width: '100%', background: 'rgba(255,255,255,0.08)', borderRadius: '999px', overflow: 'hidden' },
   barFill: { height: '100%', background: 'linear-gradient(90deg, #6366f1, #22d3ee)', borderRadius: '999px' },

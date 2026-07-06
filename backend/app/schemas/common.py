@@ -186,6 +186,7 @@ class BulkPredictionStatusResponse(BaseModel):
     processed_records: int
     successful_records: int
     failed_records: int
+    created_at: datetime
     error_message: Optional[str] = None
     completed_at: Optional[datetime] = None
     download_url: Optional[str] = None

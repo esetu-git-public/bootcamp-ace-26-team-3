@@ -1,0 +1,12 @@
+C:\Users\shrut\Downloads\team_3\bootcamp-ace-26-team-3\backend\app\routers\reports.py:24: FastAPIDeprecationWarning: `regex` has been deprecated, please use `pattern` instead
+  format: str = Query("csv", regex="^(csv|pdf|xlsx)$"),
+INFO:     Started server process [20744]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+C:\Users\shrut\Downloads\team_3\bootcamp-ace-26-team-3\backend\app\routers\reports.py:24: FastAPIDeprecationWarning: `regex` has been deprecated, please use `pattern` instead
+  format: str = Query("csv", regex="^(csv|pdf|xlsx)$"),
+INFO:     Started server process [1724]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)

@@ -40,7 +40,18 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
       fetch(`${API_BASE_URL}/customers?page=1&limit=6`, { headers }),
     ])
       .then(async (responses) => {
-        const [kpisRes, riskRes, incomeRes, deviceRes, segmentRes, customersRes] = responses;
+        const [
+          kpisRes,
+          riskRes,
+          incomeRes,
+          deviceRes,
+          paymentRes,
+          spendRes,
+          tenureRes,
+          satisfactionRes,
+          segmentRes,
+          customersRes,
+        ] = responses;
         const kpisData = await kpisRes.json();
         const riskData = await riskRes.json();
         const incomeDataResult = await incomeRes.json();
@@ -68,11 +79,15 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
         }
 
         setKpis(kpisData);
-        setRiskDistribution(riskData);
-        setIncomeData(incomeDataResult);
-        setDeviceData(deviceDataResult);
-        setSegmentData(segmentDataResult);
-        setCustomerRows(customersData.results || []);
+        setRiskDistribution(asArray(riskData));
+        setIncomeData(asArray(incomeDataResult));
+        setDeviceData(asArray(deviceDataResult));
+        setPaymentData(asArray(paymentDataResult));
+        setSpendData(asArray(spendDataResult));
+        setTenureData(asArray(tenureDataResult));
+        setSatisfactionData(asArray(satisfactionDataResult));
+        setSegmentData(asArray(segmentDataResult));
+        setCustomerRows(asArray(customersData.results));
       })
       .catch((err) => setError(err.message || 'Unable to load analytics data.'))
       .finally(() => setLoading(false));

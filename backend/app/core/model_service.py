@@ -1,9 +1,20 @@
 import os
 import pickle
+import sys
 from typing import Dict, Optional, List
 
 import numpy as np
 import pandas as pd
+
+from . import preprocessing as preprocessing_module
+
+backend_app_module = sys.modules.get("backend.app")
+backend_core_module = sys.modules.get("backend.app.core")
+if backend_app_module is not None:
+    sys.modules.setdefault("app", backend_app_module)
+if backend_core_module is not None:
+    sys.modules.setdefault("app.core", backend_core_module)
+sys.modules.setdefault("app.core.preprocessing", preprocessing_module)
 
 try:
     from catboost import CatBoostClassifier

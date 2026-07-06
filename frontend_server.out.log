@@ -15,7 +15,9 @@ Note that the development build is not optimized.
 To create a production build, use npm run build.
 
 webpack compiled [1m[32msuccessfully[39m[22m
-Compiled successfully!
-webpack compiled [1m[32msuccessfully[39m[22m
-Compiled successfully!
-webpack compiled [1m[32msuccessfully[39m[22m
+
+> subscription-churn-frontend@1.0.0 start
+> react-scripts start
+
+Starting the development server...
+

@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, Query, HTTPException, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 import io
 import csv
 import os
+import re
 from typing import Optional
 from ..database import get_db
 from .auth import get_current_user
@@ -13,6 +14,10 @@ router = APIRouter(prefix="/reports", tags=["Reporting & Exports"])
 
 RESULTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bulk_results")
 os.makedirs(RESULTS_DIR, exist_ok=True)
+
+
+def _is_valid_job_id(job_id: str) -> bool:
+    return bool(re.fullmatch(r"[A-Za-z0-9_-]+", job_id))
 
 @router.get("/export")
 async def export_report(
@@ -31,13 +36,22 @@ async def export_report(
         )
 
     if job_id:
+        if not _is_valid_job_id(job_id):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Bulk prediction report not found."
+            )
         file_path = os.path.join(RESULTS_DIR, f"{job_id}.csv")
         if os.path.exists(file_path):
-            return StreamingResponse(
-                open(file_path, "rb"),
+            return FileResponse(
+                file_path,
                 media_type="text/csv",
-                headers={"Content-Disposition": f"attachment; filename=bulk_predictions_{job_id}.csv"}
+                filename=f"bulk_predictions_{job_id}.csv"
             )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Bulk prediction report not found."
+        )
 
     # In-memory text stream
     output = io.StringIO()

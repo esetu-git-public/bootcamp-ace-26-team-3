@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import '@testing-library/jest-dom';
 import AnalyticsDashboard from './AnalyticsDashboard';
 
 describe('AnalyticsDashboard', () => {
@@ -16,8 +17,14 @@ describe('AnalyticsDashboard', () => {
       if (url.includes('/analytics/churn-by-device')) {
         return Promise.resolve({ ok: true, json: async () => [{ device_type: 'Mobile', churn_rate: 20 }, { device_type: 'Desktop', churn_rate: 15 }] });
       }
+      if (url.includes('/analytics/customer-segmentation')) {
+        return Promise.resolve({ ok: true, json: async () => [{ segment: 'Loyal customers', customer_count: 44, percentage: 37, average_churn_risk: 12 }] });
+      }
       if (url.includes('/customers?page=1&limit=6')) {
         return Promise.resolve({ ok: true, json: async () => ({ results: [{ customer_id: 'C1001', risk_category: 'High', monthly_total_spend: 80, tenure_months: 8 }] }) });
+      }
+      if (url.includes('/predictions/bulk')) {
+        return Promise.resolve({ ok: true, json: async () => ({ job_id: 'job-1', status: 'QUEUED', total_records: 2 }) });
       }
       return Promise.resolve({ ok: true, json: async () => ({}) });
     });
@@ -28,5 +35,22 @@ describe('AnalyticsDashboard', () => {
 
     expect(await screen.findByText(/Bulk prediction studio/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /run bulk prediction/i })).toBeInTheDocument();
+  });
+
+  it('uploads a CSV file to the bulk prediction endpoint', async () => {
+    render(<AnalyticsDashboard />);
+
+    await screen.findByText(/Bulk prediction studio/i);
+    const file = new File(['customer_id,age\nC100,34\n'], 'customers.csv', { type: 'text/csv' });
+    fireEvent.change(screen.getByLabelText(/bulk prediction csv/i), { target: { files: [file] } });
+    fireEvent.click(screen.getByRole('button', { name: /run bulk prediction/i }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        'http://localhost:8000/api/v1/predictions/bulk',
+        expect.objectContaining({ method: 'POST', body: expect.any(FormData) })
+      );
+    });
+    expect(await screen.findByText(/Status: QUEUED/i)).toBeInTheDocument();
   });
 });

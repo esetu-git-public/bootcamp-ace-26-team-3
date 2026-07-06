@@ -39,7 +39,23 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
       fetch(`${API_BASE_URL}/customers?page=1&limit=6`, { headers }),
     ])
       .then(async (responses) => {
-        const [kpisRes, riskRes, incomeRes, deviceRes, segmentRes, customersRes] = responses;
+        if (responses.some(res => res.status === 401)) {
+          if (onLogout) onLogout();
+          return;
+        }
+
+        const [
+          kpisRes,
+          riskRes,
+          incomeRes,
+          deviceRes,
+          paymentRes,
+          spendRes,
+          tenureRes,
+          satisfactionRes,
+          segmentRes,
+          customersRes,
+        ] = responses;
         const kpisData = await kpisRes.json();
         const riskData = await riskRes.json();
         const incomeDataResult = await incomeRes.json();

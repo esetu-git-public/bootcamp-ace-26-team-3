@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import * as apiService from '../services/api';
 
-const API_BASE_URL = 'http://localhost:8000/api/v1';
 const asArray = (value) => (Array.isArray(value) ? value : []);
 
 function AnalyticsDashboard({ onViewChange, onLogout }) {
@@ -21,7 +21,7 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
   const [bulkError, setBulkError] = useState('');
   const [bulkJob, setBulkJob] = useState(null);
   const [bulkPreview, setBulkPreview] = useState([]);
-  const backendOrigin = API_BASE_URL.replace('/api/v1', '');
+  const backendOrigin = apiService.getBackendOrigin();
 
   useEffect(() => {
     const token = localStorage.getItem('access_token');
@@ -99,37 +99,25 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
       return undefined;
     }
 
-    const token = localStorage.getItem('access_token');
-    const headers = token ? { Authorization: `Bearer ${token}` } : {};
     const timer = window.setInterval(async () => {
       try {
-        const statusRes = await fetch(`${API_BASE_URL}/predictions/bulk/status/${bulkJob.job_id}`, { headers });
-        if (statusRes.status === 401) {
+        const statusData = await apiService.getBulkPredictionStatus(bulkJob.job_id);
+        setBulkJob(statusData);
+        if (statusData.status === 'COMPLETED') {
+          const previewData = await apiService.getBulkPredictionPreview(bulkJob.job_id);
+          setBulkPreview(previewData);
+        }
+      } catch (err) {
+        if (err.status === 401) {
           if (onLogout) onLogout();
           return;
         }
-        const statusData = await statusRes.json();
-
-        if (statusRes.ok) {
-          setBulkJob(statusData);
-          if (statusData.status === 'COMPLETED') {
-            const previewRes = await fetch(`${API_BASE_URL}/predictions/bulk/preview/${bulkJob.job_id}`, { headers });
-            if (previewRes.status === 401) {
-              if (onLogout) onLogout();
-              return;
-            }
-            if (previewRes.ok) {
-              setBulkPreview(await previewRes.json());
-            }
-          }
-        }
-      } catch (err) {
         setBulkError('Unable to refresh bulk prediction progress right now.');
       }
     }, 2000);
 
     return () => window.clearInterval(timer);
-  }, [bulkJob?.job_id, bulkJob?.status]);
+  }, [bulkJob?.job_id, bulkJob?.status, onLogout]);
 
   const totalRisk = useMemo(() => {
     if (!riskDistribution.length) return 0;
@@ -160,32 +148,15 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
     setBulkUploading(true);
 
     try {
-      const token = localStorage.getItem('access_token');
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const formData = new FormData();
-      formData.append('file', bulkFile);
-
-      const response = await fetch(`${API_BASE_URL}/predictions/bulk`, {
-        method: 'POST',
-        headers,
-        body: formData,
-      });
-
-      if (response.status === 401) {
+      const result = await apiService.uploadBulkPredictions(bulkFile);
+      setBulkJob(result);
+      setBulkPreview([]);
+    } catch (err) {
+      if (err.status === 401) {
         if (onLogout) onLogout();
         return;
       }
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Bulk upload failed.');
-      }
-
-      const result = await response.json();
-      setBulkJob(result);
-      setBulkPreview([]);
-    } catch (uploadError) {
-      setBulkError(uploadError.message || 'Unable to upload bulk predictions.');
+      setBulkError(err.message || 'Unable to upload bulk predictions.');
     } finally {
       setBulkUploading(false);
     }

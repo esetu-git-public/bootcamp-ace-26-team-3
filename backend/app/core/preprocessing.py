@@ -8,7 +8,7 @@ from sklearn.impute import SimpleImputer
 
 class SubscriptionPreprocessor:
     def __init__(self):
-        # Numerical features to impute and scale
+        # Numerical features to impute and scale (including engineered features)
         self.num_cols = [
             "Age",
             "Number_of_Subscriptions",
@@ -16,7 +16,12 @@ class SubscriptionPreprocessor:
             "Monthly_Total_Spend",
             "Avg_Usage_Hours_Per_Week",
             "App_Switch_Frequency",
-            "Customer_Support_Interactions"
+            "Customer_Support_Interactions",
+            "Spend_Per_Subscription",
+            "Usage_Per_Subscription",
+            "Interactions_Per_Tenure_Month",
+            "Engagement_Score",
+            "Risk_Indicator"
         ]
         
         # Categorical nominal features to impute and one-hot encode
@@ -38,7 +43,17 @@ class SubscriptionPreprocessor:
         self.feature_names_ = None
         self.is_fitted = False
 
+    def _add_engineered_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        df = df.copy()
+        df["Spend_Per_Subscription"] = df["Monthly_Total_Spend"] / (df["Number_of_Subscriptions"] + 1e-5)
+        df["Usage_Per_Subscription"] = df["Avg_Usage_Hours_Per_Week"] / (df["Number_of_Subscriptions"] + 1e-5)
+        df["Interactions_Per_Tenure_Month"] = df["Customer_Support_Interactions"] / (df["Tenure_Months"] + 1e-5)
+        df["Engagement_Score"] = df["Avg_Usage_Hours_Per_Week"] * df["Satisfaction_Score"]
+        df["Risk_Indicator"] = df["Customer_Support_Interactions"] * (10.0 - df["Satisfaction_Score"])
+        return df
+
     def fit(self, df: pd.DataFrame):
+        df = self._add_engineered_features(df)
         # Fit numerical features
         num_data = df[self.num_cols]
         num_imputed = self.num_imputer.fit_transform(num_data)
@@ -63,7 +78,7 @@ class SubscriptionPreprocessor:
         if not self.is_fitted:
             raise ValueError("Preprocessor has not been fitted yet!")
             
-        df = df.copy()
+        df = self._add_engineered_features(df)
         
         # 1. Map Income_Level ordinally (default to Medium/2 if not found)
         income_mapped = df["Income_Level"].map(self.income_mapping).fillna(2).astype(int)

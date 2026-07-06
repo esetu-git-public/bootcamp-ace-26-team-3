@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 from datetime import datetime, timedelta
 from ..database import get_db
 from ..schemas import PaginatedCustomersResponse, CustomerProfileResponse, PredictionHistoryItem
@@ -27,9 +27,11 @@ def get_mock_customer_profile(customer_id: str):
         "payment_mode": "UPI",
         "created_at": datetime.utcnow(),
         "churn_probability": 89.00,
+        "probability_confidence_lower": 84.50,
+        "probability_confidence_upper": 93.50,
         "risk_category": "High",
         "will_cancel": 1,
-        "explainability_json": {
+        "explainability": {
             "Customer_Support_Interactions": 0.42,
             "Satisfaction_Score": 0.38,
             "Avg_Usage_Hours_Per_Week": 0.22,
@@ -89,29 +91,27 @@ async def get_customers(
         count_query_str = f"SELECT COUNT(*) FROM ({query_str}) AS sub"
         total = db.execute(text(count_query_str), {k: v for k, v in params.items() if k not in ["limit", "offset"]}).scalar() or 0
 
-        # Run paginated list query
-        query_str += " ORDER BY churn_probability DESC LIMIT :limit OFFSET :offset"
-        results = db.execute(text(query_str), params).fetchall()
-
-        if not results:
-            raise Exception("Empty DB")
-        
         rows = []
-        for r in results:
-            rows.append({
-                "customer_id": r.customer_id,
-                "age": r.age,
-                "income_level": r.income_level,
-                "tenure_months": r.tenure_months,
-                "monthly_total_spend": float(r.monthly_total_spend or 0.0),
-                "satisfaction_score": r.satisfaction_score,
-                "device_type": r.device_type,
-                "payment_mode": r.payment_mode,
-                "churn_probability": float(r.churn_probability or 0.0),
-                "risk_category": r.risk_category,
-                "will_cancel": r.will_cancel,
-                "recommendation_type": r.recommendation_type
-            })
+        if total > 0:
+            # Run paginated list query
+            query_str += " ORDER BY churn_probability DESC LIMIT :limit OFFSET :offset"
+            results = db.execute(text(query_str), params).fetchall()
+            
+            for r in results:
+                rows.append({
+                    "customer_id": r.customer_id,
+                    "age": r.age,
+                    "income_level": r.income_level,
+                    "tenure_months": r.tenure_months,
+                    "monthly_total_spend": float(r.monthly_total_spend or 0.0),
+                    "satisfaction_score": r.satisfaction_score,
+                    "device_type": r.device_type,
+                    "payment_mode": r.payment_mode,
+                    "churn_probability": float(r.churn_probability or 0.0),
+                    "risk_category": r.risk_category,
+                    "will_cancel": r.will_cancel,
+                    "recommendation_type": r.recommendation_type
+                })
 
         return {
             "total": total,
@@ -120,7 +120,7 @@ async def get_customers(
             "results": rows
         }
     except Exception:
-        # Fallback Mock paginated list
+        # Fallback Mock paginated list (only if query/db operation fails entirely)
         mock_data = [
             {"customer_id": "CUST0001", "age": 34, "income_level": "Medium", "tenure_months": 8, "monthly_total_spend": 79.50, "satisfaction_score": 2, "device_type": "Android", "payment_mode": "UPI", "churn_probability": 89.00, "risk_category": "High", "will_cancel": 1, "recommendation_type": "Offer Discount"},
             {"customer_id": "CUST0002", "age": 45, "income_level": "Low", "tenure_months": 2, "monthly_total_spend": 35.00, "satisfaction_score": 1, "device_type": "Web", "payment_mode": "Wallet", "churn_probability": 84.50, "risk_category": "High", "will_cancel": 1, "recommendation_type": "Provide Free Trial"},
@@ -169,9 +169,11 @@ async def get_customer_profile(
             "payment_mode": result.payment_mode,
             "created_at": result.created_at,
             "churn_probability": float(result.churn_probability or 0.0) if result.churn_probability else None,
+            "probability_confidence_lower": max(0.0, float(result.churn_probability or 0.0) - 5.0) if result.churn_probability else None,
+            "probability_confidence_upper": min(100.0, float(result.churn_probability or 0.0) + 5.0) if result.churn_probability else None,
             "risk_category": result.risk_category,
             "will_cancel": result.will_cancel,
-            "explainability_json": result.explainability_json,
+            "explainability": result.explainability_json,
             "recommendation_type": result.recommendation_type,
             "recommendation_desc": result.recommendation_desc,
             "predicted_at": result.predicted_at
@@ -186,25 +188,21 @@ async def get_customer_prediction_history(
     current_user: str = Depends(get_current_user)
 ):
     try:
-        query = text("""
-            SELECT prediction_id, churn_probability, risk_category, will_cancel, recommendation_type, predicted_at
-            FROM churn_predictions WHERE customer_id = :customer_id ORDER BY predicted_at DESC
-        """)
-        results = db.execute(query, {"customer_id": customer_id}).fetchall()
-        if not results:
-            raise Exception("Empty history")
+        from app.models import PredictionHistory
+        results = db.query(PredictionHistory).filter(PredictionHistory.customer_id == customer_id).order_by(PredictionHistory.evaluated_at.desc()).all()
+        
         return [{
-            "prediction_id": r.prediction_id,
-            "churn_probability": float(r.churn_probability or 0.0),
+            "history_id": r.history_id,
+            "risk_score": float(cast(Any, r.risk_score)),
             "risk_category": r.risk_category,
-            "will_cancel": r.will_cancel,
-            "recommendation_type": r.recommendation_type,
-            "predicted_at": r.predicted_at
+            "prediction_result": r.prediction_result,
+            "evaluated_at": r.evaluated_at
         } for r in results]
     except Exception:
         # Fallback Mock history
+        from datetime import datetime, timedelta
         return [
-            {"prediction_id": 105, "churn_probability": 89.00, "risk_category": "High", "will_cancel": 1, "recommendation_type": "Offer Discount", "predicted_at": datetime.utcnow()},
-            {"prediction_id": 92, "churn_probability": 65.20, "risk_category": "Medium", "will_cancel": 1, "recommendation_type": "Offer Discount", "predicted_at": datetime.utcnow() - timedelta(days=30)},
-            {"prediction_id": 71, "churn_probability": 45.00, "risk_category": "Medium", "will_cancel": 0, "recommendation_type": "No Action Required", "predicted_at": datetime.utcnow() - timedelta(days=60)}
+            {"history_id": 105, "risk_score": 89.00, "risk_category": "High", "prediction_result": 1, "evaluated_at": datetime.utcnow()},
+            {"history_id": 92, "risk_score": 65.20, "risk_category": "Medium", "prediction_result": 1, "evaluated_at": datetime.utcnow() - timedelta(days=30)},
+            {"history_id": 71, "risk_score": 45.00, "risk_category": "Medium", "prediction_result": 0, "evaluated_at": datetime.utcnow() - timedelta(days=60)}
         ]

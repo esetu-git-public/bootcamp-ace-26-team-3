@@ -36,6 +36,22 @@ async def get_model_metrics(
             "evaluated_at": result.evaluated_at
         }
     except Exception:
+        import os
+        import json
+        metrics_file = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "models",
+            "model_metrics.json"
+        )
+        if os.path.exists(metrics_file):
+            try:
+                with open(metrics_file, "r") as f:
+                    metrics = json.load(f)
+                metrics["evaluated_at"] = datetime.utcnow()
+                return metrics
+            except Exception:
+                pass
+        
         # Fallback Mock metrics
         return {
             "model_version": "v1.2.0-catboost",

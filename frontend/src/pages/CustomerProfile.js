@@ -1,19 +1,17 @@
-// frontend/src/pages/CustomerProfile.js
 import React, { useState, useEffect } from 'react';
 
-export default function CustomerProfile({ onViewChange, onLogout }) {
-  const [customerId, setCustomerId] = useState('C10239'); // Default ID to start with
-  const [searchId, setSearchId] = useState('C10239');
+const API_BASE_URL = 'http://localhost:8000/api/v1';
+
+export default function CustomerProfile({ onViewChange, onLogout, selectedCustomerId, setSelectedCustomerId }) {
+  const [customerId, setCustomerId] = useState(selectedCustomerId || 'C10239');
+  const [searchId, setSearchId] = useState(selectedCustomerId || 'C10239');
   const [customer, setCustomer] = useState(null);
   const [prediction, setPrediction] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [predicting, setPredicting] = useState(false);
 
-  // Backend API Base URL
-  const API_BASE_URL = 'http://localhost:8000/api/v1';
-
-  // 1. Fetch Customer Profile details
   const fetchCustomerDetails = async (id) => {
     setLoading(true);
     setError(null);
@@ -21,16 +19,34 @@ export default function CustomerProfile({ onViewChange, onLogout }) {
     try {
       const token = localStorage.getItem('access_token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      
       const response = await fetch(`${API_BASE_URL}/customers/${id}`, { headers });
       if (response.status === 401) {
         onLogout();
         return;
       }
+      
       if (!response.ok) {
-        throw new Error('Customer not found in the database.');
+        throw new Error('Customer ID not found in database.');
       }
+      
       const data = await response.json();
       setCustomer(data);
+      
+      // If customer has a prediction in the view result, set it
+      if (data.churn_probability !== null) {
+        setPrediction({
+          will_cancel: data.will_cancel,
+          churn_probability: data.churn_probability,
+          probability_confidence_lower: data.probability_confidence_lower,
+          probability_confidence_upper: data.probability_confidence_upper,
+          risk_category: data.risk_category,
+          explainability: data.explainability,
+          recommendation_type: data.recommendation_type,
+          recommendation_desc: data.recommendation_desc
+        });
+      }
+      
       fetchPredictionHistory(id);
     } catch (err) {
       setError(err.message);
@@ -40,13 +56,13 @@ export default function CustomerProfile({ onViewChange, onLogout }) {
     }
   };
 
-  // 2. Trigger the Churn Prediction Model
   const runChurnPrediction = async () => {
     if (!customer) return;
-    setLoading(true);
+    setPredicting(true);
     try {
       const token = localStorage.getItem('access_token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      
       const response = await fetch(`${API_BASE_URL}/predictions/single/${customerId}`, {
         method: 'POST',
         headers: {
@@ -54,31 +70,37 @@ export default function CustomerProfile({ onViewChange, onLogout }) {
           'Content-Type': 'application/json'
         }
       });
+      
       if (response.status === 401) {
         onLogout();
         return;
       }
+      
+      if (!response.ok) {
+        throw new Error('Error running prediction.');
+      }
+      
       const data = await response.json();
       setPrediction(data);
-      // Refresh history after running a new prediction
       fetchPredictionHistory(customerId);
     } catch (err) {
-      setError('Failed to run churn prediction model.');
+      setError(err.message || 'Failed to run churn prediction model.');
     } finally {
-      setLoading(false);
+      setPredicting(false);
     }
   };
 
-  // 3. Fetch past Prediction History
   const fetchPredictionHistory = async (id) => {
     try {
       const token = localStorage.getItem('access_token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      
       const response = await fetch(`${API_BASE_URL}/customers/${id}/history`, { headers });
       if (response.status === 401) {
         onLogout();
         return;
       }
+      
       const data = await response.json();
       setHistory(data || []);
     } catch (err) {
@@ -87,140 +109,179 @@ export default function CustomerProfile({ onViewChange, onLogout }) {
   };
 
   useEffect(() => {
-    fetchCustomerDetails(customerId);
-  }, [customerId]);
+    if (selectedCustomerId) {
+      setCustomerId(selectedCustomerId);
+      setSearchId(selectedCustomerId);
+      fetchCustomerDetails(selectedCustomerId);
+    }
+  }, [selectedCustomerId]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    setCustomerId(searchId);
+    if (searchId.trim()) {
+      setCustomerId(searchId);
+      if (setSelectedCustomerId) {
+        setSelectedCustomerId(searchId);
+      } else {
+        fetchCustomerDetails(searchId);
+      }
+    }
   };
 
   return (
-    <div style={styles.container}>
+    <div style={styles.page}>
       <header style={styles.header}>
         <div>
-          <h1 style={styles.title}>Customer Profile & Churn Insights</h1>
-        </div>
-        <div style={styles.navContainer}>
-          <button onClick={() => onViewChange('dashboard')} style={styles.navBtn}>Executive Dashboard</button>
-          <button onClick={onLogout} style={styles.logoutBtn}>Sign Out</button>
+          <p style={styles.eyebrow}>Deep Diagnostics & Explainability</p>
+          <h1 style={styles.title}>Customer Profile Explorer</h1>
+          <p style={styles.subtitle}>Detailed behavioral audit, feature importances, and historical model logs for individual customer profiles.</p>
         </div>
       </header>
 
-      {/* Search Bar */}
+      {/* Search Input */}
       <form onSubmit={handleSearchSubmit} style={styles.searchForm}>
         <input
           type="text"
-          placeholder="Enter Customer ID (e.g., C10239)"
+          placeholder="Search Customer ID (e.g., C10239)"
           value={searchId}
           onChange={(e) => setSearchId(e.target.value)}
           style={styles.searchInput}
         />
-        <button type="submit" style={styles.searchButton}>Load Profile</button>
+        <button type="submit" style={styles.searchButton}>Search Profile</button>
       </form>
 
-      {loading && <p style={styles.infoText}>Processing data...</p>}
-      {error && <p style={styles.errorText}>{error}</p>}
+      {loading && <div style={styles.loader}>Accessing database registry…</div>}
+      {error && <div style={styles.errorBanner}>{error}</div>}
 
-      {customer && (
-        <div style={styles.dashboardGrid}>
-          
-          {/* Left Column: Demographics & Usage */}
+      {!loading && customer && (
+        <div style={styles.mainLayout}>
+          {/* Left Column: Demographics and Subscription Profile */}
           <div style={styles.card}>
-            <h2 style={styles.cardTitle}>Core Customer Profile</h2>
-            <div style={styles.profileRow}><strong>Customer ID:</strong> {customer.customer_id}</div>
-            <div style={styles.profileRow}><strong>Age:</strong> {customer.age}</div>
-            <div style={styles.profileRow}><strong>Income Level:</strong> {customer.income_level}</div>
-            <div style={styles.profileRow}><strong>Device Preferred:</strong> {customer.device_type}</div>
-            <div style={styles.profileRow}><strong>Payment Mode:</strong> {customer.payment_mode}</div>
-            
-            <h2 style={styles.cardTitleDivider}>Subscription & Usage</h2>
-            <div style={styles.profileRow}><strong>Subscriptions:</strong> {customer.number_of_subscriptions} active</div>
-            <div style={styles.profileRow}><strong>Tenure:</strong> {customer.tenure_months} months</div>
-            <div style={styles.profileRow}><strong>Monthly Spend:</strong> ${customer.monthly_total_spend}</div>
-            <div style={styles.profileRow}><strong>Avg Weekly Usage:</strong> {customer.avg_usage_hours_per_week} hours</div>
-            <div style={styles.profileRow}><strong>App Switch Frequency:</strong> {customer.app_switch_frequency} times/hr</div>
-            <div style={styles.profileRow}><strong>Support Interactions:</strong> {customer.customer_support_interactions}</div>
-            <div style={styles.profileRow}><strong>Satisfaction Score:</strong> {customer.satisfaction_score}/5</div>
-            <div style={styles.profileRow}><strong>Discount Applied:</strong> {customer.discount_used ? 'Yes' : 'No'}</div>
-            
-            <button onClick={runChurnPrediction} style={styles.predictButton}>
-              Generate Churn Prediction
+            <h3 style={styles.cardTitle}>Core Customer Profile</h3>
+            <div style={styles.profileGrid}>
+              <div style={styles.profileRow}><span>Customer ID:</span> <strong>{customer.customer_id}</strong></div>
+              <div style={styles.profileRow}><span>Age:</span> <span>{customer.age} years old</span></div>
+              <div style={styles.profileRow}><span>Income Level:</span> <span>{customer.income_level}</span></div>
+              <div style={styles.profileRow}><span>Device Preference:</span> <span>{customer.device_type}</span></div>
+              <div style={styles.profileRow}><span>Payment Mode:</span> <span>{customer.payment_mode}</span></div>
+            </div>
+
+            <h3 style={{ ...styles.cardTitle, marginTop: '24px' }}>Subscription & Activity Metrics</h3>
+            <div style={styles.profileGrid}>
+              <div style={styles.profileRow}><span>Active Subscriptions:</span> <span>{customer.number_of_subscriptions}</span></div>
+              <div style={styles.profileRow}><span>Tenure Duration:</span> <span>{customer.tenure_months} months</span></div>
+              <div style={styles.profileRow}><span>Monthly Total Spend:</span> <span>${Number(customer.monthly_total_spend).toFixed(2)}</span></div>
+              <div style={styles.profileRow}><span>Avg Weekly Usage:</span> <span>{customer.avg_usage_hours_per_week} hours</span></div>
+              <div style={styles.profileRow}><span>App Switch Rate:</span> <span>{customer.app_switch_frequency}/hr</span></div>
+              <div style={styles.profileRow}><span>Support Tickets:</span> <span>{customer.customer_support_interactions}</span></div>
+              <div style={styles.profileRow}><span>Satisfaction Rating:</span> <span>{customer.satisfaction_score}/10</span></div>
+              <div style={styles.profileRow}><span>Discounts Claimed:</span> <span>{customer.discount_used ? 'Yes' : 'No'}</span></div>
+            </div>
+
+            <button
+              onClick={runChurnPrediction}
+              disabled={predicting}
+              style={predicting ? styles.predictBtnDisabled : styles.predictBtn}
+            >
+              {predicting ? 'Calculating Churn Model…' : 'Generate Model Prediction'}
             </button>
           </div>
 
-          {/* Right Column: Prediction Engine Output */}
+          {/* Right Column: Model Output and Local SHAP Explainability */}
           <div style={styles.rightCol}>
-            
-            {/* Churn Output Card */}
+            {/* Churn Prediction Output Badge */}
             <div style={styles.card}>
-              <h2 style={styles.cardTitle}>ML Prediction Output</h2>
+              <h3 style={styles.cardTitle}>Churn Model Inference Output</h3>
               {prediction ? (
                 <div>
-                  <div style={styles.predictionBox(prediction.prediction)}>
-                    {prediction.prediction === 1 ? 'LIKELY TO CANCEL' : 'NOT LIKELY TO CANCEL'}
+                  <div style={styles.predictionBox(prediction.will_cancel)}>
+                    {prediction.will_cancel === 1 ? 'PREDICTED TO CANCEL (CHURN)' : 'PREDICTED TO RETAIN (STABLE)'}
                   </div>
                   <div style={styles.metricRow}>
                     <span>Churn Probability:</span>
-                    <strong style={{ fontSize: '1.25rem' }}>{prediction.risk_score}%</strong>
+                    <strong style={{ fontSize: '1.4rem', color: '#f8fafc' }}>
+                      {prediction.churn_probability.toFixed(2)}%
+                    </strong>
+                    {prediction.probability_confidence_lower !== undefined && prediction.probability_confidence_upper !== undefined && (
+                      <span style={{ fontSize: '0.9rem', color: '#cbd5e1', marginLeft: '1rem' }}>
+                        (95% CI: {prediction.probability_confidence_lower.toFixed(2)}% - {prediction.probability_confidence_upper.toFixed(2)}%)
+                      </span>
+                    )}
                   </div>
                   <div style={styles.metricRow}>
                     <span>Risk Category:</span>
-                    <strong style={styles.riskBadge(prediction.risk_category)}>{prediction.risk_category}</strong>
+                    <span style={styles.riskBadge(prediction.risk_category)}>
+                      {prediction.risk_category} Risk
+                    </span>
                   </div>
                 </div>
               ) : (
-                <p style={styles.placeholderText}>Click 'Generate Churn Prediction' on the left panel to run calculations.</p>
+                <div style={styles.placeholderText}>No active churn model outputs loaded. Click the prediction button to evaluate this customer profile.</div>
               )}
             </div>
 
-            {/* Explainable AI / SHAP Factors Card */}
-            {prediction && (
+            {/* Explainable AI / Local SHAP Indicators */}
+            {prediction && prediction.explainability && (
               <div style={styles.card}>
-                <h2 style={styles.cardTitle}>Explainable AI (Local Model Factors)</h2>
-                <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '10px' }}>
-                  Top factors contributing to this prediction:
-                </p>
-                <ul style={styles.reasonList}>
-                  {prediction.reasons.map((reason, idx) => (
-                    <li key={idx} style={styles.reasonItem}>• {reason}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Retention Recommendations Card */}
-            {prediction && prediction.prediction === 1 && (
-              <div style={styles.recommendationCard}>
-                <h2 style={styles.recommendationTitle}>Retention Recommendation Engine</h2>
-                <div style={styles.recommendationBox}>
-                  <strong>Action Recommended:</strong>
-                  <p style={{ marginTop: '5px' }}>
-                    {customer.monthly_total_spend > 100 
-                      ? 'High subscription spending detected. Recommend sending a 15% discount code on renewal.'
-                      : 'Low engagement and satisfaction detected. Recommend routing to VIP support desk for immediate call outreach.'}
-                  </p>
+                <h3 style={styles.cardTitle}>Local Model Explainability (SHAP Factors)</h3>
+                <p style={styles.helperText}>Calculated weights indicating how features influenced the model risk score upward (red) or downward (green):</p>
+                <div style={styles.factorList}>
+                  {Object.entries(prediction.explainability).map(([key, val]) => {
+                    const isIncrease = val > 0;
+                    return (
+                      <div key={key} style={styles.factorRow}>
+                        <span style={styles.factorName}>{key.replace(/_/g, ' ')}</span>
+                        <div style={styles.factorProgressTrack}>
+                          <div style={styles.factorProgressBar(val, isIncrease)} />
+                        </div>
+                        <span style={styles.factorValue(isIncrease)}>
+                          {isIncrease ? '+' : ''}{val.toFixed(2)}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
 
-            {/* Prediction Log History */}
+            {/* Recommendation Card */}
+            {prediction && (
+              <div style={styles.recommendationCard(prediction.will_cancel)}>
+                <h4 style={styles.recommendationTitle(prediction.will_cancel)}>
+                  Retention Action Recommendation
+                </h4>
+                <p style={styles.recommendationHeading}>
+                  <strong>Action:</strong> {prediction.recommendation_type}
+                </p>
+                <p style={styles.recommendationDesc}>
+                  {prediction.recommendation_desc}
+                </p>
+              </div>
+            )}
+
+            {/* Prediction History Logs */}
             <div style={styles.card}>
-              <h2 style={styles.cardTitle}>Prediction History log</h2>
+              <h3 style={styles.cardTitle}>Model Audit Log (Prediction History)</h3>
               {history.length > 0 ? (
-                <ul style={styles.historyList}>
+                <div style={styles.historyList}>
                   {history.map((log) => (
-                    <li key={log.history_id} style={styles.historyItem}>
-                      <span>Run #{log.history_id}:</span> 
-                      <strong>{log.risk_score}% Risk</strong> ({log.risk_category})
-                    </li>
+                    <div key={log.history_id} style={styles.historyRow}>
+                      <span style={styles.historyTime}>
+                        {new Date(log.evaluated_at).toLocaleString()}
+                      </span>
+                      <span style={styles.historyBadge(log.prediction_result)}>
+                        {log.prediction_result === 1 ? 'Churn' : 'Retain'}
+                      </span>
+                      <strong style={styles.historyScore}>
+                        {log.risk_score.toFixed(1)}% Risk
+                      </strong>
+                    </div>
                   ))}
-                </ul>
+                </div>
               ) : (
-                <p style={styles.placeholderText}>No previous historical logs recorded for this customer.</p>
+                <div style={styles.placeholderText}>No historical prediction runs recorded for this profile.</div>
               )}
             </div>
-
           </div>
         </div>
       )}
@@ -228,50 +289,119 @@ export default function CustomerProfile({ onViewChange, onLogout }) {
   );
 }
 
-// Simple Inline CSS Object to styled component layout automatically
 const styles = {
-  container: { padding: '24px', fontFamily: 'Arial, sans-serif', maxWidth: '1200px', margin: '0 auto', backgroundColor: '#f9f9f9', minHeight: '100vh' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid #ccc', paddingBottom: '16px' },
-  navContainer: { display: 'flex', alignItems: 'center', gap: '12px' },
-  navBtn: { background: '#007bff', border: 'none', borderRadius: '4px', padding: '10px 16px', color: '#fff', fontWeight: 'bold', cursor: 'pointer' },
-  logoutBtn: { background: '#dc3545', border: 'none', borderRadius: '4px', padding: '10px 16px', color: '#fff', fontWeight: 'bold', cursor: 'pointer' },
-  title: { fontSize: '2rem', fontWeight: 'bold', color: '#333', marginBottom: '0px' },
-  searchForm: { display: 'flex', gap: '10px', marginBottom: '24px' },
-  searchInput: { padding: '10px', fontSize: '1rem', border: '1px solid #ccc', borderRadius: '4px', flex: '1', maxWidth: '300px' },
-  searchButton: { padding: '10px 20px', fontSize: '1rem', backgroundColor: '#007bff', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' },
-  dashboardGrid: { display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '24px' },
-  card: { backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', marginBottom: '16px' },
-  cardTitle: { fontSize: '1.2rem', fontWeight: 'bold', color: '#2c3e50', borderBottom: '2px solid #ecf0f1', paddingBottom: '8px', marginBottom: '12px' },
-  cardTitleDivider: { fontSize: '1.2rem', fontWeight: 'bold', color: '#2c3e50', borderBottom: '2px solid #ecf0f1', paddingBottom: '8px', margin: '20px 0 12px 0' },
-  profileRow: { display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f9f9f9', fontSize: '0.95rem' },
-  predictButton: { width: '100%', marginTop: '20px', padding: '12px', fontSize: '1rem', backgroundColor: '#28a745', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' },
+  page: { minHeight: '100vh', background: '#07111f', color: '#f7f8fc', padding: '24px', fontFamily: 'Inter, Arial, sans-serif' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' },
+  eyebrow: { textTransform: 'uppercase', letterSpacing: '0.18em', color: '#7dd3fc', fontSize: '0.75rem', margin: 0 },
+  title: { margin: '4px 0 8px', fontSize: '2rem' },
+  subtitle: { margin: 0, color: '#94a3b8', maxWidth: '620px', lineHeight: 1.7 },
+  searchForm: { display: 'flex', gap: '12px', marginBottom: '24px', maxWidth: '500px' },
+  searchInput: { background: 'rgba(17,24,39,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', padding: '12px 16px', color: '#f7f8fc', outline: 'none', fontSize: '0.95rem', flex: 1 },
+  searchButton: { background: '#6366f1', color: '#ffffff', border: 'none', borderRadius: '10px', padding: '0 20px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' },
+  loader: { padding: '40px 0', textAlign: 'center', color: '#38bdf8', fontStyle: 'italic' },
+  errorBanner: { background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', padding: '12px 16px', borderRadius: '10px', color: '#fca5a5', marginBottom: '24px' },
+  mainLayout: { display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: '24px', alignItems: 'start' },
+  card: { background: 'rgba(17,24,39,0.8)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '24px', marginBottom: '16px', boxShadow: '0 12px 34px rgba(0,0,0,0.25)' },
+  cardTitle: { marginTop: 0, marginBottom: '16px', color: '#e2e8f0', fontSize: '1.15rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '8px' },
+  profileGrid: { display: 'flex', flexDirection: 'column', gap: '10px' },
+  profileRow: { display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '0.9rem', color: '#cbd5e1' },
+  predictBtn: { width: '100%', marginTop: '24px', padding: '14px', fontSize: '0.95rem', background: '#10b981', color: '#07111f', border: 'none', borderRadius: '10px', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' },
+  predictBtnDisabled: { width: '100%', marginTop: '24px', padding: '14px', fontSize: '0.95rem', background: 'rgba(16,185,129,0.2)', color: '#10b981', border: 'none', borderRadius: '10px', fontWeight: 700, cursor: 'not-allowed' },
   rightCol: { display: 'flex', flexDirection: 'column' },
-  predictionBox: (isChurn) => ({
-    padding: '16px',
-    borderRadius: '4px',
-    textAlign: 'center',
-    fontWeight: 'bold',
-    fontSize: '1.2rem',
-    marginBottom: '16px',
-    backgroundColor: isChurn === 1 ? '#f8d7da' : '#d4edda',
-    color: isChurn === 1 ? '#721c24' : '#155724',
-    border: isChurn === 1 ? '1px solid #f5c6cb' : '1px solid #c3e6cb'
+  predictionBox: (willCancel) => {
+    const isChurn = willCancel === 1;
+    const bg = isChurn ? 'rgba(239,68,68,0.08)' : 'rgba(16,185,129,0.08)';
+    const text = isChurn ? '#fca5a5' : '#a7f3d0';
+    const border = isChurn ? 'rgba(239,68,68,0.2)' : 'rgba(16,185,129,0.2)';
+    return {
+      padding: '16px',
+      borderRadius: '10px',
+      textAlign: 'center',
+      fontWeight: 700,
+      fontSize: '1.1rem',
+      backgroundColor: bg,
+      color: text,
+      border: `1px solid ${border}`,
+      marginBottom: '16px'
+    };
+  },
+  metricRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '12px 0', color: '#94a3b8', fontSize: '0.95rem' },
+  riskBadge: (category) => {
+    const isHigh = category === 'High' || category === 'CRITICAL';
+    const isMedium = category === 'Medium';
+    const bg = isHigh ? '#dc3545' : isMedium ? '#ffc107' : '#10b981';
+    return {
+      padding: '4px 10px',
+      borderRadius: '6px',
+      color: '#0f172a',
+      backgroundColor: bg,
+      fontWeight: 700,
+      fontSize: '0.85rem'
+    };
+  },
+  placeholderText: { color: '#94a3b8', fontStyle: 'italic', textAlign: 'center', padding: '20px 0' },
+  helperText: { color: '#94a3b8', fontSize: '0.85rem', marginBottom: '14px', lineHeight: 1.5 },
+  factorList: { display: 'flex', flexDirection: 'column', gap: '12px' },
+  factorRow: { display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.85rem' },
+  factorName: { width: '160px', color: '#cbd5e1', textTransform: 'capitalize' },
+  factorProgressTrack: { flex: 1, background: 'rgba(255,255,255,0.06)', height: '8px', borderRadius: '4px', overflow: 'hidden', position: 'relative' },
+  factorProgressBar: (val, isIncrease) => {
+    // scale SHAP value width (max at around 2.0 SHAP strength)
+    const maxVal = 2.0;
+    const widthPct = Math.min(100, Math.round((Math.abs(val) / maxVal) * 100));
+    return {
+      width: `${widthPct}%`,
+      height: '100%',
+      background: isIncrease ? 'linear-gradient(90deg, #f87171, #ef4444)' : 'linear-gradient(90deg, #34d399, #10b981)',
+      borderRadius: '4px',
+      float: isIncrease ? 'left' : 'right'
+    };
+  },
+  factorValue: (isIncrease) => ({
+    width: '45px',
+    textAlign: 'right',
+    fontWeight: 600,
+    color: isIncrease ? '#f87171' : '#34d399'
   }),
-  metricRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '10px 0' },
-  riskBadge: (category) => ({
-    padding: '4px 8px',
-    borderRadius: '4px',
-    color: '#fff',
-    backgroundColor: category === 'CRITICAL' || category === 'HIGH' ? '#dc3545' : category === 'MEDIUM' ? '#ffc107' : '#28a745'
+  recommendationCard: (willCancel) => {
+    const isChurn = willCancel === 1;
+    const bg = isChurn ? 'rgba(245,158,11,0.06)' : 'rgba(99,102,241,0.06)';
+    const border = isChurn ? '#ffc107' : '#6366f1';
+    return {
+      background: bg,
+      padding: '20px',
+      borderRadius: '16px',
+      borderLeft: `5px solid ${border}`,
+      marginBottom: '16px',
+      borderTop: '1px solid rgba(255,255,255,0.04)',
+      borderRight: '1px solid rgba(255,255,255,0.04)',
+      borderBottom: '1px solid rgba(255,255,255,0.04)',
+      boxShadow: '0 8px 24px rgba(0,0,0,0.15)'
+    };
+  },
+  recommendationTitle: (willCancel) => ({
+    margin: 0,
+    fontSize: '1.05rem',
+    fontWeight: 700,
+    color: willCancel === 1 ? '#fde047' : '#818cf8',
+    marginBottom: '12px'
   }),
-  reasonList: { listStyle: 'none', padding: 0, margin: 0 },
-  reasonItem: { padding: '8px 0', color: '#2c3e50', borderBottom: '1px solid #f5f5f5' },
-  recommendationCard: { backgroundColor: '#fff3cd', padding: '20px', borderRadius: '8px', borderLeft: '5px solid #ffc107', marginBottom: '16px' },
-  recommendationTitle: { fontSize: '1.2rem', fontWeight: 'bold', color: '#856404', marginBottom: '10px' },
-  recommendationBox: { color: '#856404' },
-  historyList: { listStyle: 'none', padding: 0, margin: 0 },
-  historyItem: { display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f1f1f1', fontSize: '0.9rem' },
-  placeholderText: { color: '#888', fontStyle: 'italic', textAlign: 'center', margin: '20px 0' },
-  infoText: { color: '#007bff', fontWeight: 'bold' },
-  errorText: { color: '#dc3545', fontWeight: 'bold', marginBottom: '16px' }
+  recommendationHeading: { margin: 0, color: '#e2e8f0', fontSize: '0.9rem', marginBottom: '6px' },
+  recommendationDesc: { margin: 0, color: '#cbd5e1', fontSize: '0.9rem', lineHeight: 1.6 },
+  historyList: { display: 'flex', flexDirection: 'column', gap: '8px' },
+  historyRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: '0.85rem' },
+  historyTime: { color: '#cbd5e1' },
+  historyBadge: (predictionResult) => {
+    const isChurn = predictionResult === 1;
+    return {
+      padding: '2px 8px',
+      borderRadius: '4px',
+      fontSize: '0.75rem',
+      fontWeight: 600,
+      backgroundColor: isChurn ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)',
+      color: isChurn ? '#fca5a5' : '#a7f3d0',
+      border: `1px solid ${isChurn ? 'rgba(239,68,68,0.2)' : 'rgba(16,185,129,0.2)'}`
+    };
+  },
+  historyScore: { color: '#e2e8f0' }
 };

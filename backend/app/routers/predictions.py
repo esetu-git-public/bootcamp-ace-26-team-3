@@ -3,211 +3,98 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 import uuid
 from datetime import datetime
-import csv
-import io
+from typing import Optional
 import os
-from typing import Optional, List, Dict, Any
-from ..database import get_db, SessionLocal
+import csv
+import pandas as pd
+from ..database import get_db
 from ..schemas import (
     SinglePredictionResponse, BulkPredictionUploadResponse, 
     BulkPredictionStatusResponse
 )
+from ..core.risk_score import build_risk_profile
+from ..core.model_service import model_service
 from .auth import get_current_user
 
 router = APIRouter(prefix="/predictions", tags=["ML Predictions"])
 
+# Load CatBoost model and explainer
+MODEL_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "models",
+    "catboost_model.cbm"
+)
+
+RESULTS_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "bulk_results"
+)
+os.makedirs(RESULTS_DIR, exist_ok=True)
+
+def _normalize_bool(value: Optional[object]) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        return value.strip().lower() in ["true", "yes", "1", "t", "y"]
+    return False
+
+
+def _build_prediction_input(data: dict) -> pd.DataFrame:
+    input_row = {
+        "Income_Level": data.get("income_level", "Medium"),
+        "Satisfaction_Score": int(data.get("satisfaction_score", 3)),
+        "Discount_Used": _normalize_bool(data.get("discount_used", False)),
+        "Age": int(data.get("age", 35)),
+        "Number_of_Subscriptions": int(data.get("number_of_subscriptions", 1)),
+        "Tenure_Months": int(data.get("tenure_months", 12)),
+        "Monthly_Total_Spend": float(data.get("monthly_total_spend", 75.0)),
+        "Avg_Usage_Hours_Per_Week": float(data.get("avg_usage_hours_per_week", 15.0)),
+        "App_Switch_Frequency": int(data.get("app_switch_frequency", 5)),
+        "Customer_Support_Interactions": int(data.get("customer_support_interactions", 3)),
+        "Device_Type": data.get("device_type", "Mobile"),
+        "Payment_Mode": data.get("payment_mode", "UPI"),
+    }
+    return pd.DataFrame([input_row])
+
+
+def _risk_from_probability(prob: float) -> tuple[str, int, str, str]:
+    if prob >= 0.7:
+        return (
+            "High",
+            1,
+            "Offer Discount",
+            "Apply 20% discount on renewal to mitigate high interaction friction.",
+        )
+    if prob >= 0.3:
+        return (
+            "Medium",
+            1,
+            "Subscription Upgrade",
+            "Provide subscription upgrade incentive for premium benefits.",
+        )
+    return (
+        "Low",
+        0,
+        "No Action Required",
+        "Customer behavior shows stable engagement.",
+    )
+
 # Global dictionary to track bulk job status in-memory for prototype
 BULK_JOBS_DB = {}
 
-# Resolve bulk_results path relative to this router file (backend/app/bulk_results)
-RESULTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bulk_results")
-os.makedirs(RESULTS_DIR, exist_ok=True)
-
-def get_csv_value(row: dict, possible_keys: List[str], default: Any) -> Any:
-    # Normalize row keys: strip spaces, underscores and convert to lowercase
-    normalized_row = {k.lower().strip().replace(" ", "").replace("_", ""): v for k, v in row.items()}
-    for key in possible_keys:
-        norm_key = key.lower().strip().replace(" ", "").replace("_", "")
-        if norm_key in normalized_row:
-            return normalized_row[norm_key]
-    return default
-
-def run_prediction_rules(support_interactions: int, satisfaction: int, monthly_spend: float, usage: float) -> tuple:
-    # Rule-based model logic
-    score = 30.0 + (support_interactions * 15.0) - (satisfaction * 10.0) + (monthly_spend * 0.20) - (usage * 0.8)
-    score = max(0.0, min(100.0, score))  # Clip between 0 and 100
-    
-    if score >= 70.0:
-        risk = "High"
-        will_cancel = 1
-        rec_type = "Offer Discount"
-        rec_desc = "Apply 20% discount on renewal to mitigate high interaction friction."
-    elif score >= 30.0:
-        risk = "Medium"
-        will_cancel = 1
-        rec_type = "Subscription Upgrade"
-        rec_desc = "Provide subscription upgrade incentive for premium benefits."
-    else:
-        risk = "Low"
-        will_cancel = 0
-        rec_type = "No Action Required"
-        rec_desc = "Customer behavior shows stable engagement."
-        
-    explainability = {
-        "Customer_Support_Interactions": round(support_interactions * 0.1, 2),
-        "Satisfaction_Score": round((6 - satisfaction) * 0.1, 2),
-        "Avg_Usage_Hours_Per_Week": round(-usage * 0.02, 2),
-        "Monthly_Total_Spend": round(monthly_spend * 0.002, 2)
-    }
-    
-    return score, risk, will_cancel, rec_type, rec_desc, explainability
-
 def process_bulk_predictions_task(job_id: str, file_content: bytes):
+    # Simulates asynchronous background parsing and inference
     import time
-    time.sleep(3)  # Simulate processing delay
+    time.sleep(5)  # Simulate processing delay
     
-    if job_id not in BULK_JOBS_DB:
-        return
-        
-    BULK_JOBS_DB[job_id]["status"] = "PROCESSING"
-    
-    try:
-        # Decode and parse CSV
-        csv_data = file_content.decode('utf-8-sig', errors='ignore')
-        stream = io.StringIO(csv_data)
-        reader = csv.DictReader(stream)
-        
-        # Prepare list for processed records
-        processed_rows = []
-        successful_records = 0
-        failed_records = 0
-        
-        db = SessionLocal()
-        
-        for idx, row in enumerate(reader):
-            try:
-                # Extract columns case-insensitively
-                customer_id = str(get_csv_value(row, ["customer_id", "customerid", "customer", "id"], f"CUST_B{idx+1}"))
-                age = int(float(get_csv_value(row, ["age"], 35)))
-                income_level = str(get_csv_value(row, ["income_level", "income", "incomelevel"], "Medium"))
-                device_type = str(get_csv_value(row, ["device_type", "device", "devicetype"], "Mobile"))
-                payment_mode = str(get_csv_value(row, ["payment_mode", "payment", "paymentmode"], "UPI"))
-                number_of_subscriptions = int(float(get_csv_value(row, ["number_of_subscriptions", "subscriptions"], 1)))
-                tenure_months = int(float(get_csv_value(row, ["tenure_months", "tenure", "tenuremonths"], 12)))
-                monthly_total_spend = float(get_csv_value(row, ["monthly_total_spend", "monthlyspend", "spend", "monthlytotalspend"], 75.00))
-                avg_usage_hours_per_week = float(get_csv_value(row, ["avg_usage_hours_per_week", "avgusagehoursperweek", "weeklyusage", "usage"], 15.0))
-                app_switch_frequency = int(float(get_csv_value(row, ["app_switch_frequency", "appswitchfrequency", "appswitches"], 5)))
-                customer_support_interactions = int(float(get_csv_value(row, ["customer_support_interactions", "supportinteractions", "supporttickets", "support"], 3)))
-                satisfaction_score = int(float(get_csv_value(row, ["satisfaction_score", "satisfactionscore", "satisfaction"], 3)))
-                discount_used_str = str(get_csv_value(row, ["discount_used", "discountused", "discount"], "False"))
-                discount_used = discount_used_str.lower() in ["true", "yes", "1", "t", "y"]
-                
-                # Run rule-based classifier model
-                score, risk, will_cancel, rec_type, rec_desc, explainability = run_prediction_rules(
-                    customer_support_interactions, satisfaction_score, monthly_total_spend, avg_usage_hours_per_week
-                )
-                
-                # Append to processed rows
-                processed_rows.append({
-                    "customer_id": customer_id,
-                    "age": age,
-                    "tenure_months": tenure_months,
-                    "monthly_total_spend": monthly_total_spend,
-                    "avg_usage_hours_per_week": avg_usage_hours_per_week,
-                    "customer_support_interactions": customer_support_interactions,
-                    "satisfaction_score": satisfaction_score,
-                    "churn_probability": score,
-                    "risk_category": risk,
-                    "recommendation_type": rec_type,
-                    "recommendation_desc": rec_desc
-                })
-                
-                # Graceful database insertion of customer and predictions if they don't exist
-                try:
-                    # Check if customer exists
-                    check_query = text("SELECT customer_id FROM customers WHERE customer_id = :cust_id")
-                    cust_exists = db.execute(check_query, {"cust_id": customer_id}).fetchone()
-                    
-                    if not cust_exists:
-                        # Insert customer
-                        insert_cust = text("""
-                            INSERT INTO customers 
-                            (customer_id, age, income_level, number_of_subscriptions, tenure_months, monthly_total_spend, 
-                             avg_usage_hours_per_week, app_switch_frequency, customer_support_interactions, satisfaction_score, 
-                             discount_used, device_type, payment_mode, created_at)
-                            VALUES 
-                            (:customer_id, :age, :income_level, :number_of_subscriptions, :tenure_months, :monthly_total_spend, 
-                             :avg_usage_hours_per_week, :app_switch_frequency, :customer_support_interactions, :satisfaction_score, 
-                             :discount_used, :device_type, :payment_mode, CURRENT_TIMESTAMP)
-                        """)
-                        db.execute(insert_cust, {
-                            "customer_id": customer_id, "age": age, "income_level": income_level,
-                            "number_of_subscriptions": number_of_subscriptions, "tenure_months": tenure_months,
-                            "monthly_total_spend": monthly_total_spend, "avg_usage_hours_per_week": avg_usage_hours_per_week,
-                            "app_switch_frequency": str(app_switch_frequency),
-                            "customer_support_interactions": customer_support_interactions,
-                            "satisfaction_score": satisfaction_score, "discount_used": discount_used,
-                            "device_type": device_type, "payment_mode": payment_mode
-                        })
-                    
-                    # Insert churn prediction history
-                    insert_pred = text("""
-                        INSERT INTO churn_predictions 
-                        (customer_id, churn_probability, risk_category, will_cancel, explainability_json, recommendation_type, recommendation_desc, predicted_at)
-                        VALUES (:cust_id, :prob, :risk, :cancel, :explain, :rec_type, :rec_desc, CURRENT_TIMESTAMP)
-                    """)
-                    db.execute(insert_pred, {
-                        "cust_id": customer_id,
-                        "prob": score,
-                        "risk": risk,
-                        "cancel": will_cancel,
-                        "explain": explainability,
-                        "rec_type": rec_type,
-                        "rec_desc": rec_desc
-                    })
-                    db.commit()
-                except Exception as db_err:
-                    db.rollback()
-                    # Silently ignore database errors for mockup fallback
-                    pass
-                
-                successful_records += 1
-            except Exception as row_err:
-                print(f"Row processing error in bulk job {job_id}: {row_err}")
-                failed_records += 1
-                
-        db.close()
-        
-        # Write output to CSV file
-        file_path = os.path.join(RESULTS_DIR, f"{job_id}.csv")
-        with open(file_path, "w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            writer.writerow([
-                "Customer ID", "Age", "Tenure (Months)", "Monthly Spend ($)", 
-                "Weekly Usage (Hrs)", "Support Tickets", "Satisfaction (1-5)", 
-                "Churn Probability", "Risk Category", "Recommended Offer", "Action Description"
-            ])
-            for r in processed_rows:
-                writer.writerow([
-                    r["customer_id"], r["age"], r["tenure_months"], f"{r['monthly_total_spend']:.2f}",
-                    f"{r['avg_usage_hours_per_week']:.1f}", r["customer_support_interactions"],
-                    r["satisfaction_score"], f"{r['churn_probability']:.1f}%", r["risk_category"],
-                    r["recommendation_type"], r["recommendation_desc"]
-                ])
-                
-        # Update job database
+    if job_id in BULK_JOBS_DB:
         BULK_JOBS_DB[job_id]["status"] = "COMPLETED"
-        BULK_JOBS_DB[job_id]["processed_records"] = successful_records + failed_records
-        BULK_JOBS_DB[job_id]["successful_records"] = successful_records
-        BULK_JOBS_DB[job_id]["failed_records"] = failed_records
+        BULK_JOBS_DB[job_id]["processed_records"] = BULK_JOBS_DB[job_id]["total_records"]
+        BULK_JOBS_DB[job_id]["successful_records"] = BULK_JOBS_DB[job_id]["total_records"]
         BULK_JOBS_DB[job_id]["completed_at"] = datetime.utcnow()
         BULK_JOBS_DB[job_id]["download_url"] = f"/api/v1/reports/export?format=csv&job_id={job_id}"
-        
-    except Exception as job_err:
-        print(f"Fatal job error in bulk job {job_id}: {job_err}")
-        BULK_JOBS_DB[job_id]["status"] = "FAILED"
-        BULK_JOBS_DB[job_id]["error_message"] = str(job_err)
-        BULK_JOBS_DB[job_id]["completed_at"] = datetime.utcnow()
 
 @router.post("/single/{customer_id}", response_model=SinglePredictionResponse)
 async def predict_single(
@@ -215,38 +102,87 @@ async def predict_single(
     db: Session = Depends(get_db),
     current_user: str = Depends(get_current_user)
 ):
-    # Graceful fallback database check
-    customer = None
-    support_interactions = 3
-    satisfaction = 3
-    usage = 14.5
-    monthly_spend = 79.50
-    
     try:
+        # Check if customer exists in database
         query = text("SELECT * FROM customers WHERE customer_id = :customer_id")
         customer = db.execute(query, {"customer_id": customer_id}).fetchone()
         
+        # Determine features (either from db or fallback values)
         if customer:
             support_interactions = customer.customer_support_interactions
             satisfaction = customer.satisfaction_score
             usage = float(customer.avg_usage_hours_per_week)
             monthly_spend = float(customer.monthly_total_spend)
-    except Exception as exc:
-        print(f"Database customer lookup failed (database may be offline, falling back to defaults): {exc}")
-        customer = None
-        
-    # Run predictions rules
-    score, risk, will_cancel, rec_type, rec_desc, explainability = run_prediction_rules(
-        support_interactions, satisfaction, monthly_spend, usage
-    )
-    
-    # Save prediction if database connection works
-    if customer:
-        try:
+        else:
+            # Fake values
+            support_interactions = 3
+            satisfaction = 2
+            usage = 14.5
+            monthly_spend = 79.50
+
+        input_data = {
+            "income_level": customer.income_level if customer else "Medium",
+            "satisfaction_score": customer.satisfaction_score if customer else 2,
+            "discount_used": customer.discount_used if customer else False,
+            "age": customer.age if customer else 35,
+            "number_of_subscriptions": customer.number_of_subscriptions if customer else 1,
+            "tenure_months": customer.tenure_months if customer else 12,
+            "monthly_total_spend": float(customer.monthly_total_spend) if customer else 79.50,
+            "avg_usage_hours_per_week": float(customer.avg_usage_hours_per_week) if customer else 14.5,
+            "app_switch_frequency": customer.app_switch_frequency if customer else 5,
+            "customer_support_interactions": customer.customer_support_interactions if customer else 3,
+            "device_type": customer.device_type if customer else "Mobile",
+            "payment_mode": customer.payment_mode if customer else "UPI",
+        }
+
+        if model_service.is_ready:
+            try:
+                df_input = _build_prediction_input(input_data)
+                output = model_service.predict_and_explain(df_input)
+                score = round(output["probability"] * 100.0, 2)
+                score_lower = round(output["probability_confidence_lower"] * 100.0, 2)
+                score_upper = round(output["probability_confidence_upper"] * 100.0, 2)
+                risk, will_cancel, rec_type, rec_desc = _risk_from_probability(score / 100.0)
+                explainability = output["explainability"]
+            except Exception as exc:
+                print(f"Model prediction failed, falling back to rule-based predictor: {exc}")
+                profile = build_risk_profile(
+                    customer_support_interactions=support_interactions,
+                    satisfaction_score=satisfaction,
+                    monthly_total_spend=monthly_spend,
+                    avg_usage_hours_per_week=usage,
+                )
+                score = profile["risk_score"]
+                score_lower = max(0, score - 5.0)  # ±5% confidence bounds for rule-based
+                score_upper = min(100, score + 5.0)
+                risk = profile["risk_category"]
+                will_cancel = profile["will_cancel"]
+                rec_type = profile["recommendation_type"]
+                rec_desc = profile["recommendation_desc"]
+                explainability = profile.get("explainability_json", {})
+        else:
+            profile = build_risk_profile(
+                customer_support_interactions=support_interactions,
+                satisfaction_score=satisfaction,
+                monthly_total_spend=monthly_spend,
+                avg_usage_hours_per_week=usage,
+            )
+            score = profile["risk_score"]
+            score_lower = max(0, score - 5.0)  # ±5% confidence bounds for rule-based
+            score_upper = min(100, score + 5.0)
+            risk = profile["risk_category"]
+            will_cancel = profile["will_cancel"]
+            rec_type = profile["recommendation_type"]
+            rec_desc = profile["recommendation_desc"]
+            explainability = profile.get("explainability_json", {})
+
+        # Save to database if customer is database-backed
+        if customer:
+            now_time = datetime.utcnow()
             insert_query = text("""
                 INSERT INTO churn_predictions 
                 (customer_id, churn_probability, risk_category, will_cancel, explainability_json, recommendation_type, recommendation_desc, predicted_at)
-                VALUES (:cust_id, :prob, :risk, :cancel, :explain, :rec_type, :rec_desc, CURRENT_TIMESTAMP)
+                VALUES (:cust_id, :prob, :risk, :cancel, :explain, :rec_type, :rec_desc, :predicted_at)
             """)
             db.execute(insert_query, {
                 "cust_id": customer_id,
@@ -255,22 +191,40 @@ async def predict_single(
                 "cancel": will_cancel,
                 "explain": explainability,
                 "rec_type": rec_type,
-                "rec_desc": rec_desc
+                "rec_desc": rec_desc,
+                "predicted_at": now_time
+            })
+            
+            history_query = text("""
+                INSERT INTO prediction_history 
+                (customer_id, risk_score, risk_category, prediction_result, evaluated_at)
+                VALUES (:cust_id, :risk_score, :risk_cat, :pred_res, :evaluated_at)
+            """)
+            db.execute(history_query, {
+                "cust_id": customer_id,
+                "risk_score": score,
+                "risk_cat": risk,
+                "pred_res": will_cancel,
+                "evaluated_at": now_time
             })
             db.commit()
-        except Exception as exc:
-            db.rollback()
-            print(f"Failed to save single customer prediction to DB: {exc}")
-            
-    return {
-        "customer_id": customer_id,
-        "churn_probability": round(score, 2),
-        "risk_category": risk,
-        "will_cancel": will_cancel,
-        "explainability_json": explainability,
-        "recommendation_type": rec_type,
-        "recommendation_desc": rec_desc
-    }
+
+        return {
+            "customer_id": customer_id,
+            "churn_probability": round(score, 2),
+            "probability_confidence_lower": score_lower,
+            "probability_confidence_upper": score_upper,
+            "risk_category": risk,
+            "will_cancel": will_cancel,
+            "explainability": explainability,
+            "recommendation_type": rec_type,
+            "recommendation_desc": rec_desc
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Inference pipeline execution failed: {str(e)}"
+        )
 
 @router.post("/bulk", response_model=BulkPredictionUploadResponse, status_code=status.HTTP_202_ACCEPTED)
 async def predict_bulk(

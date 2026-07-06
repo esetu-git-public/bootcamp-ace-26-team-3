@@ -22,16 +22,28 @@ The dataset contains 14 features, classified as follows:
 | `Payment_Mode` | Categorical (Nominal) | One-Hot Encoding (`Credit Card`, `UPI`, `Net Banking`, etc.) |
 | `Will_Cancel_Next_3_Months` | Binary Target | Target Label (0 or 1) |
 
+### 1.1 Engineered Features
+To capture complex non-linear customer behavioral interactions, the preprocessing pipeline (`SubscriptionPreprocessor`) dynamically engineers the following features:
+
+| Engineered Feature | Calculation | Rationale / Predictive Intent |
+| :--- | :--- | :--- |
+| `Spend_Per_Subscription` | `Monthly_Total_Spend / (Number_of_Subscriptions + 1e-5)` | Measures the average financial value of each active subscription. |
+| `Usage_Per_Subscription` | `Avg_Usage_Hours_Per_Week / (Number_of_Subscriptions + 1e-5)` | Tracks the weekly usage distribution across subscriptions to flag low-engagement. |
+| `Interactions_Per_Tenure_Month` | `Customer_Support_Interactions / (Tenure_Months + 1e-5)` | Identifies customer support friction frequency adjusted by relationship length. |
+| `Engagement_Score` | `Avg_Usage_Hours_Per_Week * Satisfaction_Score` | Measures overall active satisfaction-weighted engagement. |
+| `Risk_Indicator` | `Customer_Support_Interactions * (10.0 - Satisfaction_Score)` | Combines low satisfaction scores with high support calls to identify high-churn risk. |
+
 ## 2. Pipeline Execution Steps
 
 ```mermaid
 graph TD
     A[Raw Dataset] --> B[Drop Customer_ID]
     B --> C[Impute Missing Values if any]
-    C --> D[Ordinal Mapping: Income_Level]
-    C --> E[Binary Encoding: Discount_Used]
-    C --> F[One-Hot Encoding: Device_Type, Payment_Mode]
-    C --> G[Standard Scaling: Numerical Features]
+    C --> FE[Feature Engineering: 5 New Engineered Features]
+    FE --> D[Ordinal Mapping: Income_Level]
+    FE --> E[Binary Encoding: Discount_Used]
+    FE --> F[One-Hot Encoding: Device_Type, Payment_Mode]
+    FE --> G[Standard Scaling: Numerical & Engineered Features]
     D & E & F & G --> H[Feature Vectorization]
     H --> I[Stratified Train-Test Split 80:20]
 ```

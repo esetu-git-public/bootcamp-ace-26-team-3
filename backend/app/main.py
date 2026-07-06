@@ -4,8 +4,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
 from .database import Base, engine
 from .models.user import User
+from .core.risk_score import build_risk_profile
 from . import models
 from .routers import analytics, auth, customers, dashboard, model, predictions, reports
+from .api.endpoints import explainability
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -79,7 +81,23 @@ try:
             ) p ON c.customer_id = p.customer_id;
         """))
         db.commit()
-        print("Database view 'v_customer_predictions' created/verified.")
+
+        # Create supporting indexes for common analytics and search patterns
+        db.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_customers_lower_customer_id
+            ON customers(LOWER(customer_id));
+
+            CREATE INDEX IF NOT EXISTS idx_predictions_customer_predicted_at
+            ON churn_predictions(customer_id, predicted_at DESC);
+
+            CREATE INDEX IF NOT EXISTS idx_predictions_risk_will
+            ON churn_predictions(risk_category, will_cancel);
+
+            CREATE INDEX IF NOT EXISTS idx_prediction_history_customer_at
+            ON prediction_history(customer_id, evaluated_at DESC);
+        """))
+        db.commit()
+        print("Database index recommendations created/verified.")
 
         # 2. Seed default admin user if none exists
         admin_exists = db.query(User).filter(User.username == "admin").first()
@@ -140,32 +158,19 @@ try:
                             "payment_mode": pay
                         })
                         
-                        # Generate deterministic churn prediction score
-                        score = 30.0 + (support * 15.0) - (sat * 10.0) + (spend * 0.20) - (usage * 0.8)
-                        score = max(0.0, min(100.0, score))
-                        
-                        if score >= 70.0:
-                            risk = "High"
-                            will_cancel = 1
-                            rec_type = "Offer Discount"
-                            rec_desc = "Apply 20% discount on renewal to mitigate high interaction friction."
-                        elif score >= 30.0:
-                            risk = "Medium"
-                            will_cancel = 1
-                            rec_type = "Subscription Upgrade"
-                            rec_desc = "Provide subscription upgrade incentive for premium benefits."
-                        else:
-                            risk = "Low"
-                            will_cancel = 0
-                            rec_type = "No Action Required"
-                            rec_desc = "Customer behavior shows stable engagement."
-                            
-                        explainability = {
-                            "Customer_Support_Interactions": round(support * 0.1, 2),
-                            "Satisfaction_Score": round((6 - sat) * 0.1, 2),
-                            "Avg_Usage_Hours_Per_Week": round(-usage * 0.02, 2),
-                            "Monthly_Total_Spend": round(spend * 0.002, 2)
-                        }
+                        # Generate deterministic churn prediction score using centralized helper
+                        profile = build_risk_profile(
+                            customer_support_interactions=support,
+                            satisfaction_score=sat,
+                            monthly_total_spend=spend,
+                            avg_usage_hours_per_week=usage,
+                        )
+                        score = profile["risk_score"]
+                        risk = profile["risk_category"]
+                        will_cancel = profile["will_cancel"]
+                        rec_type = profile["recommendation_type"]
+                        rec_desc = profile["recommendation_desc"]
+                        explainability = profile["explainability_json"]
                         
                         predictions_to_insert.append({
                             "customer_id": cust_id,
@@ -194,6 +199,7 @@ app.include_router(customers.router, prefix="/api/v1")
 app.include_router(predictions.router, prefix="/api/v1")
 app.include_router(reports.router, prefix="/api/v1")
 app.include_router(model.router, prefix="/api/v1")
+app.include_router(explainability.router, prefix="/api/v1")
 
 
 @app.get("/")

@@ -41,14 +41,13 @@ async def get_current_user(
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ", 1)[1]
 
-    if not token:
-        return "demo-user"
-
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    if not token:
+        raise credentials_exception
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         username: str = payload.get("sub")

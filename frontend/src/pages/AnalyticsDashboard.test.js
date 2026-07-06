@@ -17,11 +17,8 @@ describe('AnalyticsDashboard', () => {
       if (url.includes('/analytics/churn-by-device')) {
         return Promise.resolve({ ok: true, json: async () => [{ device_type: 'Mobile', churn_rate: 20 }, { device_type: 'Desktop', churn_rate: 15 }] });
       }
-      if (url.includes('/analytics/customer-segmentation')) {
-        return Promise.resolve({ ok: true, json: async () => [{ segment: 'Loyal customers', customer_count: 44, percentage: 37, average_churn_risk: 12 }] });
-      }
       if (url.includes('/customers?page=1&limit=6')) {
-        return Promise.resolve({ ok: true, json: async () => ({ results: [{ customer_id: 'C1001', risk_category: 'High', monthly_total_spend: 80, tenure_months: 8 }] }) });
+        return Promise.resolve({ ok: true, json: async () => ({ results: [{ customer_id: 'C1001', risk_category: 'High', monthly_total_spend: 80, tenure_months: 8, satisfaction_score: 6 }] }) });
       }
       if (url.includes('/predictions/bulk')) {
         return Promise.resolve({ ok: true, json: async () => ({ job_id: 'job-1', status: 'QUEUED', total_records: 2 }) });

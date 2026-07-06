@@ -129,3 +129,4 @@ The backend exposes prediction and analytics routes under `/api/v1`, including:
 - If the frontend cannot reach the backend, confirm that the backend server is still running on port 8000.
 - If you want to switch away from the SQLite local setup, set `DATABASE_URL` to your preferred database connection string before starting the backend.
 - If `npm start` shows a build warning, the app should still run locally in development mode.
+- If your linter/import checker (**`pyrefly`**) reports that it cannot find modules such as `fastapi` or `sqlalchemy`, check that `python-interpreter-path` in [pyrefly.toml](file:///d:/Team-3/pyrefly.toml) and [backend/pyrefly.toml](file:///d:/Team-3/backend/pyrefly.toml) matches your active virtual environment path (e.g. `.venv/Scripts/python.exe` or `backend/.venv/Scripts/python.exe`).

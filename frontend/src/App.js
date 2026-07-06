@@ -87,6 +87,7 @@ function App() {
           <CustomerDirectory
             onViewChange={setView}
             onSelectCustomer={setSelectedCustomerId}
+            onLogout={handleLogout}
           />
         )}
         {view === 'profile' && (

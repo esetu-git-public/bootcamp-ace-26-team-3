@@ -31,6 +31,11 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
       fetch(`${API_BASE_URL}/customers?page=1&limit=6`, { headers }),
     ])
       .then(async (responses) => {
+        if (responses.some(res => res.status === 401)) {
+          if (onLogout) onLogout();
+          return;
+        }
+
         const [kpisRes, riskRes, incomeRes, deviceRes, segmentRes, customersRes] = responses;
         const kpisData = await kpisRes.json();
         const riskData = await riskRes.json();
@@ -64,12 +69,20 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
     const timer = window.setInterval(async () => {
       try {
         const statusRes = await fetch(`${API_BASE_URL}/predictions/bulk/status/${bulkJob.job_id}`, { headers });
+        if (statusRes.status === 401) {
+          if (onLogout) onLogout();
+          return;
+        }
         const statusData = await statusRes.json();
 
         if (statusRes.ok) {
           setBulkJob(statusData);
           if (statusData.status === 'COMPLETED') {
             const previewRes = await fetch(`${API_BASE_URL}/predictions/bulk/preview/${bulkJob.job_id}`, { headers });
+            if (previewRes.status === 401) {
+              if (onLogout) onLogout();
+              return;
+            }
             if (previewRes.ok) {
               setBulkPreview(await previewRes.json());
             }
@@ -122,6 +135,11 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
         headers,
         body: formData,
       });
+
+      if (response.status === 401) {
+        if (onLogout) onLogout();
+        return;
+      }
 
       if (!response.ok) {
         const errorData = await response.json();

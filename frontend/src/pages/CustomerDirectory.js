@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 const API_BASE_URL = 'http://localhost:8000/api/v1';
 
-export default function CustomerDirectory({ onViewChange, onSelectCustomer }) {
+export default function CustomerDirectory({ onViewChange, onSelectCustomer, onLogout }) {
   const [customers, setCustomers] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -39,8 +39,12 @@ export default function CustomerDirectory({ onViewChange, onSelectCustomer }) {
       const response = await fetch(url, { headers });
       if (response.status === 401) {
         // Handle token expiration
-        localStorage.removeItem('access_token');
-        onViewChange('login');
+        if (onLogout) {
+          onLogout();
+        } else {
+          localStorage.removeItem('access_token');
+          onViewChange('login');
+        }
         return;
       }
       

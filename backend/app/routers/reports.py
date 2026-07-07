@@ -21,7 +21,7 @@ def _is_valid_job_id(job_id: str) -> bool:
 
 @router.get("/export")
 async def export_report(
-    format: str = Query("csv", regex="^(csv|pdf|xlsx)$"),
+    format: str = Query("csv", pattern="^(csv|pdf|xlsx)$"),
     risk_category: Optional[str] = Query(None),
     recommendation_type: Optional[str] = Query(None),
     job_id: Optional[str] = Query(None),

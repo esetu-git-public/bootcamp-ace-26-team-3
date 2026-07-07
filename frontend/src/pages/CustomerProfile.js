@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import * as apiService from '../services/api';
 import * as mlModel from '../services/mlModel';
 import { ModelPredictionCard, RiskGauge, PredictionTimeline } from '../components/ModelPredictionCard';
+import { formatPercent } from '../utils/percent';
 
 export default function CustomerProfile({ onViewChange, onLogout, selectedCustomerId, setSelectedCustomerId }) {
   const [customerId, setCustomerId] = useState(selectedCustomerId || 'C10239');
@@ -223,7 +224,7 @@ export default function CustomerProfile({ onViewChange, onLogout, selectedCustom
                         {log.prediction_result === 1 ? 'Churn' : 'Retain'}
                       </span>
                       <strong style={styles.historyScore}>
-                        {log.risk_score.toFixed(1)}% Risk
+                        {formatPercent(log.risk_score)} Risk
                       </strong>
                     </div>
                   ))}

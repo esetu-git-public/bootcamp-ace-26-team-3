@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import * as apiService from '../services/api';
+import { formatPercent } from '../utils/percent';
 
 export default function CustomerDirectory({ onViewChange, onSelectCustomer, onLogout }) {
   const [customers, setCustomers] = useState([]);
@@ -237,7 +238,7 @@ export default function CustomerDirectory({ onViewChange, onSelectCustomer, onLo
                         <td style={styles.td}>{row.satisfaction_score}/10</td>
                         <td style={styles.td}>
                           <span style={styles.riskBadge(row.risk_category)}>
-                            {row.risk_category} ({row.churn_probability.toFixed(1)}%)
+                            {row.risk_category} ({formatPercent(row.churn_probability)})
                           </span>
                         </td>
                         <td style={styles.td}>

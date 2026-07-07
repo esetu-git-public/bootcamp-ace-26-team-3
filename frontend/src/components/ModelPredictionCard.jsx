@@ -11,6 +11,7 @@
 
 import React from 'react';
 import * as mlModel from '../services/mlModel';
+import { clampPercent, formatPercent } from '../utils/percent';
 
 export function ModelPredictionCard({ prediction, loading = false, error = null, onRegenerate = null }) {
   if (loading) {
@@ -64,11 +65,11 @@ export function ModelPredictionCard({ prediction, loading = false, error = null,
         <span style={styles.metricLabel}>Churn Probability:</span>
         <div style={styles.probabilityDisplay}>
           <span style={styles.probabilityValue}>
-            {prediction.churn_probability ? prediction.churn_probability.toFixed(2) : 'N/A'}%
+            {formatPercent(prediction.churn_probability, 2)}
           </span>
           {prediction.probability_confidence_lower !== undefined && prediction.probability_confidence_upper !== undefined && (
             <span style={styles.confidenceInterval}>
-              (95% CI: {prediction.probability_confidence_lower.toFixed(2)}% - {prediction.probability_confidence_upper.toFixed(2)}%)
+              (95% CI: {formatPercent(prediction.probability_confidence_lower, 2)} - {formatPercent(prediction.probability_confidence_upper, 2)})
             </span>
           )}
         </div>
@@ -163,9 +164,12 @@ function FeatureImportanceBar({ feature }) {
  * Risk Gauge Component - Visual representation of churn probability
  */
 export function RiskGauge({ probability = 0 }) {
-  const riskLevel = mlModel.getRiskCategory(probability);
+  const percent = clampPercent(probability);
+  const riskLevel = mlModel.getRiskCategory(percent);
   const riskColors = mlModel.getRiskColors(riskLevel);
-  const rotation = (probability / 100) * 180 - 90; // Rotate from -90 to 90 degrees
+  const arcRatio = percent / 100;
+  const arcY = 100 - 70 * Math.sqrt(Math.max(0, 1 - Math.pow((arcRatio - 0.5) * 2, 2)));
+  const rotation = arcRatio * 180 - 90; // Rotate from -90 to 90 degrees
 
   return (
     <div style={styles.gaugeContainer}>
@@ -187,7 +191,7 @@ export function RiskGauge({ probability = 0 }) {
           </linearGradient>
         </defs>
         <path
-          d={`M 30 100 A 70 70 0 0 1 ${30 + 140 * (probability / 100)} ${100 - 70 * Math.sqrt(1 - Math.pow((probability / 100 - 0.5) * 2, 2))}`}
+          d={`M 30 100 A 70 70 0 0 1 ${30 + 140 * arcRatio} ${arcY}`}
           fill="none"
           stroke="url(#riskGradient)"
           strokeWidth="8"
@@ -202,7 +206,7 @@ export function RiskGauge({ probability = 0 }) {
         <circle cx="100" cy="100" r="6" fill={riskColors.text} />
       </svg>
       <div style={styles.gaugeLabel}>
-        <div style={styles.gaugeLabelValue}>{probability.toFixed(1)}%</div>
+        <div style={styles.gaugeLabelValue}>{formatPercent(percent)}</div>
         <div style={styles.gaugeLabelRisk}>{riskLevel} Risk</div>
       </div>
     </div>
@@ -259,7 +263,7 @@ function PredictionTimelineEntry({ prediction, isLatest }) {
             Risk: <strong>{prediction.risk_category}</strong>
           </span>
           <span style={styles.timelineMetric}>
-            Probability: <strong>{prediction.risk_score ? prediction.risk_score.toFixed(1) : 'N/A'}%</strong>
+            Probability: <strong>{formatPercent(prediction.risk_score)}</strong>
           </span>
         </div>
       </div>

@@ -9,6 +9,59 @@ from .auth import get_current_user
 
 router = APIRouter(prefix="/customers", tags=["Customer Management"])
 
+CASE_INSENSITIVE_LIST_FILTERS = {
+    "income_levels": "income_level",
+    "device_types": "device_type",
+    "payment_modes": "payment_mode",
+    "risk_categories": "risk_category",
+}
+
+
+def _normalize_values(values: Optional[List[str]]) -> List[str]:
+    if not values:
+        return []
+    return [value.strip().lower() for value in values if value and value.strip()]
+
+
+def _mock_customer_rows() -> List[Dict[str, Any]]:
+    return [
+        {"customer_id": "1", "age": 34, "income_level": "Medium", "tenure_months": 8, "monthly_total_spend": 79.50, "satisfaction_score": 2, "device_type": "Android", "payment_mode": "UPI", "churn_probability": 89.00, "risk_category": "High", "will_cancel": 1, "recommendation_type": "Offer Discount"},
+        {"customer_id": "2", "age": 45, "income_level": "Low", "tenure_months": 2, "monthly_total_spend": 35.00, "satisfaction_score": 1, "device_type": "Web", "payment_mode": "Wallet", "churn_probability": 84.50, "risk_category": "High", "will_cancel": 1, "recommendation_type": "Provide Free Trial"},
+        {"customer_id": "3", "age": 22, "income_level": "High", "tenure_months": 15, "monthly_total_spend": 120.00, "satisfaction_score": 4, "device_type": "iOS", "payment_mode": "Credit Card", "churn_probability": 15.30, "risk_category": "Low", "will_cancel": 0, "recommendation_type": "No Action Required"},
+        {"customer_id": "4", "age": 58, "income_level": "Medium", "tenure_months": 24, "monthly_total_spend": 55.00, "satisfaction_score": 5, "device_type": "Android", "payment_mode": "Debit Card", "churn_probability": 4.10, "risk_category": "Low", "will_cancel": 0, "recommendation_type": "No Action Required"},
+        {"customer_id": "5", "age": 29, "income_level": "Low", "tenure_months": 5, "monthly_total_spend": 45.00, "satisfaction_score": 3, "device_type": "iOS", "payment_mode": "Wallet", "churn_probability": 52.40, "risk_category": "Medium", "will_cancel": 1, "recommendation_type": "Subscription Upgrade"}
+    ]
+
+
+def _filter_mock_customer_rows(
+    rows: List[Dict[str, Any]],
+    search_id: Optional[str],
+    income_levels: Optional[List[str]],
+    device_types: Optional[List[str]],
+    payment_modes: Optional[List[str]],
+    risk_categories: Optional[List[str]],
+    will_cancel: Optional[int],
+) -> List[Dict[str, Any]]:
+    filtered = rows
+    if search_id and search_id.strip():
+        search_value = search_id.strip().lower()
+        filtered = [row for row in filtered if search_value in str(row["customer_id"]).lower()]
+
+    filter_sets = {
+        "income_level": set(_normalize_values(income_levels)),
+        "device_type": set(_normalize_values(device_types)),
+        "payment_mode": set(_normalize_values(payment_modes)),
+        "risk_category": set(_normalize_values(risk_categories)),
+    }
+    for field, accepted_values in filter_sets.items():
+        if accepted_values:
+            filtered = [row for row in filtered if str(row.get(field, "")).lower() in accepted_values]
+
+    if will_cancel is not None:
+        filtered = [row for row in filtered if row.get("will_cancel") == will_cancel]
+
+    return sorted(filtered, key=lambda row: row.get("churn_probability") or 0.0, reverse=True)
+
 # Mock single customer fallback helper
 def get_mock_customer_profile(customer_id: str):
     return {
@@ -46,7 +99,7 @@ def get_mock_customer_profile(customer_id: str):
 
 
 def _expand_list_params(query, params: Dict[str, Any]):
-    for key in ("income_levels", "device_types", "payment_modes", "risk_categories"):
+    for key in CASE_INSENSITIVE_LIST_FILTERS:
         if key in params:
             query = query.bindparams(bindparam(key, expanding=True))
     return query
@@ -60,7 +113,7 @@ async def get_customers(
     device_types: Optional[List[str]] = Query(None),
     payment_modes: Optional[List[str]] = Query(None),
     risk_categories: Optional[List[str]] = Query(None),
-    will_cancel: Optional[int] = Query(None),
+    will_cancel: Optional[int] = Query(None, ge=0, le=1),
     db: Session = Depends(get_db),
     current_user: str = Depends(get_current_user)
 ):
@@ -75,21 +128,21 @@ async def get_customers(
         """
         params: Dict[str, Any] = {"limit": limit, "offset": offset}
         
-        if search_id:
+        if search_id and search_id.strip():
             query_str += " AND lower(customer_id) LIKE :search_id"
-            params["search_id"] = f"%{search_id.lower()}%"
-        if income_levels:
-            query_str += " AND income_level IN :income_levels"
-            params["income_levels"] = income_levels
-        if device_types:
-            query_str += " AND device_type IN :device_types"
-            params["device_types"] = device_types
-        if payment_modes:
-            query_str += " AND payment_mode IN :payment_modes"
-            params["payment_modes"] = payment_modes
-        if risk_categories:
-            query_str += " AND risk_category IN :risk_categories"
-            params["risk_categories"] = risk_categories
+            params["search_id"] = f"%{search_id.strip().lower()}%"
+
+        list_filters = {
+            "income_levels": _normalize_values(income_levels),
+            "device_types": _normalize_values(device_types),
+            "payment_modes": _normalize_values(payment_modes),
+            "risk_categories": _normalize_values(risk_categories),
+        }
+        for param_name, values in list_filters.items():
+            if values:
+                query_str += f" AND lower({CASE_INSENSITIVE_LIST_FILTERS[param_name]}) IN :{param_name}"
+                params[param_name] = values
+
         if will_cancel is not None:
             query_str += " AND will_cancel = :will_cancel"
             params["will_cancel"] = will_cancel
@@ -129,22 +182,22 @@ async def get_customers(
         }
     except Exception:
         # Fallback Mock paginated list (only if query/db operation fails entirely)
-        mock_data = [
-            {"customer_id": "CUST0001", "age": 34, "income_level": "Medium", "tenure_months": 8, "monthly_total_spend": 79.50, "satisfaction_score": 2, "device_type": "Android", "payment_mode": "UPI", "churn_probability": 89.00, "risk_category": "High", "will_cancel": 1, "recommendation_type": "Offer Discount"},
-            {"customer_id": "CUST0002", "age": 45, "income_level": "Low", "tenure_months": 2, "monthly_total_spend": 35.00, "satisfaction_score": 1, "device_type": "Web", "payment_mode": "Wallet", "churn_probability": 84.50, "risk_category": "High", "will_cancel": 1, "recommendation_type": "Provide Free Trial"},
-            {"customer_id": "CUST0003", "age": 22, "income_level": "High", "tenure_months": 15, "monthly_total_spend": 120.00, "satisfaction_score": 4, "device_type": "iOS", "payment_mode": "Credit Card", "churn_probability": 15.30, "risk_category": "Low", "will_cancel": 0, "recommendation_type": "No Action Required"},
-            {"customer_id": "CUST0004", "age": 58, "income_level": "Medium", "tenure_months": 24, "monthly_total_spend": 55.00, "satisfaction_score": 5, "device_type": "Android", "payment_mode": "Debit Card", "churn_probability": 4.10, "risk_category": "Low", "will_cancel": 0, "recommendation_type": "No Action Required"},
-            {"customer_id": "CUST0005", "age": 29, "income_level": "Low", "tenure_months": 5, "monthly_total_spend": 45.00, "satisfaction_score": 3, "device_type": "iOS", "payment_mode": "Wallet", "churn_probability": 52.40, "risk_category": "Medium", "will_cancel": 1, "recommendation_type": "Subscription Upgrade"}
-        ]
-        # Filter if search provided in mock
-        if search_id:
-            search_str = str(search_id).upper()
-            mock_data = [x for x in mock_data if search_str in str(x["customer_id"]).upper()]
+        mock_data = _filter_mock_customer_rows(
+            _mock_customer_rows(),
+            search_id,
+            income_levels,
+            device_types,
+            payment_modes,
+            risk_categories,
+            will_cancel,
+        )
+        total = len(mock_data)
+        paginated_mock_data = mock_data[offset:offset + limit]
         return {
-            "total": len(mock_data),
+            "total": total,
             "page": page,
             "limit": limit,
-            "results": mock_data
+            "results": paginated_mock_data
         }
 
 @router.get("/{customer_id}", response_model=CustomerProfileResponse)

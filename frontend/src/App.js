@@ -10,7 +10,7 @@ import ScrumBoard from './pages/ScrumBoard';
 function App() {
   const [view, setView] = useState('login');
   const [token, setToken] = useState(localStorage.getItem('access_token'));
-  const [selectedCustomerId, setSelectedCustomerId] = useState('C10239');
+  const [selectedCustomerId, setSelectedCustomerId] = useState('1');
 
   useEffect(() => {
     if (token) {

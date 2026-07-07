@@ -92,18 +92,15 @@ function StatPill({ label, value, color='#38bdf8', icon }) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function CustomerProfile({ onViewChange, onLogout, selectedCustomerId, setSelectedCustomerId }) {
-  const [customerId, setCustomerId]   = useState(selectedCustomerId || '');
-  const [searchId,   setSearchId]     = useState(selectedCustomerId || '');
-  const [customer,   setCustomer]     = useState(null);
-  const [prediction, setPrediction]   = useState(null);
-  const [history,    setHistory]      = useState([]);
-  const [loading,    setLoading]      = useState(false);
-  const [error,      setError]        = useState(null);
-  const [predicting, setPredicting]   = useState(false);
-  const [notFound,   setNotFound]     = useState(false);
-  const inputRef = useRef(null);
+  const [customerId, setCustomerId] = useState(selectedCustomerId || 'C10239');
+  const [searchId, setSearchId] = useState(selectedCustomerId || 'C10239');
+  const [customer, setCustomer] = useState(null);
+  const [prediction, setPrediction] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [predicting, setPredicting] = useState(false);
 
-  // ── data fetchers ─────────────────────────────────────────────────────────
   const fetchCustomerDetails = async (id) => {
     if (!id) return;
     setLoading(true);
@@ -198,22 +195,16 @@ export default function CustomerProfile({ onViewChange, onLogout, selectedCustom
         </div>
       </header>
 
-      {/* ── Search Bar ── */}
-      <form onSubmit={handleSearchSubmit} style={S.searchForm}>
-        <div style={S.searchInputWrap}>
-          <span style={S.searchIcon}>🔍</span>
-          <input
-            ref={inputRef}
-            type="text"
-            placeholder="Enter Customer ID  (e.g. C10239)"
-            value={searchId}
-            onChange={(e) => setSearchId(e.target.value)}
-            style={S.searchInput}
-          />
-        </div>
-        <button type="submit" className="cp-search-btn" style={S.searchBtn}>
-          Search Profile
-        </button>
+      {/* Search Input */}
+      <form onSubmit={handleSearchSubmit} style={styles.searchForm}>
+        <input
+          type="text"
+          placeholder="Search Customer ID (e.g., C10239)"
+          value={searchId}
+          onChange={(e) => setSearchId(e.target.value)}
+          style={styles.searchInput}
+        />
+        <button type="submit" style={styles.searchButton}>Search Profile</button>
       </form>
 
       {/* ── Loading ── */}

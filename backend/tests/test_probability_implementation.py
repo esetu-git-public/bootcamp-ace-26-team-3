@@ -135,7 +135,7 @@ class TestAPIResponseSchema:
     def test_single_prediction_response_fields(self):
         """Verify SinglePredictionResponse contains all required fields."""
         mock_response = {
-            "customer_id": "CUST0001",
+            "customer_id": "1",
             "churn_probability": 85.50,
             "probability_confidence_lower": 80.30,
             "probability_confidence_upper": 90.70,
@@ -166,7 +166,7 @@ class TestAPIResponseSchema:
     def test_customer_profile_response_fields(self):
         """Verify CustomerProfileResponse includes probability fields."""
         mock_response = {
-            "customer_id": "CUST0001",
+            "customer_id": "1",
             "age": 34,
             "income_level": "Medium",
             "number_of_subscriptions": 2,
@@ -261,7 +261,7 @@ class TestRegressionDetection:
     def test_explainability_field_renamed(self):
         """Verify explainability field is named 'explainability', not 'explainability_json'."""
         mock_response = {
-            "customer_id": "CUST0001",
+            "customer_id": "1",
             "churn_probability": 85.50,
             "explainability": {"feature": 0.42},
             "explainability_json": None  # Should not exist in API response

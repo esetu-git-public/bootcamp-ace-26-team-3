@@ -20,9 +20,9 @@ function getAuthHeaders() {
 async function parseErrorResponse(response) {
   try {
     const data = await response.json();
-    return data.detail || `Error: ${response.status} ${response.statusText}`;
+    return data.detail || data.message || `Error: ${response.status} ${response.statusText || ''}`.trim();
   } catch {
-    return `Error: ${response.status} ${response.statusText}`;
+    return `Error: ${response.status} ${response.statusText || ''}`.trim();
   }
 }
 
@@ -216,7 +216,7 @@ export async function getBulkPredictionPreview(jobId) {
 }
 
 /**
- * Export report (CSV, PDF, XLSX)
+ * Export report file with auth headers.
  */
 export async function exportReport(format = 'csv', filters = {}) {
   const params = new URLSearchParams({ format });
@@ -225,7 +225,26 @@ export async function exportReport(format = 'csv', filters = {}) {
   if (filters.riskCategory) params.append('risk_category', filters.riskCategory);
   if (filters.recommendationType) params.append('recommendation_type', filters.recommendationType);
 
-  return request(`/reports/export?${params.toString()}`);
+  const endpoint = `/reports/export?${params.toString()}`;
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(response);
+    throw {
+      status: response.status,
+      message: errorMessage,
+      endpoint,
+    };
+  }
+
+  const disposition = response.headers?.get?.('Content-Disposition') || '';
+  const filenameMatch = disposition.match(/filename="?([^"]+)"?/i);
+  const filename = filenameMatch?.[1] || `churn_report.${format}`;
+  const blob = response.blob ? await response.blob() : new Blob([await response.text()]);
+
+  return { blob, filename };
 }
 
 /**

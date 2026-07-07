@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Login from './pages/Login';
 import SignUp from './pages/SignUp';
 import AnalyticsDashboard from './pages/AnalyticsDashboard';
@@ -10,7 +10,7 @@ import ScrumBoard from './pages/ScrumBoard';
 function App() {
   const [view, setView] = useState('login');
   const [token, setToken] = useState(localStorage.getItem('access_token'));
-  const [selectedCustomerId, setSelectedCustomerId] = useState('1');
+  const [selectedCustomerId, setSelectedCustomerId] = useState('');
 
   useEffect(() => {
     if (token) {
@@ -22,16 +22,16 @@ function App() {
     }
   }, [token, view]);
 
-  const handleLoginSuccess = (newToken) => {
+  const handleLoginSuccess = useCallback((newToken) => {
     localStorage.setItem('access_token', newToken);
     setToken(newToken);
-  };
+  }, []);
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     localStorage.removeItem('access_token');
     setToken(null);
     setView('login');
-  };
+  }, []);
 
   const isAuth = token && ['dashboard', 'directory', 'profile', 'model', 'board'].includes(view);
 

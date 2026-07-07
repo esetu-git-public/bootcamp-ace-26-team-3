@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as apiService from '../services/api';
 import { clampPercent, formatPercent } from '../utils/percent';
 
@@ -24,7 +24,13 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
   const [bulkPreview, setBulkPreview] = useState([]);
   const [reportDownloading, setReportDownloading] = useState(false);
 
+  // Keep a stable ref to onLogout so we can call it inside the effect
+  // without adding it as a dependency (avoids infinite refetch loop on re-render).
+  const onLogoutRef = useRef(onLogout);
+  useEffect(() => { onLogoutRef.current = onLogout; }, [onLogout]);
+
   useEffect(() => {
+    let cancelled = false;
     Promise.all([
       apiService.getDashboardKPIs(),
       apiService.getChurnRiskDistribution(),
@@ -49,6 +55,7 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
         segmentDataResult,
         customersData,
       ]) => {
+        if (cancelled) return;
         setKpis(kpisData);
         setRiskDistribution(asArray(riskData));
         setIncomeData(asArray(incomeDataResult));
@@ -61,14 +68,17 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
         setCustomerRows(asArray(customersData.results));
       })
       .catch((err) => {
+        if (cancelled) return;
         if (err.status === 401) {
-          if (onLogout) onLogout();
+          if (onLogoutRef.current) onLogoutRef.current();
         } else {
           setError(err.message || 'Unable to load analytics data.');
         }
       })
-      .finally(() => setLoading(false));
-  }, [onLogout]);
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount — onLogout accessed via ref
 
   useEffect(() => {
     if (!bulkJob?.job_id || ['COMPLETED', 'FAILED'].includes(bulkJob.status)) {

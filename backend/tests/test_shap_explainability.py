@@ -240,7 +240,7 @@ class TestAPIResponseFormats:
     def test_local_explanation_response_format(self):
         """Test local explanation response structure."""
         response = {
-            "customer_id": "CUST_001",
+            "customer_id": "1",
             "probability": 0.75,
             "prediction": "churn",
             "base_value": 0.45,
@@ -392,7 +392,7 @@ class TestIntegration:
     
     def test_multiple_customer_batch(self):
         """Test processing multiple customers."""
-        customer_ids = ["CUST_001", "CUST_002", "CUST_003"]
+        customer_ids = ["1", "2", "3"]
         
         results = {}
         for cid in customer_ids:

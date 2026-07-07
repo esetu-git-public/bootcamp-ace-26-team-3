@@ -5,8 +5,8 @@ import { ModelPredictionCard, RiskGauge, PredictionTimeline } from '../component
 import { formatPercent } from '../utils/percent';
 
 export default function CustomerProfile({ onViewChange, onLogout, selectedCustomerId, setSelectedCustomerId }) {
-  const [customerId, setCustomerId] = useState(selectedCustomerId || 'C10239');
-  const [searchId, setSearchId] = useState(selectedCustomerId || 'C10239');
+  const [customerId, setCustomerId] = useState(selectedCustomerId || '1');
+  const [searchId, setSearchId] = useState(selectedCustomerId || '1');
   const [customer, setCustomer] = useState(null);
   const [prediction, setPrediction] = useState(null);
   const [history, setHistory] = useState([]);
@@ -113,7 +113,7 @@ export default function CustomerProfile({ onViewChange, onLogout, selectedCustom
       <form onSubmit={handleSearchSubmit} style={styles.searchForm}>
         <input
           type="text"
-          placeholder="Search Customer ID (e.g., C10239)"
+          placeholder="Search Customer ID (e.g., 1)"
           value={searchId}
           onChange={(e) => setSearchId(e.target.value)}
           style={styles.searchInput}

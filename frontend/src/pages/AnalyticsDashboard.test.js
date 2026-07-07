@@ -27,7 +27,7 @@ describe('AnalyticsDashboard', () => {
         });
       }
       if (url.includes('/customers?page=1&limit=6')) {
-        return Promise.resolve({ ok: true, json: async () => ({ results: [{ customer_id: 'C1001', risk_category: 'High', monthly_total_spend: 80, tenure_months: 8, satisfaction_score: 6 }] }) });
+        return Promise.resolve({ ok: true, json: async () => ({ results: [{ customer_id: '1001', risk_category: 'High', monthly_total_spend: 80, tenure_months: 8, satisfaction_score: 6 }] }) });
       }
       if (url.includes('/predictions/bulk')) {
         return Promise.resolve({ ok: true, json: async () => ({ job_id: 'job-1', status: 'QUEUED', total_records: 2 }) });
@@ -47,7 +47,7 @@ describe('AnalyticsDashboard', () => {
     render(<AnalyticsDashboard />);
 
     await screen.findByText(/Bulk prediction studio/i);
-    const file = new File(['customer_id,age\nC100,34\n'], 'customers.csv', { type: 'text/csv' });
+    const file = new File(['customer_id,age\n100,34\n'], 'customers.csv', { type: 'text/csv' });
     fireEvent.change(screen.getByLabelText(/bulk prediction csv/i), { target: { files: [file] } });
     fireEvent.click(screen.getByRole('button', { name: /run bulk prediction/i }));
 

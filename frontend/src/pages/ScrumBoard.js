@@ -1,43 +1,53 @@
 import React, { useState, useEffect } from 'react';
 
 const INITIAL_TASKS = [
-  { id: 'US-101', title: 'Customer Churn Data Pipeline', type: 'story', sp: 5, status: 'Done', desc: 'Build a robust preprocessing pipeline to clean, scale, and encode customer data.' },
-  { id: 'US-102', title: 'Predictive Feature Engineering', type: 'story', sp: 5, status: 'Done', desc: 'Engineer 5 interaction features (e.g. Spend_Per_Subscription, Engagement_Score) to boost predictive power.' },
-  { id: 'US-201', title: 'CatBoost Model Training', type: 'story', sp: 8, status: 'Done', desc: 'Select and tune CatBoost classifier model to maximize F1-score (target > 0.80) and AUC.' },
-  { id: 'US-202', title: 'Advanced XAI with SHAP', type: 'story', sp: 8, status: 'Done', desc: 'Create tree SHAP explainability calculations and visualizer for local/global predictions.' },
-  { id: 'US-203', title: 'Confidence Intervals Calibration', type: 'story', sp: 5, status: 'Done', desc: 'Standardize outputs to 0-100% and compute 95% binomial confidence bounds around prediction margins.' },
-  { id: 'US-301', title: 'JWT Security & Auth Router', type: 'story', sp: 5, status: 'Done', desc: 'Secure backend routes using FastAPI Security and user authentication with JWT bearer tokens.' },
-  { id: 'US-302', title: 'Core FastAPI REST Endpoints', type: 'story', sp: 8, status: 'Done', desc: 'Deliver paginated directory, profile audit, dashboard metrics, and prediction routes.' },
-  { id: 'US-401', title: 'Executive React Dashboard', type: 'story', sp: 8, status: 'Done', desc: 'Build visual charts dashboard featuring KPI metrics, segment distributions, and risk queue.' },
-  { id: 'US-402', title: 'Customer Directory view', type: 'story', sp: 5, status: 'Done', desc: 'Render search filters dashboard matching pagination, ID lookup, and column sorting.' },
-  { id: 'US-403', title: 'Profile Explorer & XAI Visuals', type: 'story', sp: 8, status: 'Done', desc: 'Provide deep-dive profiles showing circular risk gauges, SHAP impact bars, and audit timeline.' },
-  { id: 'US-404', title: 'Frontend Service Abstract', type: 'story', sp: 5, status: 'Done', desc: 'Refactor fetch routines into dedicated services (api.js, mlModel.js) to reduce component logic.' },
-  { id: 'US-501', title: 'Bulk Prediction Studio', type: 'story', sp: 8, status: 'Done', desc: 'Provide asynchronous CSV uploader, execution status pollers, results preview, and file downloads.' },
-  { id: 'US-502', title: 'Export Reporting Service', type: 'story', sp: 5, status: 'Done', desc: 'Implement report exporters formatting PDF summaries, Excel sheets, and filtered CSV downloads.' },
+  { id: 'US-101', title: 'Customer Churn Data Pipeline', type: 'story', sp: 5, status: 'Done', sprint: 'Sprint 1', desc: 'Build a robust preprocessing pipeline to clean, scale, and encode customer data.' },
+  { id: 'US-102', title: 'Predictive Feature Engineering', type: 'story', sp: 5, status: 'Done', sprint: 'Sprint 2', desc: 'Engineer 5 interaction features (e.g. Spend_Per_Subscription, Engagement_Score) to boost predictive power.' },
+  { id: 'US-201', title: 'CatBoost Model Training', type: 'story', sp: 8, status: 'Done', sprint: 'Sprint 2', desc: 'Select and tune CatBoost classifier model to maximize F1-score (target > 0.80) and AUC.' },
+  { id: 'US-202', title: 'Advanced XAI with SHAP', type: 'story', sp: 8, status: 'Done', sprint: 'Sprint 3', desc: 'Create tree SHAP explainability calculations and visualizer for local/global predictions.' },
+  { id: 'US-203', title: 'Confidence Intervals Calibration', type: 'story', sp: 5, status: 'Done', sprint: 'Sprint 3', desc: 'Standardize outputs to 0-100% and compute 95% binomial confidence bounds around prediction margins.' },
+  { id: 'US-301', title: 'JWT Security & Auth Router', type: 'story', sp: 5, status: 'Done', sprint: 'Sprint 3', desc: 'Secure backend routes using FastAPI Security and user authentication with JWT bearer tokens.' },
+  { id: 'US-302', title: 'Core FastAPI REST Endpoints', type: 'story', sp: 8, status: 'Done', sprint: 'Sprint 3', desc: 'Deliver paginated directory, profile audit, dashboard metrics, and prediction routes.' },
+  { id: 'US-401', title: 'Executive React Dashboard', type: 'story', sp: 8, status: 'Done', sprint: 'Sprint 3', desc: 'Build visual charts dashboard featuring KPI metrics, segment distributions, and risk queue.' },
+  { id: 'US-402', title: 'Customer Directory view', type: 'story', sp: 5, status: 'Done', sprint: 'Sprint 3', desc: 'Render search filters dashboard matching pagination, ID lookup, and column sorting.' },
+  { id: 'US-403', title: 'Profile Explorer & XAI Visuals', type: 'story', sp: 8, status: 'Done', sprint: 'Sprint 3', desc: 'Provide deep-dive profiles showing circular risk gauges, SHAP impact bars, and audit timeline.' },
+  { id: 'US-404', title: 'Frontend Service Abstract', type: 'story', sp: 5, status: 'Done', sprint: 'Sprint 3', desc: 'Refactor fetch routines into dedicated services (api.js, mlModel.js) to reduce component logic.' },
+  { id: 'US-501', title: 'Bulk Prediction Studio', type: 'story', sp: 8, status: 'Done', sprint: 'Sprint 3', desc: 'Provide asynchronous CSV uploader, execution status pollers, results preview, and file downloads.' },
+  { id: 'US-502', title: 'Export Reporting Service', type: 'story', sp: 5, status: 'Done', sprint: 'Sprint 3', desc: 'Implement report exporters formatting PDF summaries, Excel sheets, and filtered CSV downloads.' },
   
-  { id: 'BUG-001', title: 'Async Test Suite Failure', type: 'bug', sp: 3, status: 'Todo', desc: 'Async bulk prediction tests fail because pytest-asyncio is not installed or configured.', priority: 'High' },
-  { id: 'BUG-002', title: 'FastAPI Query Deprecation Warning', type: 'bug', sp: 1, status: 'Todo', desc: 'Query parameter regex is deprecated in reports.py, replace with pattern parameter.', priority: 'Low' },
-  { id: 'BUG-003', title: 'Pydantic Field example Warning', type: 'bug', sp: 1, status: 'Todo', desc: 'Attribute example is deprecated in common.py schemas, replace with json_schema_extra.', priority: 'Low' },
-  { id: 'BUG-004', title: 'ML Model Pickle Version Mismatch', type: 'bug', sp: 3, status: 'Backlog', desc: 'SimpleImputer / StandardScaler pickled with newer sklearn version 1.8.0 throws unpickling warnings in 1.6.1.', priority: 'Medium' },
-  { id: 'BUG-005', title: 'datetime.utcnow() Deprecations', type: 'bug', sp: 1, status: 'Backlog', desc: 'Code relies on deprecated timezone-naive datetime.utcnow(), use timezone-aware datetime.now(datetime.UTC).', priority: 'Low' },
-  { id: 'BUG-006', title: 'Webpack Dev Server Warnings', type: 'bug', sp: 2, status: 'Backlog', desc: 'fs.F_OK and setupMiddlewares deprecation warnings on npm start, update react-scripts dependencies.', priority: 'Low' }
+  { id: 'BUG-001', title: 'Async Test Suite Failure', type: 'bug', sp: 3, status: 'Todo', sprint: 'Sprint 4', desc: 'Async bulk prediction tests fail because pytest-asyncio is not installed or configured.', priority: 'High' },
+  { id: 'BUG-002', title: 'FastAPI Query Deprecation Warning', type: 'bug', sp: 1, status: 'Todo', sprint: 'Sprint 4', desc: 'Query parameter regex is deprecated in reports.py, replace with pattern parameter.', priority: 'Low' },
+  { id: 'BUG-003', title: 'Pydantic Field example Warning', type: 'bug', sp: 1, status: 'Todo', sprint: 'Sprint 4', desc: 'Attribute example is deprecated in common.py schemas, replace with json_schema_extra.', priority: 'Low' },
+  { id: 'BUG-004', title: 'ML Model Pickle Version Mismatch', type: 'bug', sp: 3, status: 'Backlog', sprint: 'Backlog', desc: 'SimpleImputer / StandardScaler pickled with newer sklearn version 1.8.0 throws unpickling warnings in 1.6.1.', priority: 'Medium' },
+  { id: 'BUG-005', title: 'datetime.utcnow() Deprecations', type: 'bug', sp: 1, status: 'Backlog', sprint: 'Backlog', desc: 'Code relies on deprecated timezone-naive datetime.utcnow(), use timezone-aware datetime.now(datetime.UTC).', priority: 'Low' },
+  { id: 'BUG-006', title: 'Webpack Dev Server Warnings', type: 'bug', sp: 2, status: 'Backlog', sprint: 'Backlog', desc: 'fs.F_OK and setupMiddlewares deprecation warnings on npm start, update react-scripts dependencies.', priority: 'Low' }
 ];
 
 const COLUMNS = [
-  { id: 'Backlog', title: 'Product Backlog', desc: 'Ready for grooming / Future Sprints', color: '#94a3b8' },
+  { id: 'Backlog', title: 'Product Backlog', desc: 'Ready for grooming / Unplanned', color: '#94a3b8' },
   { id: 'Todo', title: 'Sprint Backlog', desc: 'Planned for immediate action', color: '#f59e0b' },
   { id: 'InProgress', title: 'In Progress', desc: 'Active development / testing', color: '#38bdf8' },
   { id: 'Done', title: 'Done', desc: 'Fully verified & production ready', color: '#10b981' }
 ];
 
+const SPRINTS = [
+  { id: 'all', title: 'All Sprints', desc: 'Complete project backlog' },
+  { id: 'Sprint 1', title: 'Sprint 1', desc: 'Data Preprocessing & Setup' },
+  { id: 'Sprint 2', title: 'Sprint 2', desc: 'ML Model & Hyperparameter Tuning' },
+  { id: 'Sprint 3', title: 'Sprint 3', desc: 'Backend Endpoints & UI Interface' },
+  { id: 'Sprint 4', title: 'Sprint 4', desc: 'Bug-fix & Deprecations Sprint' },
+  { id: 'Backlog', title: 'Unscheduled', desc: 'Future backlog features & bugs' }
+];
+
 export default function ScrumBoard({ onViewChange }) {
   const [tasks, setTasks] = useState(() => {
-    const saved = localStorage.getItem('scrum_tasks');
+    const saved = localStorage.getItem('scrum_tasks_sprints');
     return saved ? JSON.parse(saved) : INITIAL_TASKS;
   });
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all'); // all, story, bug
+  const [selectedSprint, setSelectedSprint] = useState('all'); // all, Sprint 1, 2, 3, 4, Backlog
   const [selectedTask, setSelectedTask] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
 
@@ -48,9 +58,10 @@ export default function ScrumBoard({ onViewChange }) {
   const [newDesc, setNewDesc] = useState('');
   const [newPriority, setNewPriority] = useState('Medium');
   const [newStatus, setNewStatus] = useState('Backlog');
+  const [newSprint, setNewSprint] = useState('Sprint 4');
 
   useEffect(() => {
-    localStorage.setItem('scrum_tasks', JSON.stringify(tasks));
+    localStorage.setItem('scrum_tasks_sprints', JSON.stringify(tasks));
   }, [tasks]);
 
   const moveTask = (taskId, newStatus) => {
@@ -59,6 +70,15 @@ export default function ScrumBoard({ onViewChange }) {
     ));
     if (selectedTask && selectedTask.id === taskId) {
       setSelectedTask(prev => ({ ...prev, status: newStatus }));
+    }
+  };
+
+  const updateTaskSprint = (taskId, sprintValue) => {
+    setTasks(prev => prev.map(task => 
+      task.id === taskId ? { ...task, sprint: sprintValue } : task
+    ));
+    if (selectedTask && selectedTask.id === taskId) {
+      setSelectedTask(prev => ({ ...prev, sprint: sprintValue }));
     }
   };
 
@@ -92,6 +112,7 @@ export default function ScrumBoard({ onViewChange }) {
       type: newType,
       sp: Number(newSp) || 0,
       status: newStatus,
+      sprint: newSprint,
       desc: newDesc,
       priority: newType === 'bug' ? newPriority : undefined
     };
@@ -106,6 +127,7 @@ export default function ScrumBoard({ onViewChange }) {
     setNewType('story');
     setNewPriority('Medium');
     setNewStatus('Backlog');
+    setNewSprint('Sprint 4');
   };
 
   const handleDeleteTask = (taskId) => {
@@ -116,24 +138,26 @@ export default function ScrumBoard({ onViewChange }) {
   };
 
   const resetBoard = () => {
-    if (window.confirm('Are you sure you want to reset the board to the default state? All customized tasks will be lost.')) {
+    if (window.confirm('Are you sure you want to reset the board to the default state? All customized tasks and sprint settings will be lost.')) {
       setTasks(INITIAL_TASKS);
     }
   };
 
-  // Calculations
-  const totalStoryPoints = tasks.reduce((sum, t) => sum + (t.sp || 0), 0);
-  const completedStoryPoints = tasks.filter(t => t.status === 'Done').reduce((sum, t) => sum + (t.sp || 0), 0);
+  // Calculations for current selected filter context
+  const activeSprintTasks = tasks.filter(t => selectedSprint === 'all' || t.sprint === selectedSprint);
+  const totalStoryPoints = activeSprintTasks.reduce((sum, t) => sum + (t.sp || 0), 0);
+  const completedStoryPoints = activeSprintTasks.filter(t => t.status === 'Done').reduce((sum, t) => sum + (t.sp || 0), 0);
   const completionRate = totalStoryPoints > 0 ? (completedStoryPoints / totalStoryPoints) * 100 : 0;
   
-  const activeBugsCount = tasks.filter(t => t.type === 'bug' && t.status !== 'Done').length;
-  const completedStoriesCount = tasks.filter(t => t.type === 'story' && t.status === 'Done').length;
-  const totalStoriesCount = tasks.filter(t => t.type === 'story').length;
+  const activeBugsCount = activeSprintTasks.filter(t => t.type === 'bug' && t.status !== 'Done').length;
+  const completedStoriesCount = activeSprintTasks.filter(t => t.type === 'story' && t.status === 'Done').length;
+  const totalStoriesCount = activeSprintTasks.filter(t => t.type === 'story').length;
 
   const filteredTasks = tasks.filter(t => {
     const matchesSearch = t.title.toLowerCase().includes(searchTerm.toLowerCase()) || t.id.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = filterType === 'all' || t.type === filterType;
-    return matchesSearch && matchesType;
+    const matchesSprint = selectedSprint === 'all' || t.sprint === selectedSprint;
+    return matchesSearch && matchesType && matchesSprint;
   });
 
   return (
@@ -144,7 +168,7 @@ export default function ScrumBoard({ onViewChange }) {
           <p style={styles.eyebrow}>Workspace Agile Tracking</p>
           <h1 style={styles.title}>Scrum Story Board</h1>
           <p style={styles.subtitle}>
-            A live, interactive view of features, tasks, and bugs. Drag-and-drop cards or click task details to manage status.
+            A live, interactive view of features, tasks, and bugs. Group tasks by Sprints using the tabs below. Drag-and-drop cards to manage workflow.
           </p>
         </div>
         <div style={styles.headerActions}>
@@ -160,12 +184,35 @@ export default function ScrumBoard({ onViewChange }) {
         </div>
       </header>
 
+      {/* Sprints Tab Selector */}
+      <section style={styles.sprintsSection}>
+        <div style={styles.sprintTabs}>
+          {SPRINTS.map(sprint => (
+            <button
+              key={sprint.id}
+              onClick={() => setSelectedSprint(sprint.id)}
+              style={selectedSprint === sprint.id ? styles.sprintTabActive : styles.sprintTab}
+              title={sprint.desc}
+            >
+              <div style={styles.sprintTabTitle}>{sprint.title}</div>
+              <div style={styles.sprintTabDesc}>
+                {tasks.filter(t => t.sprint === sprint.id || (sprint.id === 'all')).length} Tasks
+              </div>
+            </button>
+          ))}
+        </div>
+      </section>
+
       {/* Metrics Panel */}
       <section style={styles.metricsPanel}>
         <div style={styles.metricItem}>
-          <span style={styles.metricLabel}>Story Points Delivered</span>
+          <span style={styles.metricLabel}>
+            {selectedSprint === 'all' ? 'Overall Backlog Progress' : `${selectedSprint} Progress`}
+          </span>
           <div style={styles.progressContainer}>
-            <strong style={styles.metricValue}>{completedStoryPoints} <span style={styles.metricSub}>/ {totalStoryPoints} SP</span></strong>
+            <strong style={styles.metricValue}>
+              {completedStoryPoints} <span style={styles.metricSub}>/ {totalStoryPoints} SP</span>
+            </strong>
             <div style={styles.progressBarTrack}>
               <div style={{ ...styles.progressBarFill, width: `${completionRate}%` }} />
             </div>
@@ -174,7 +221,7 @@ export default function ScrumBoard({ onViewChange }) {
         </div>
         <div style={styles.metricMiniGrid}>
           <div style={styles.miniCard}>
-            <span style={styles.miniLabel}>Stories Completed</span>
+            <span style={styles.miniLabel}>User Stories Done</span>
             <strong style={styles.miniValue}>{completedStoriesCount} <span style={styles.miniSub}>/ {totalStoriesCount}</span></strong>
           </div>
           <div style={styles.miniCard}>
@@ -188,7 +235,7 @@ export default function ScrumBoard({ onViewChange }) {
       <section style={styles.filtersBar}>
         <input
           type="text"
-          placeholder="Search by Title or ID (e.g., US-101)..."
+          placeholder="Search tasks by title or ticket ID..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           style={styles.searchInput}
@@ -263,24 +310,34 @@ export default function ScrumBoard({ onViewChange }) {
                         }}>
                           {task.id}
                         </span>
-                        {task.type === 'bug' && task.priority && (
-                          <span style={{ 
-                            ...styles.priorityTag,
-                            backgroundColor: task.priority === 'High' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(245, 158, 11, 0.2)',
-                            color: task.priority === 'High' ? '#ef4444' : '#f59e0b',
-                            border: `1px solid ${task.priority === 'High' ? 'rgba(239, 68, 68, 0.4)' : 'rgba(245, 158, 11, 0.4)'}`
-                          }}>
-                            {task.priority} Priority
-                          </span>
-                        )}
-                        {task.sp > 0 && <span style={styles.cardSp}>{task.sp} SP</span>}
+                        
+                        <span style={{ ...styles.cardSprintBadge, color: task.sprint === 'Backlog' ? '#94a3b8' : '#22d3ee' }}>
+                          {task.sprint === 'Backlog' ? 'Backlog' : task.sprint}
+                        </span>
                       </div>
+                      
                       <h4 style={styles.cardTitle}>{task.title}</h4>
                       <p style={styles.cardDesc}>{task.desc}</p>
                       
+                      {/* Priority Tag for Bugs */}
+                      {task.type === 'bug' && task.priority && (
+                        <div style={{ marginTop: '2px' }}>
+                          <span style={{ 
+                            ...styles.priorityTag,
+                            backgroundColor: task.priority === 'High' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                            color: task.priority === 'High' ? '#ef4444' : '#f59e0b',
+                            border: `1px solid ${task.priority === 'High' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`
+                          }}>
+                            {task.priority} Priority
+                          </span>
+                        </div>
+                      )}
+
                       {/* Interactive click indicator and micro-actions */}
                       <div style={styles.cardFooter}>
-                        <span style={styles.cardMore}>Click to edit / move</span>
+                        <div style={styles.spLabel}>
+                          {task.sp > 0 ? `${task.sp} SP` : '0 SP'}
+                        </div>
                         <div style={styles.arrowControls}>
                           {col.id !== 'Backlog' && (
                             <button 
@@ -336,11 +393,26 @@ export default function ScrumBoard({ onViewChange }) {
               </div>
               
               <div style={styles.modalSidebar}>
-                <h4 style={styles.modalSectionHeading}>Details</h4>
+                <h4 style={styles.modalSectionHeading}>Agile Planning</h4>
+                
                 <div style={styles.modalMetaRow}>
                   <span>Story Points:</span>
                   <strong>{selectedTask.sp} SP</strong>
                 </div>
+
+                <div style={styles.modalMetaRowSelect}>
+                  <span>Sprint:</span>
+                  <select 
+                    value={selectedTask.sprint} 
+                    onChange={(e) => updateTaskSprint(selectedTask.id, e.target.value)}
+                    style={styles.modalSelect}
+                  >
+                    {SPRINTS.filter(s => s.id !== 'all').map(s => (
+                      <option key={s.id} value={s.id}>{s.title}</option>
+                    ))}
+                  </select>
+                </div>
+
                 {selectedTask.type === 'bug' && selectedTask.priority && (
                   <div style={styles.modalMetaRow}>
                     <span>Priority:</span>
@@ -354,7 +426,7 @@ export default function ScrumBoard({ onViewChange }) {
                   <strong>{COLUMNS.find(c => c.id === selectedTask.status)?.title}</strong>
                 </div>
 
-                <h4 style={styles.modalSectionHeading}>Quick Status Transition</h4>
+                <h4 style={styles.modalSectionHeading}>Status Transition</h4>
                 <div style={styles.statusButtonsGrid}>
                   {COLUMNS.map(col => (
                     <button
@@ -424,6 +496,32 @@ export default function ScrumBoard({ onViewChange }) {
                   />
                 </div>
 
+                <div style={styles.formGroup}>
+                  <label style={styles.formLabel}>Assign Sprint</label>
+                  <select
+                    value={newSprint}
+                    onChange={(e) => setNewSprint(e.target.value)}
+                    style={styles.formSelect}
+                  >
+                    {SPRINTS.filter(s => s.id !== 'all').map(s => (
+                      <option key={s.id} value={s.id}>{s.title}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={styles.formGroup}>
+                  <label style={styles.formLabel}>Initial Column</label>
+                  <select
+                    value={newStatus}
+                    onChange={(e) => setNewStatus(e.target.value)}
+                    style={styles.formSelect}
+                  >
+                    {COLUMNS.map(c => (
+                      <option key={c.id} value={c.id}>{c.title}</option>
+                    ))}
+                  </select>
+                </div>
+
                 {newType === 'bug' && (
                   <div style={styles.formGroup}>
                     <label style={styles.formLabel}>Bug Priority</label>
@@ -438,19 +536,6 @@ export default function ScrumBoard({ onViewChange }) {
                     </select>
                   </div>
                 )}
-
-                <div style={styles.formGroup}>
-                  <label style={styles.formLabel}>Initial Column</label>
-                  <select
-                    value={newStatus}
-                    onChange={(e) => setNewStatus(e.target.value)}
-                    style={styles.formSelect}
-                  >
-                    {COLUMNS.map(c => (
-                      <option key={c.id} value={c.id}>{c.title}</option>
-                    ))}
-                  </select>
-                </div>
 
                 <div style={styles.formGroupFull}>
                   <label style={styles.formLabel}>Description</label>
@@ -491,6 +576,14 @@ const styles = {
   resetBtn: { background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '12px', color: '#cbd5e1', padding: '10px 20px', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer' },
   backBtn: { background: 'rgba(99, 102, 241, 0.12)', border: '1px solid rgba(99, 102, 241, 0.3)', borderRadius: '12px', color: '#818cf8', padding: '10px 20px', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer' },
   
+  // Sprint Section Tabs
+  sprintsSection: { display: 'flex', overflowX: 'auto', paddingBottom: '4px', borderBottom: '1px solid rgba(255, 255, 255, 0.06)' },
+  sprintTabs: { display: 'flex', gap: '12px' },
+  sprintTab: { background: 'rgba(15, 23, 42, 0.4)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', color: '#94a3b8', padding: '10px 20px', cursor: 'pointer', textAlign: 'left', minWidth: '150px', transition: 'all 0.2s' },
+  sprintTabActive: { background: 'rgba(99, 102, 241, 0.12)', border: '1.5px solid #6366f1', borderRadius: '12px', color: '#818cf8', padding: '10px 20px', cursor: 'pointer', textAlign: 'left', minWidth: '150px', boxShadow: '0 0 12px rgba(99, 102, 241, 0.15)' },
+  sprintTabTitle: { fontSize: '0.9rem', fontWeight: 700, marginBottom: '4px' },
+  sprintTabDesc: { fontSize: '0.75rem', color: '#64748b' },
+
   // Metrics Panel
   metricsPanel: { display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '20px', background: 'rgba(15,23,42,0.4)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '16px', padding: '20px', flexWrap: 'wrap' },
   metricItem: { display: 'flex', flexDirection: 'column', gap: '10px' },
@@ -531,12 +624,12 @@ const styles = {
   card: { background: 'rgba(17, 24, 39, 0.75)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: '12px', padding: '14px', cursor: 'grab', display: 'flex', flexDirection: 'column', gap: '8px', transition: 'transform 0.15s, box-shadow 0.15s', ':hover': { transform: 'translateY(-2px)', boxShadow: '0 8px 24px rgba(0,0,0,0.3)' } },
   cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' },
   cardId: { fontSize: '0.72rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px' },
-  cardSp: { fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 },
+  cardSprintBadge: { fontSize: '0.72rem', fontWeight: 600, opacity: 0.8 },
   cardTitle: { margin: 0, fontSize: '0.92rem', fontWeight: 600, color: '#f1f5f9', lineHeight: 1.4 },
   cardDesc: { margin: 0, fontSize: '0.8rem', color: '#94a3b8', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' },
-  priorityTag: { fontSize: '0.65rem', padding: '1px 5px', borderRadius: '4px', fontWeight: 600 },
+  priorityTag: { fontSize: '0.65rem', padding: '1px 5px', borderRadius: '4px', fontWeight: 600, display: 'inline-block' },
   cardFooter: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '8px' },
-  cardMore: { fontSize: '0.7rem', color: '#475569' },
+  spLabel: { fontSize: '0.75rem', color: '#cbd5e1', fontWeight: 600 },
   arrowControls: { display: 'flex', gap: '4px' },
   arrowBtn: { background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '4px', color: '#94a3b8', cursor: 'pointer', fontSize: '0.65rem', padding: '3px 6px', ':hover': { background: 'rgba(255,255,255,0.1)', color: '#ffffff' } },
 
@@ -552,8 +645,10 @@ const styles = {
   modalSidebar: { flex: 1, minWidth: '220px', background: 'rgba(15,23,42,0.4)', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' },
   modalSectionHeading: { margin: '0 0 4px 0', fontSize: '0.85rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' },
   modalDesc: { color: '#cbd5e1', fontSize: '0.92rem', lineHeight: 1.6, whiteSpace: 'pre-wrap', margin: 0 },
-  modalMetaRow: { display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: '#cbd5e1', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '8px' },
-  
+  modalMetaRow: { display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: '#cbd5e1', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '8px', alignItems: 'center' },
+  modalMetaRowSelect: { display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: '#cbd5e1', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '8px', alignItems: 'center', gap: '8px' },
+  modalSelect: { background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', color: '#ffffff', padding: '4px 8px', fontSize: '0.85rem', flex: 1 },
+
   // Status buttons
   statusButtonsGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' },
   statusBtn: { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', color: '#cbd5e1', padding: '8px', fontSize: '0.8rem', fontWeight: 500, cursor: 'pointer', transition: 'all 0.15s' },

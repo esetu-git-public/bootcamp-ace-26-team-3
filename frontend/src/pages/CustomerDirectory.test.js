@@ -34,7 +34,6 @@ describe('CustomerDirectory', () => {
   });
 
   afterEach(() => {
-    jest.runOnlyPendingTimers();
     jest.useRealTimers();
     jest.clearAllMocks();
   });
@@ -59,7 +58,7 @@ describe('CustomerDirectory', () => {
     await screen.findByText('CUST0001');
 
     fireEvent.change(screen.getByPlaceholderText(/C10239/i), { target: { value: ' CUST ' } });
-    fireEvent.click(screen.getByLabelText('High'));
+    fireEvent.click(screen.getAllByLabelText('High')[0]);
     fireEvent.click(screen.getByLabelText('iOS'));
     fireEvent.click(screen.getByLabelText('Wallet'));
     fireEvent.click(screen.getByLabelText('Predicted Churn'));

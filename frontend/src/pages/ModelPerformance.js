@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import * as apiService from '../services/api';
+import { clampPercent, formatPercent } from '../utils/percent';
 
 export default function ModelPerformance({ onViewChange, onLogout }) {
   const [metrics, setMetrics] = useState(null);
@@ -35,13 +36,17 @@ export default function ModelPerformance({ onViewChange, onLogout }) {
     return <div style={styles.center}>{error}</div>;
   }
 
+  if (!metrics) {
+    return <div style={styles.center}>Model metrics are unavailable.</div>;
+  }
+
   // Calculate confusion matrix percentages
   const matrix = metrics?.confusion_matrix || { tp: 0, fp: 0, tn: 0, fn: 0 };
   const totalMatrixCases = (matrix.tp + matrix.fp + matrix.tn + matrix.fn) || 1;
-  const tnPercent = ((matrix.tn / totalMatrixCases) * 100).toFixed(1);
-  const fpPercent = ((matrix.fp / totalMatrixCases) * 100).toFixed(1);
-  const fnPercent = ((matrix.fn / totalMatrixCases) * 100).toFixed(1);
-  const tpPercent = ((matrix.tp / totalMatrixCases) * 100).toFixed(1);
+  const tnPercent = formatPercent(matrix.tn / totalMatrixCases, 1, { inputScale: 'fraction' });
+  const fpPercent = formatPercent(matrix.fp / totalMatrixCases, 1, { inputScale: 'fraction' });
+  const fnPercent = formatPercent(matrix.fn / totalMatrixCases, 1, { inputScale: 'fraction' });
+  const tpPercent = formatPercent(matrix.tp / totalMatrixCases, 1, { inputScale: 'fraction' });
 
   // Normalize feature importance to find max value for scaling progress bars
   const featureImportances = metrics?.feature_importance ? Object.entries(metrics.feature_importance) : [];
@@ -78,11 +83,11 @@ export default function ModelPerformance({ onViewChange, onLogout }) {
 
       {/* Metrics Row */}
       <section style={styles.metricsRow}>
-        <MetricCard label="Accuracy" value={`${(metrics.accuracy * 100).toFixed(2)}%`} tone="accent" />
-        <MetricCard label="Precision" value={`${(metrics.precision * 100).toFixed(2)}%`} tone="success" />
-        <MetricCard label="Recall" value={`${(metrics.recall * 100).toFixed(2)}%`} tone="warn" />
-        <MetricCard label="F1 Score" value={`${(metrics.f1_score * 100).toFixed(2)}%`} tone="danger" />
-        <MetricCard label="ROC-AUC" value={`${(metrics.roc_auc * 100).toFixed(2)}%`} tone="accent" />
+        <MetricCard label="Accuracy" value={formatPercent(metrics.accuracy, 2, { inputScale: 'auto' })} tone="accent" />
+        <MetricCard label="Precision" value={formatPercent(metrics.precision, 2, { inputScale: 'auto' })} tone="success" />
+        <MetricCard label="Recall" value={formatPercent(metrics.recall, 2, { inputScale: 'auto' })} tone="warn" />
+        <MetricCard label="F1 Score" value={formatPercent(metrics.f1_score, 2, { inputScale: 'auto' })} tone="danger" />
+        <MetricCard label="ROC-AUC" value={formatPercent(metrics.roc_auc, 2, { inputScale: 'auto' })} tone="accent" />
       </section>
 
       {/* Grid Layout for Confusion Matrix and Feature Importance */}
@@ -110,14 +115,14 @@ export default function ModelPerformance({ onViewChange, onLogout }) {
               <div style={styles.matrixDataCell(true)}>
                 <strong style={styles.matrixValueText}>{matrix.tn.toLocaleString()}</strong>
                 <span style={styles.matrixLabelText}>True Negatives</span>
-                <span style={styles.matrixPercentText}>{tnPercent}%</span>
+                <span style={styles.matrixPercentText}>{tnPercent}</span>
               </div>
 
               {/* False Positive (FP) */}
               <div style={styles.matrixDataCell(false)}>
                 <strong style={styles.matrixValueText}>{matrix.fp.toLocaleString()}</strong>
                 <span style={styles.matrixLabelText}>False Positives</span>
-                <span style={styles.matrixPercentText}>{fpPercent}%</span>
+                <span style={styles.matrixPercentText}>{fpPercent}</span>
               </div>
             </div>
 
@@ -129,14 +134,14 @@ export default function ModelPerformance({ onViewChange, onLogout }) {
               <div style={styles.matrixDataCell(false)}>
                 <strong style={styles.matrixValueText}>{matrix.fn.toLocaleString()}</strong>
                 <span style={styles.matrixLabelText}>False Negatives</span>
-                <span style={styles.matrixPercentText}>{fnPercent}%</span>
+                <span style={styles.matrixPercentText}>{fnPercent}</span>
               </div>
 
               {/* True Positive (TP) */}
               <div style={styles.matrixDataCell(true)}>
                 <strong style={styles.matrixValueText}>{matrix.tp.toLocaleString()}</strong>
                 <span style={styles.matrixLabelText}>True Positives</span>
-                <span style={styles.matrixPercentText}>{tpPercent}%</span>
+                <span style={styles.matrixPercentText}>{tpPercent}</span>
               </div>
             </div>
           </div>
@@ -151,7 +156,7 @@ export default function ModelPerformance({ onViewChange, onLogout }) {
 
           <div style={styles.featureList}>
             {featureImportances.map(([feature, val]) => {
-              const scaledPercent = (val / maxImportance) * 100;
+              const scaledPercent = maxImportance ? clampPercent((val / maxImportance) * 100) : 0;
               return (
                 <div key={feature} style={styles.featureRow}>
                   <div style={styles.featureHeader}>

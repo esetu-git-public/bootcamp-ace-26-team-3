@@ -12,6 +12,7 @@
  */
 
 import * as apiService from './api';
+import { formatPercent } from '../utils/percent';
 
 /**
  * Get single customer churn prediction with SHAP explainability
@@ -131,10 +132,10 @@ export function interpretSHAPValue(value) {
  */
 export function formatConfidenceInterval(probability, lowerBound, upperBound) {
   return {
-    point: probability ? probability.toFixed(2) : 'N/A',
-    lower: lowerBound ? lowerBound.toFixed(2) : 'N/A',
-    upper: upperBound ? upperBound.toFixed(2) : 'N/A',
-    range: `${lowerBound ? lowerBound.toFixed(2) : 'N/A'}% - ${upperBound ? upperBound.toFixed(2) : 'N/A'}%`
+    point: formatPercent(probability, 2).replace('%', ''),
+    lower: formatPercent(lowerBound, 2).replace('%', ''),
+    upper: formatPercent(upperBound, 2).replace('%', ''),
+    range: `${formatPercent(lowerBound, 2)} - ${formatPercent(upperBound, 2)}`
   };
 }
 

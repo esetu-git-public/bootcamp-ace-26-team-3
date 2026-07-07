@@ -5,6 +5,7 @@ import AnalyticsDashboard from './pages/AnalyticsDashboard';
 import CustomerProfile from './pages/CustomerProfile';
 import CustomerDirectory from './pages/CustomerDirectory';
 import ModelPerformance from './pages/ModelPerformance';
+import ScrumBoard from './pages/ScrumBoard';
 
 function App() {
   const [view, setView] = useState('login');
@@ -32,7 +33,7 @@ function App() {
     setView('login');
   };
 
-  const isAuth = token && ['dashboard', 'directory', 'profile', 'model'].includes(view);
+  const isAuth = token && ['dashboard', 'directory', 'profile', 'model', 'board'].includes(view);
 
   return (
     <div className="App" style={styles.appContainer}>
@@ -67,6 +68,12 @@ function App() {
               style={view === 'model' ? styles.activeNavLink : styles.navLink}
             >
               Model Performance
+            </button>
+            <button
+              onClick={() => setView('board')}
+              style={view === 'board' ? styles.activeNavLink : styles.navLink}
+            >
+              Scrum Board
             </button>
           </div>
           <button onClick={handleLogout} style={styles.signOutBtn}>
@@ -109,6 +116,11 @@ function App() {
           <ModelPerformance
             onViewChange={setView}
             onLogout={handleLogout}
+          />
+        )}
+        {view === 'board' && (
+          <ScrumBoard
+            onViewChange={setView}
           />
         )}
       </main>

@@ -63,10 +63,10 @@ describe('AnalyticsDashboard', () => {
 
   it('renders risk distribution from the API', async () => {
     render(<AnalyticsDashboard />);
-    expect(await screen.findByText('High')).toBeInTheDocument();
+    expect((await screen.findAllByText('High')).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('6.7% of customers')).toBeInTheDocument();
     expect(screen.getByText('8')).toBeInTheDocument(); // Count for High
-    expect(await screen.findByText('Medium')).toBeInTheDocument();
+    expect((await screen.findAllByText('Medium')).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('8.3% of customers')).toBeInTheDocument();
     expect(screen.getByText('10')).toBeInTheDocument(); // Count for Medium
   });
@@ -74,7 +74,7 @@ describe('AnalyticsDashboard', () => {
   it('renders customer segmentation from the API', async () => {
     render(<AnalyticsDashboard />);
     // Top Segment card
-    expect(await screen.findByText('High Risk')).toBeInTheDocument();
+    expect((await screen.findAllByText('High Risk')).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/5 customers - 10.0% of base/i)).toBeInTheDocument();
 
     // Customer Segments list

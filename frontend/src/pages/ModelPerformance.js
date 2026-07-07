@@ -36,6 +36,10 @@ export default function ModelPerformance({ onViewChange, onLogout }) {
     return <div style={styles.center}>{error}</div>;
   }
 
+  if (!metrics) {
+    return <div style={styles.center}>Model metrics are unavailable.</div>;
+  }
+
   // Calculate confusion matrix percentages
   const matrix = metrics?.confusion_matrix || { tp: 0, fp: 0, tn: 0, fn: 0 };
   const totalMatrixCases = (matrix.tp + matrix.fp + matrix.tn + matrix.fn) || 1;

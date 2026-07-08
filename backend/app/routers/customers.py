@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from ..database import get_db
 from ..schemas import PaginatedCustomersResponse, CustomerProfileResponse, PredictionHistoryItem
 from .auth import get_current_user
+import json
 
 router = APIRouter(prefix="/customers", tags=["Customer Management"])
 
@@ -247,7 +248,11 @@ async def get_customer_profile(
             "probability_confidence_upper": min(100.0, float(result.churn_probability or 0.0) + 5.0) if result.churn_probability else None,
             "risk_category": result.risk_category,
             "will_cancel": result.will_cancel,
-            "explainability": result.explainability_json,
+            "explainability": (
+                json.loads(result.explainability_json)
+                if isinstance(result.explainability_json, str)
+                else result.explainability_json
+            ),
             "recommendation_type": result.recommendation_type,
             "recommendation_desc": result.recommendation_desc,
             "predicted_at": result.predicted_at

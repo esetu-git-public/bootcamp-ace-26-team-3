@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Login from './pages/Login';
 import SignUp from './pages/SignUp';
 import AnalyticsDashboard from './pages/AnalyticsDashboard';
@@ -15,7 +15,7 @@ function getStoredToken() {
 
 function App() {
   const [view, setView] = useState('login');
-  const [token, setToken] = useState(getStoredToken());
+  const [token, setToken] = useState(localStorage.getItem('access_token'));
   const [selectedCustomerId, setSelectedCustomerId] = useState('C10239');
 
   useEffect(() => {
@@ -28,20 +28,16 @@ function App() {
     }
   }, [token, view]);
 
-  const handleLoginSuccess = (newToken, rememberMe = false) => {
-    const storage = rememberMe ? localStorage : sessionStorage;
-    localStorage.removeItem(AUTH_TOKEN_KEY);
-    sessionStorage.removeItem(AUTH_TOKEN_KEY);
-    storage.setItem(AUTH_TOKEN_KEY, newToken);
+  const handleLoginSuccess = (newToken) => {
+    localStorage.setItem('access_token', newToken);
     setToken(newToken);
-  };
+  }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem(AUTH_TOKEN_KEY);
-    sessionStorage.removeItem(AUTH_TOKEN_KEY);
+    localStorage.removeItem('access_token');
     setToken(null);
     setView('login');
-  };
+  }, []);
 
   const isAuth = token && ['dashboard', 'directory', 'profile', 'model', 'board'].includes(view);
 

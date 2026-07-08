@@ -44,9 +44,9 @@ def generate_report_task(task_id: str, report_type: str, file_format: str, filte
     if file_format == "csv":
         with open(file_path, "w") as f:
             f.write("Customer_ID,Churn_Probability,Risk_Category,Recommendation\n")
-            f.write("USR-1092,0.89,High,Offer 20% Discount\n")
-            f.write("USR-4821,0.45,Medium,Personalized Email Outreach\n")
-            f.write("USR-3021,0.12,Low,No Intervention Required\n")
+            f.write("1092,0.89,High,Offer 20% Discount\n")
+            f.write("4821,0.45,Medium,Personalized Email Outreach\n")
+            f.write("3021,0.12,Low,No Intervention Required\n")
     elif file_format == "xlsx":
         # In production, openpyxl creates Binary worksheets.
         # Writing mock workbook bytes here for the design template.

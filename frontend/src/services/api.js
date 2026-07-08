@@ -7,6 +7,21 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api
 const BACKEND_ORIGIN = API_BASE_URL.replace('/api/v1', '');
 
 /**
+ * Decode a JWT and check if it's expired (client-side only, no signature verify).
+ * Returns true if the token is missing, malformed, or past its exp claim.
+ */
+function isTokenExpired(token) {
+  if (!token) return true;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    // exp is in seconds; Date.now() is in ms
+    return payload.exp * 1000 < Date.now();
+  } catch {
+    return true;
+  }
+}
+
+/**
  * Get authorization headers with access token if available.
  */
 function getAuthHeaders() {
@@ -29,8 +44,17 @@ async function parseErrorResponse(response) {
 /**
  * Generic fetch wrapper with error handling and auth.
  * Rejects with error on non-2xx responses; returns parsed JSON on success.
+ * Proactively checks token expiry before making the request.
  */
 async function request(endpoint, options = {}) {
+  const token = localStorage.getItem('access_token');
+
+  // Proactively check token expiry — avoids wasting a round-trip on a 401
+  if (token && isTokenExpired(token)) {
+    localStorage.removeItem('access_token');
+    throw { status: 401, message: 'Session expired. Please log in again.', endpoint };
+  }
+
   const url = `${API_BASE_URL}${endpoint}`;
   const headers = {
     ...getAuthHeaders(),

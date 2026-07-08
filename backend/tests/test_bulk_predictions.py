@@ -11,7 +11,7 @@ from backend.app.routers import predictions, reports
 
 def test_build_prediction_input_accepts_dashboard_headers():
     row = {
-        "customer_id": "C900",
+        "customer_id": "900",
         "age": "41",
         "income_level": "High",
         "device_type": "Android",
@@ -54,8 +54,8 @@ def test_process_bulk_predictions_task_writes_real_results(tmp_path, monkeypatch
         "customer_id,age,income_level,device_type,payment_mode,number_of_subscriptions,"
         "tenure_months,monthly_total_spend,avg_usage_hours_per_week,app_switch_frequency,"
         "customer_support_interactions,satisfaction_score,discount_used\n"
-        "C100,34,Medium,Android,UPI,2,8,79.5,14.5,5,3,2,false\n"
-        "C101,45,High,iOS,Credit Card,1,20,120,25,2,1,8,true\n"
+        "100,34,Medium,Android,UPI,2,8,79.5,14.5,5,3,2,false\n"
+        "101,45,High,iOS,Credit Card,1,20,120,25,2,1,8,true\n"
     ).encode("utf-8")
 
     predictions.process_bulk_predictions_task(job_id, upload)
@@ -72,7 +72,7 @@ def test_process_bulk_predictions_task_writes_real_results(tmp_path, monkeypatch
         rows = list(csv.DictReader(f))
 
     assert len(rows) == 2
-    assert rows[0]["Customer ID"] == "C100"
+    assert rows[0]["Customer ID"] == "100"
     assert rows[0]["Churn Probability"].endswith("%")
     assert rows[0]["Risk Category"] in {"Low", "Medium", "High"}
 

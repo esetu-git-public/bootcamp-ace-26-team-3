@@ -98,11 +98,11 @@ async def export_report(
     except Exception:
         # Stream realistic mock customer data for demo purposes
         mock_records = [
-            ["CUST0001", 34, 8, 79.50, 14.5, 3, 2, "89.0%", "High", "Offer Discount", "Apply 20% discount offer for renewal."],
-            ["CUST0002", 45, 2, 35.00, 8.2, 5, 1, "84.5%", "High", "Provide Free Trial", "Offer a 14-day premium free trial extension."],
-            ["CUST0008", 28, 4, 95.00, 6.0, 4, 2, "78.2%", "High", "Offer Discount", "Recommend a 15% discount for a 6-month contract."],
-            ["CUST0012", 50, 1, 110.00, 5.5, 3, 1, "92.1%", "High", "Contact Customer Support", "Flag customer success agent for call follow-up."],
-            ["CUST0025", 39, 6, 65.00, 10.1, 2, 2, "74.6%", "High", "Subscription Upgrade", "Offer subscription tier upgrade at existing price."]
+            ["1", 34, 8, 79.50, 14.5, 3, 2, "89.0%", "High", "Offer Discount", "Apply 20% discount offer for renewal."],
+            ["2", 45, 2, 35.00, 8.2, 5, 1, "84.5%", "High", "Provide Free Trial", "Offer a 14-day premium free trial extension."],
+            ["8", 28, 4, 95.00, 6.0, 4, 2, "78.2%", "High", "Offer Discount", "Recommend a 15% discount for a 6-month contract."],
+            ["12", 50, 1, 110.00, 5.5, 3, 1, "92.1%", "High", "Contact Customer Support", "Flag customer success agent for call follow-up."],
+            ["25", 39, 6, 65.00, 10.1, 2, 2, "74.6%", "High", "Subscription Upgrade", "Offer subscription tier upgrade at existing price."]
         ]
         # Filter mock records if params provided
         if risk_category:

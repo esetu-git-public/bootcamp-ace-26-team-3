@@ -125,7 +125,7 @@ export default function CustomerDirectory({ onViewChange, onSelectCustomer, onLo
             <label style={styles.filterLabel}>Customer ID Search</label>
             <input
               type="text"
-              placeholder="e.g., C10239"
+              placeholder="e.g., 1"
               value={searchId}
               onChange={(e) => { setSearchId(e.target.value); setPage(1); }}
               style={styles.searchInput}

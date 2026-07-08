@@ -11,7 +11,7 @@ const customerResponse = {
   limit: 20,
   results: [
     {
-      customer_id: 'CUST0001',
+      customer_id: '12345',
       age: 34,
       income_level: 'Medium',
       tenure_months: 8,
@@ -41,7 +41,7 @@ describe('CustomerDirectory', () => {
   it('loads customers and displays the matched record count', async () => {
     render(<CustomerDirectory onViewChange={jest.fn()} onSelectCustomer={jest.fn()} />);
 
-    expect(await screen.findByText('CUST0001')).toBeInTheDocument();
+    expect(await screen.findByText('12345')).toBeInTheDocument();
     expect(screen.getByText('1')).toBeInTheDocument();
     expect(apiService.getCustomers).toHaveBeenCalledWith(1, 20, {
       searchId: '',
@@ -55,9 +55,9 @@ describe('CustomerDirectory', () => {
 
   it('debounces ID search and sends selected filters', async () => {
     render(<CustomerDirectory onViewChange={jest.fn()} onSelectCustomer={jest.fn()} />);
-    await screen.findByText('CUST0001');
+    await screen.findByText('12345');
 
-    fireEvent.change(screen.getByPlaceholderText(/C10239/i), { target: { value: ' CUST ' } });
+    fireEvent.change(screen.getByPlaceholderText(/1/i), { target: { value: ' 12345 ' } });
     fireEvent.click(screen.getAllByLabelText('High')[0]);
     fireEvent.click(screen.getByLabelText('iOS'));
     fireEvent.click(screen.getByLabelText('Wallet'));
@@ -69,7 +69,7 @@ describe('CustomerDirectory', () => {
 
     await waitFor(() => {
       expect(apiService.getCustomers).toHaveBeenLastCalledWith(1, 20, {
-        searchId: 'CUST',
+        searchId: '12345',
         willCancel: 1,
         riskCategories: ['High'],
         incomeLevels: [],

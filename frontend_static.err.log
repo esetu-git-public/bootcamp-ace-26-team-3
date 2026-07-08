@@ -1,0 +1,6 @@
+::ffff:127.0.0.1 - - [08/Jul/2026 11:56:03] "GET / HTTP/1.1" 200 -
+::ffff:127.0.0.1 - - [08/Jul/2026 11:56:13] "GET / HTTP/1.1" 200 -
+::ffff:127.0.0.1 - - [08/Jul/2026 11:56:13] "GET /static/css/main.e937bf74.css HTTP/1.1" 200 -
+::ffff:127.0.0.1 - - [08/Jul/2026 11:56:13] "GET /static/js/main.b6775708.js HTTP/1.1" 200 -
+::ffff:127.0.0.1 - - [08/Jul/2026 11:56:13] code 404, message File not found
+::ffff:127.0.0.1 - - [08/Jul/2026 11:56:13] "GET /favicon.ico HTTP/1.1" 404 -

@@ -6,6 +6,29 @@
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1';
 const BACKEND_ORIGIN = API_BASE_URL.replace('/api/v1', '');
 
+function notifyApiError(error) {
+  if (typeof window === 'undefined') return;
+
+  window.dispatchEvent(new CustomEvent('app:api-error', {
+    detail: error,
+  }));
+}
+
+/**
+ * Decode a JWT and check if it's expired (client-side only, no signature verify).
+ * Returns true if the token is missing, malformed, or past its exp claim.
+ */
+function isTokenExpired(token) {
+  if (!token) return true;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    // exp is in seconds; Date.now() is in ms
+    return payload.exp * 1000 < Date.now();
+  } catch {
+    return true;
+  }
+}
+
 /**
  * Get authorization headers with access token if available.
  */
@@ -29,8 +52,19 @@ async function parseErrorResponse(response) {
 /**
  * Generic fetch wrapper with error handling and auth.
  * Rejects with error on non-2xx responses; returns parsed JSON on success.
+ * Proactively checks token expiry before making the request.
  */
 async function request(endpoint, options = {}) {
+  const token = localStorage.getItem('access_token');
+
+  // Proactively check token expiry — avoids wasting a round-trip on a 401
+  if (token && isTokenExpired(token)) {
+    localStorage.removeItem('access_token');
+    const error = { status: 401, message: 'Session expired. Please log in again.', endpoint };
+    notifyApiError(error);
+    throw error;
+  }
+
   const url = `${API_BASE_URL}${endpoint}`;
   const headers = {
     ...getAuthHeaders(),
@@ -44,11 +78,13 @@ async function request(endpoint, options = {}) {
 
   if (!response.ok) {
     const errorMessage = await parseErrorResponse(response);
-    throw {
+    const error = {
       status: response.status,
       message: errorMessage,
       endpoint,
     };
+    notifyApiError(error);
+    throw error;
   }
 
   // Handle 204 No Content
@@ -191,11 +227,13 @@ export async function uploadBulkPredictions(file) {
 
   if (!response.ok) {
     const errorMessage = await parseErrorResponse(response);
-    throw {
+    const error = {
       status: response.status,
       message: errorMessage,
       endpoint: '/predictions/bulk',
     };
+    notifyApiError(error);
+    throw error;
   }
 
   return response.json();
@@ -232,11 +270,13 @@ export async function exportReport(format = 'csv', filters = {}) {
 
   if (!response.ok) {
     const errorMessage = await parseErrorResponse(response);
-    throw {
+    const error = {
       status: response.status,
       message: errorMessage,
       endpoint,
     };
+    notifyApiError(error);
+    throw error;
   }
 
   const disposition = response.headers?.get?.('Content-Disposition') || '';

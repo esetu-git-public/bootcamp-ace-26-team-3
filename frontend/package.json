@@ -1,6 +1,7 @@
 {
   "name": "subscription-churn-frontend",
   "version": "1.0.0",
+  "description": "Subscription Churn Prediction system frontend",
   "private": true,
   "dependencies": {
     "react": "^18.3.1",

@@ -95,22 +95,35 @@ class ModelService:
                 print(f"Found latest model version '{latest_metric.model_version}' in registry. Attempting to load.")
                 self.load_artifacts(latest_metric.model_version, as_champion=True)
             else:
-                print("No models found in the registry. Model service will be inactive.")
+                print("No models found in the registry. Loading fallback champion model version 'v1.2.0-catboost'.")
+                self.load_artifacts("v1.2.0-catboost", as_champion=True)
+        except Exception as e:
+            print(f"Warning: Could not load latest model from registry due to: {e}. Loading fallback champion model version 'v1.2.0-catboost'.")
+            try:
+                self.load_artifacts("v1.2.0-catboost", as_champion=True)
+            except Exception as load_err:
+                print(f"Error loading fallback model: {load_err}")
         finally:
             db.close()
 
-    def load_artifacts(self, version: str):
+    def load_artifacts(self, version: str, as_champion: bool = False):
         """Loads model artifacts for a specific version."""
         model_path = os.path.join(ARTIFACT_DIR, f"catboost_model_{version}.cbm")
-        preprocessor_path = os.path.join(ARTIFACT_DIR, f"preprocessor_{version}.pkl") # This was a bug in my previous suggestion, fixing it here.
+        preprocessor_path = os.path.join(ARTIFACT_DIR, f"preprocessor_{version}.pkl")
 
         if not os.path.exists(preprocessor_path) or not os.path.exists(model_path):
-            print(f"Artifacts for version '{version}' not found. Searched for {model_path} and {preprocessor_path}")
+            print(f"Artifacts for version '{version}' not found. Falling back to default unversioned artifacts.")
+            model_path = os.path.join(ARTIFACT_DIR, "catboost_model.cbm")
+            preprocessor_path = os.path.join(ARTIFACT_DIR, "preprocessor.pkl")
+
+        if not os.path.exists(preprocessor_path) or not os.path.exists(model_path):
+            print(f"Artifacts not found. Searched for version '{version}' and default paths.")
             return
 
         try:
+            _install_pickle_module_aliases()
             with open(preprocessor_path, "rb") as f:
-                self.preprocessor = pickle.load(f)
+                preprocessor = pickle.load(f)
         except (ModuleNotFoundError, AttributeError, pickle.UnpicklingError) as e:
             print(f"Warning: Could not load preprocessor pickle: {e}. Continuing without it.")
             return # Cannot proceed without a preprocessor
@@ -120,39 +133,85 @@ class ModelService:
             return
 
         try:
-            self.model = CatBoostClassifier()
-            self.model.load_model(model_path)
+            model = CatBoostClassifier()
+            model.load_model(model_path)
         except Exception as e:
             print(f"Warning: Could not load CatBoost model: {e}")
             return
 
-        if hasattr(self.preprocessor, "feature_names_"):
-            self.feature_names = list(self.preprocessor.feature_names_)
+        feature_names = []
+        if hasattr(preprocessor, "feature_names_"):
+            feature_names = list(preprocessor.feature_names_)
 
         # Only initialize SHAP if available and model loaded
         if SHAP_AVAILABLE and shap is not None:
             try:
-                self.explainer = shap.TreeExplainer(self.model)
+                explainer = shap.TreeExplainer(model)
                 # Initialize enhanced SHAP explainer
-                if self.feature_names and SHAPExplainer is not None:
-                    self.shap_explainer = SHAPExplainer(self.model, self.preprocessor, self.feature_names)
+                if feature_names and SHAPExplainer is not None:
+                    shap_explainer = SHAPExplainer(model, preprocessor, feature_names)
                 else:
-                    self.shap_explainer = None
+                    shap_explainer = None
             except Exception as e:
-                self.explainer = None
-                self.shap_explainer = None
+                explainer = None
+                shap_explainer = None
                 print(f"Warning: Could not initialize SHAP explainer: {str(e)}")
-        
-        if self.model is not None:
-            self.model_version = version
-            print(f"Successfully loaded model version '{version}'. Service is ready.")
-            # SHAP not available, but core model is still ready
-            if not SHAP_AVAILABLE:
-                self.explainer = None
-                self.shap_explainer = None
-                print("Warning: SHAP not available, core model features will work but SHAP explainability disabled")
         else:
-            print(f"Warning: Model version '{version}' could not be loaded.")
+            explainer = None
+            shap_explainer = None
+
+        # Store loaded artifacts
+        self.models[version] = {
+            "model": model,
+            "preprocessor": preprocessor,
+            "explainer": explainer,
+            "shap_explainer": shap_explainer,
+            "feature_names": feature_names
+        }
+
+        if as_champion:
+            self.champion_version = version
+            print(f"Successfully loaded champion model version '{version}'.")
+            # Setup aliases for backwards compatibility and easy access
+            self.model = model
+            self.preprocessor = preprocessor
+            self.explainer = explainer
+            self.shap_explainer = shap_explainer
+            self.feature_names = feature_names
+        else:
+            print(f"Successfully loaded challenger model version '{version}'.")
+
+    def get_ab_test_status(self) -> Dict:
+        """Get status of the A/B test and loaded models."""
+        return {
+            "is_active": self.ab_test_config["is_active"],
+            "champion_version": self.champion_version,
+            "challenger_version": self.ab_test_config["challenger_version"],
+            "traffic_split_percent": self.ab_test_config["traffic_split_percent"],
+            "loaded_models": list(self.models.keys())
+        }
+
+    def get_model_version_for_request(self, customer_id: int) -> Optional[str]:
+        """Determine which model version to use for a given customer based on A/B test config."""
+        with self._lock:
+            if not self.is_ready:
+                return None
+            
+            if not self.ab_test_config["is_active"] or not self.ab_test_config["challenger_version"]:
+                return self.champion_version
+
+            # Deterministic split based on customer_id hash
+            try:
+                cid = int(customer_id)
+            except (ValueError, TypeError):
+                # Fallback to simple hash of string
+                import hashlib
+                cid = int(hashlib.md5(str(customer_id).encode()).hexdigest(), 16)
+
+            bucket = cid % 100
+            if bucket < self.ab_test_config["traffic_split_percent"]:
+                return self.ab_test_config["challenger_version"]
+            return self.champion_version
 
     def _shap_values(self, processed_features: pd.DataFrame) -> np.ndarray:
         raw_values = self.explainer.shap_values(processed_features)
@@ -162,22 +221,36 @@ class ModelService:
             shap_values = raw_values
         return np.array(shap_values)
 
-    def predict_and_explain(self, raw_features: pd.DataFrame) -> Dict[str, object]:
+    def predict_and_explain(self, raw_features: pd.DataFrame, model_version: Optional[str] = None) -> Dict[str, object]:
         """Legacy method for backward compatibility."""
         with self._lock:
-            if not self.is_ready:
-                raise RuntimeError("Model artifacts are not available.")
+            version = model_version or self.champion_version
+            if not version or version not in self.models:
+                raise RuntimeError(f"Model artifacts for version '{version}' are not available.")
 
-            processed = self.preprocessor.transform(raw_features)
-            probabilities = self.model.predict_proba(processed)[:, 1]
+            artifacts = self.models[version]
+            preprocessor = artifacts["preprocessor"]
+            model = artifacts["model"]
+            explainer = artifacts["explainer"]
+            feature_names = artifacts["feature_names"]
+
+            processed = preprocessor.transform(raw_features)
+            probabilities = model.predict_proba(processed)[:, 1]
             probability = float(probabilities[0])
 
-            shap_values = self._shap_values(processed)
-            shap_row = shap_values[0]
-            explainability = {
-                feature: float(value)
-                for feature, value in zip(self.feature_names, shap_row.tolist())
-            }
+            if explainer is not None:
+                raw_values = explainer.shap_values(processed)
+                if isinstance(raw_values, list):
+                    shap_values = raw_values[1] if len(raw_values) > 1 else raw_values[0]
+                else:
+                    shap_values = raw_values
+                shap_row = np.array(shap_values)[0]
+                explainability = {
+                    feature: float(value)
+                    for feature, value in zip(feature_names, shap_row.tolist())
+                }
+            else:
+                explainability = {}
             
             # Calculate confidence interval (95% CI approximation)
             # Using binomial proportion confidence interval
@@ -193,17 +266,21 @@ class ModelService:
                 "explainability": explainability,
             }
 
-    def predict_with_advanced_explanation(self, raw_features: pd.DataFrame) -> Dict[str, object]:
+    def predict_with_advanced_explanation(self, raw_features: pd.DataFrame, model_version: Optional[str] = None) -> Dict[str, object]:
         """Enhanced prediction with detailed SHAP explanations."""
         with self._lock:
-            if not self.is_ready:
-                raise RuntimeError("Model artifacts are not available.")
+            version = model_version or self.champion_version
+            if not version or version not in self.models:
+                raise RuntimeError(f"Model artifacts for version '{version}' are not available.")
             
-            if self.shap_explainer is None:
+            artifacts = self.models[version]
+            shap_explainer = artifacts["shap_explainer"]
+            
+            if shap_explainer is None:
                 # Fallback to legacy method
-                return self.predict_and_explain(raw_features)
+                return self.predict_and_explain(raw_features, model_version=version)
             
-            return self.shap_explainer.explain_prediction(raw_features, return_base_value=True)
+            return shap_explainer.explain_prediction(raw_features, return_base_value=True)
 
     def get_global_importance(self, processed_features: Optional[pd.DataFrame] = None, top_n: int = 10) -> Dict:
         """Get global feature importance using SHAP."""

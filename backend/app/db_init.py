@@ -28,6 +28,12 @@ def create_customer_predictions_view(engine: Engine, db: Session) -> None:
 
     db.execute(text("""
         CREATE VIEW v_customer_predictions AS
+        WITH latest_predictions AS (
+            SELECT
+                p.*,
+                ROW_NUMBER() OVER(PARTITION BY p.customer_id ORDER BY p.predicted_at DESC) as rn
+            FROM churn_predictions p
+        )
         SELECT
             c.customer_id,
             c.age,
@@ -43,21 +49,16 @@ def create_customer_predictions_view(engine: Engine, db: Session) -> None:
             c.device_type,
             c.payment_mode,
             c.created_at,
-            p.prediction_id,
-            p.churn_probability,
-            p.risk_category,
-            p.will_cancel,
-            p.explainability_json,
-            p.recommendation_type,
-            p.recommendation_desc,
-            p.predicted_at
+            lp.prediction_id,
+            lp.churn_probability,
+            lp.risk_category,
+            lp.will_cancel,
+            lp.explainability_json,
+            lp.recommendation_type,
+            lp.recommendation_desc,
+            lp.predicted_at
         FROM customers c
-        LEFT JOIN (
-            SELECT * FROM churn_predictions
-            WHERE prediction_id IN (
-                SELECT MAX(prediction_id) FROM churn_predictions GROUP BY customer_id
-            )
-        ) p ON c.customer_id = p.customer_id
+        LEFT JOIN latest_predictions lp ON c.customer_id = lp.customer_id AND lp.rn = 1
     """))
     db.commit()
 

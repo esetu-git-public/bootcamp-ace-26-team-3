@@ -9,9 +9,14 @@ jest.mock('../services/api', () => ({
   getChurnRiskDistribution: jest.fn(),
   getChurnByIncome: jest.fn(),
   getChurnByDevice: jest.fn(),
+  getChurnByPayment: jest.fn(),
+  getChurnBySpend: jest.fn(),
+  getChurnByTenure: jest.fn(),
+  getChurnBySatisfaction: jest.fn(),
   getCustomerSegmentation: jest.fn(),
   getCustomers: jest.fn(),
   uploadBulkPredictions: jest.fn(),
+  getBulkPredictionStatus: jest.fn(),
 }));
 
 // Import the mocked service after the mock setup
@@ -27,6 +32,10 @@ describe('AnalyticsDashboard', () => {
     apiService.getChurnRiskDistribution.mockResolvedValue([{ risk_category: 'High', customer_count: 8, percentage: 6.7 }, { risk_category: 'Medium', customer_count: 10, percentage: 8.3 }]);
     apiService.getChurnByIncome.mockResolvedValue([{ income_level: 'Low', churn_rate: 12 }, { income_level: 'Medium', churn_rate: 24 }]);
     apiService.getChurnByDevice.mockResolvedValue([{ device_type: 'Mobile', churn_rate: 20 }, { device_type: 'Desktop', churn_rate: 15 }]);
+    apiService.getChurnByPayment.mockResolvedValue([]);
+    apiService.getChurnBySpend.mockResolvedValue([]);
+    apiService.getChurnByTenure.mockResolvedValue([]);
+    apiService.getChurnBySatisfaction.mockResolvedValue([]);
     apiService.getCustomerSegmentation.mockResolvedValue([
       { segment: 'High Risk', customer_count: 5, percentage: 10.0, average_churn_risk: 80.0 },
       { segment: 'Loyal', customer_count: 45, percentage: 90.0, average_churn_risk: 5.0 }

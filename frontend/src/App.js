@@ -7,9 +7,15 @@ import CustomerDirectory from './pages/CustomerDirectory';
 import ModelPerformance from './pages/ModelPerformance';
 import ScrumBoard from './pages/ScrumBoard';
 
+const AUTH_TOKEN_KEY = 'access_token';
+
+function getStoredToken() {
+  return localStorage.getItem(AUTH_TOKEN_KEY) || sessionStorage.getItem(AUTH_TOKEN_KEY);
+}
+
 function App() {
   const [view, setView] = useState('login');
-  const [token, setToken] = useState(localStorage.getItem('access_token'));
+  const [token, setToken] = useState(getStoredToken());
   const [selectedCustomerId, setSelectedCustomerId] = useState('C10239');
 
   useEffect(() => {
@@ -22,13 +28,17 @@ function App() {
     }
   }, [token, view]);
 
-  const handleLoginSuccess = (newToken) => {
-    localStorage.setItem('access_token', newToken);
+  const handleLoginSuccess = (newToken, rememberMe = false) => {
+    const storage = rememberMe ? localStorage : sessionStorage;
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+    sessionStorage.removeItem(AUTH_TOKEN_KEY);
+    storage.setItem(AUTH_TOKEN_KEY, newToken);
     setToken(newToken);
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('access_token');
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+    sessionStorage.removeItem(AUTH_TOKEN_KEY);
     setToken(null);
     setView('login');
   };
@@ -40,8 +50,8 @@ function App() {
       {isAuth && (
         <nav style={styles.navbar}>
           <div style={styles.brand}>
-            <span style={styles.brandText}>Churn Predictor</span>
-            <span style={styles.brandDot}>•</span>
+            <span style={styles.brandText}>Engagement Tracker</span>
+            <span style={styles.brandDot}>|</span>
             <span style={styles.brandSub}>Console</span>
           </div>
           <div style={styles.navLinks}>

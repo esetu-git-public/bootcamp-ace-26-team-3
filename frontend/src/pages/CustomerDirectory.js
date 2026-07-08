@@ -44,6 +44,7 @@ export default function CustomerDirectory({ onViewChange, onSelectCustomer, onLo
           onLogout();
         } else {
           localStorage.removeItem('access_token');
+          sessionStorage.removeItem('access_token');
           onViewChange('login');
         }
       } else {

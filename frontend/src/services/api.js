@@ -10,7 +10,7 @@ const BACKEND_ORIGIN = API_BASE_URL.replace('/api/v1', '');
  * Get authorization headers with access token if available.
  */
 function getAuthHeaders() {
-  const token = localStorage.getItem('access_token');
+  const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token');
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 

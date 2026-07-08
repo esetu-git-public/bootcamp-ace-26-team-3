@@ -258,10 +258,19 @@ async def predict_single(
             "payment_mode": customer.payment_mode if customer else "UPI",
         }
 
+        # A/B Testing Logic
+        model_version_to_use = model_service.get_model_version_for_request(customer_id)
+
+        if not model_version_to_use:
+             raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="No model is currently available to serve predictions."
+            )
+
         if model_service.is_ready:
             try:
                 df_input = _build_prediction_input(input_data)
-                output = model_service.predict_and_explain(df_input)
+                output = model_service.predict_and_explain(df_input, model_version=model_version_to_use)
                 score = round(output["probability"] * 100.0, 2)
                 score_lower = round(output["probability_confidence_lower"] * 100.0, 2)
                 score_upper = round(output["probability_confidence_upper"] * 100.0, 2)
@@ -304,8 +313,8 @@ async def predict_single(
             now_time = datetime.utcnow()
             insert_query = text("""
                 INSERT INTO churn_predictions 
-                (customer_id, churn_probability, risk_category, will_cancel, explainability_json, recommendation_type, recommendation_desc, predicted_at)
-                VALUES (:cust_id, :prob, :risk, :cancel, :explain, :rec_type, :rec_desc, :predicted_at)
+                (customer_id, churn_probability, risk_category, will_cancel, explainability_json, recommendation_type, recommendation_desc, predicted_at, model_version)
+                VALUES (:cust_id, :prob, :risk, :cancel, :explain, :rec_type, :rec_desc, :predicted_at, :model_version)
             """)
             db.execute(insert_query, {
                 "cust_id": customer_id,
@@ -315,7 +324,8 @@ async def predict_single(
                 "explain": json.dumps(explainability) if isinstance(explainability, dict) else explainability,
                 "rec_type": rec_type,
                 "rec_desc": rec_desc,
-                "predicted_at": now_time
+                "predicted_at": now_time,
+                "model_version": model_version_to_use
             })
             
             history_query = text("""

@@ -1,6 +1,7 @@
 import os
 import pickle
 import sys
+import threading
 from typing import Dict, Optional, List
 
 import numpy as np
@@ -46,9 +47,6 @@ else:
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 ARTIFACT_DIR = os.path.join(os.path.dirname(__file__), "model_artifacts")
-PREPROCESSOR_PATH = os.path.join(ARTIFACT_DIR, "preprocessor.pkl")
-MODEL_PATH = os.path.join(ARTIFACT_DIR, "catboost_model.cbm")
-
 
 def _install_pickle_module_aliases() -> None:
     """Allow older artifacts pickled as app.core.* to load as backend.app.core.*."""
@@ -66,65 +64,95 @@ def _install_pickle_module_aliases() -> None:
 
 class ModelService:
     def __init__(self):
-        self.preprocessor = None
-        self.model = None
-        self.explainer = None
-        self.shap_explainer = None  # Enhanced SHAP explainer
-        self.feature_names = []
-        self.is_ready = False
-        self._load_artifacts()
+        # Main model artifacts
+        self.champion_version: Optional[str] = None
+        self.models: Dict[str, Dict] = {}  # Stores artifacts for each loaded version
 
-    def _load_artifacts(self):
-        if not os.path.exists(PREPROCESSOR_PATH) or not os.path.exists(MODEL_PATH):
+        # A/B Test configuration
+        self.ab_test_config = {
+            "is_active": False,
+            "challenger_version": None,
+            "traffic_split_percent": 0,  # Percentage of traffic to challenger
+        }
+
+        self._lock = threading.Lock()
+        self.load_latest_model()
+
+    @property
+    def is_ready(self) -> bool:
+        """Check if the champion model is loaded and ready."""
+        return self.champion_version is not None and self.champion_version in self.models
+
+    def load_latest_model(self):
+        """Loads the latest model from the database-backed model registry."""
+        # This will become the default "champion" model
+        from app.database import SessionLocal
+        from app.models import ModelMetric
+        db = SessionLocal()
+        try:
+            latest_metric = db.query(ModelMetric).order_by(ModelMetric.evaluated_at.desc()).first()
+            if latest_metric and latest_metric.model_version:
+                print(f"Found latest model version '{latest_metric.model_version}' in registry. Attempting to load.")
+                self.load_artifacts(latest_metric.model_version, as_champion=True)
+            else:
+                print("No models found in the registry. Model service will be inactive.")
+        finally:
+            db.close()
+
+    def load_artifacts(self, version: str):
+        """Loads model artifacts for a specific version."""
+        model_path = os.path.join(ARTIFACT_DIR, f"catboost_model_{version}.cbm")
+        preprocessor_path = os.path.join(ARTIFACT_DIR, f"preprocessor_{version}.pkl") # This was a bug in my previous suggestion, fixing it here.
+
+        if not os.path.exists(preprocessor_path) or not os.path.exists(model_path):
+            print(f"Artifacts for version '{version}' not found. Searched for {model_path} and {preprocessor_path}")
             return
 
         try:
-            _install_pickle_module_aliases()
-            with open(PREPROCESSOR_PATH, "rb") as f:
+            with open(preprocessor_path, "rb") as f:
                 self.preprocessor = pickle.load(f)
         except (ModuleNotFoundError, AttributeError, pickle.UnpicklingError) as e:
             print(f"Warning: Could not load preprocessor pickle: {e}. Continuing without it.")
-            self.preprocessor = None
+            return # Cannot proceed without a preprocessor
 
         if not CATBOOST_AVAILABLE or CatBoostClassifier is None:
             print("Warning: CatBoost not available, ML model service disabled.")
-            self.model = None
-            self.is_ready = False
             return
 
         try:
             self.model = CatBoostClassifier()
-            self.model.load_model(MODEL_PATH)
+            self.model.load_model(model_path)
         except Exception as e:
             print(f"Warning: Could not load CatBoost model: {e}")
-            self.model = None
             return
 
         if hasattr(self.preprocessor, "feature_names_"):
             self.feature_names = list(self.preprocessor.feature_names_)
 
         # Only initialize SHAP if available and model loaded
-        if self.model is not None and SHAP_AVAILABLE and shap is not None:
+        if SHAP_AVAILABLE and shap is not None:
             try:
                 self.explainer = shap.TreeExplainer(self.model)
                 # Initialize enhanced SHAP explainer
                 if self.feature_names and SHAPExplainer is not None:
                     self.shap_explainer = SHAPExplainer(self.model, self.preprocessor, self.feature_names)
-                self.is_ready = True
+                else:
+                    self.shap_explainer = None
             except Exception as e:
                 self.explainer = None
                 self.shap_explainer = None
-                self.is_ready = False
                 print(f"Warning: Could not initialize SHAP explainer: {str(e)}")
-        elif self.model is not None:
+        
+        if self.model is not None:
+            self.model_version = version
+            print(f"Successfully loaded model version '{version}'. Service is ready.")
             # SHAP not available, but core model is still ready
-            self.explainer = None
-            self.shap_explainer = None
-            self.is_ready = True
-            print("Warning: SHAP not available, core model features will work but SHAP explainability disabled")
+            if not SHAP_AVAILABLE:
+                self.explainer = None
+                self.shap_explainer = None
+                print("Warning: SHAP not available, core model features will work but SHAP explainability disabled")
         else:
-            self.is_ready = False
-            print("Warning: Model not loaded")
+            print(f"Warning: Model version '{version}' could not be loaded.")
 
     def _shap_values(self, processed_features: pd.DataFrame) -> np.ndarray:
         raw_values = self.explainer.shap_values(processed_features)
@@ -136,60 +164,63 @@ class ModelService:
 
     def predict_and_explain(self, raw_features: pd.DataFrame) -> Dict[str, object]:
         """Legacy method for backward compatibility."""
-        if not self.is_ready:
-            raise RuntimeError("Model artifacts are not available.")
+        with self._lock:
+            if not self.is_ready:
+                raise RuntimeError("Model artifacts are not available.")
 
-        processed = self.preprocessor.transform(raw_features)
-        probabilities = self.model.predict_proba(processed)[:, 1]
-        probability = float(probabilities[0])
+            processed = self.preprocessor.transform(raw_features)
+            probabilities = self.model.predict_proba(processed)[:, 1]
+            probability = float(probabilities[0])
 
-        shap_values = self._shap_values(processed)
-        shap_row = shap_values[0]
-        explainability = {
-            feature: float(value)
-            for feature, value in zip(self.feature_names, shap_row.tolist())
-        }
-        
-        # Calculate confidence interval (95% CI approximation)
-        # Using binomial proportion confidence interval
-        z_score = 1.96  # 95% confidence
-        margin_of_error = z_score * np.sqrt((probability * (1 - probability)) / 100)
-        confidence_lower = max(0.0, probability - margin_of_error)
-        confidence_upper = min(1.0, probability + margin_of_error)
+            shap_values = self._shap_values(processed)
+            shap_row = shap_values[0]
+            explainability = {
+                feature: float(value)
+                for feature, value in zip(self.feature_names, shap_row.tolist())
+            }
+            
+            # Calculate confidence interval (95% CI approximation)
+            # Using binomial proportion confidence interval
+            z_score = 1.96  # 95% confidence
+            margin_of_error = z_score * np.sqrt((probability * (1 - probability)) / 100)
+            confidence_lower = max(0.0, probability - margin_of_error)
+            confidence_upper = min(1.0, probability + margin_of_error)
 
-        return {
-            "probability": probability,
-            "probability_confidence_lower": confidence_lower,
-            "probability_confidence_upper": confidence_upper,
-            "explainability": explainability,
-        }
+            return {
+                "probability": probability,
+                "probability_confidence_lower": confidence_lower,
+                "probability_confidence_upper": confidence_upper,
+                "explainability": explainability,
+            }
 
     def predict_with_advanced_explanation(self, raw_features: pd.DataFrame) -> Dict[str, object]:
         """Enhanced prediction with detailed SHAP explanations."""
-        if not self.is_ready:
-            raise RuntimeError("Model artifacts are not available.")
-        
-        if self.shap_explainer is None:
-            # Fallback to legacy method
-            return self.predict_and_explain(raw_features)
-        
-        return self.shap_explainer.explain_prediction(raw_features, return_base_value=True)
+        with self._lock:
+            if not self.is_ready:
+                raise RuntimeError("Model artifacts are not available.")
+            
+            if self.shap_explainer is None:
+                # Fallback to legacy method
+                return self.predict_and_explain(raw_features)
+            
+            return self.shap_explainer.explain_prediction(raw_features, return_base_value=True)
 
     def get_global_importance(self, processed_features: Optional[pd.DataFrame] = None, top_n: int = 10) -> Dict:
         """Get global feature importance using SHAP."""
-        if not self.is_ready or self.shap_explainer is None:
-            raise RuntimeError("Model artifacts are not available or SHAP explainer not initialized.")
-        
-        # If no data provided, return empty but valid structure
-        if processed_features is None:
-            return {
-                "global_importance": [],
-                "total_features": len(self.feature_names),
-                "base_value": 0.0,
-                "importance_percentiles": {}
-            }
-        
-        return self.shap_explainer.global_feature_importance(processed_features, top_n=top_n)
+        with self._lock:
+            if not self.is_ready or self.shap_explainer is None:
+                raise RuntimeError("Model artifacts are not available or SHAP explainer not initialized.")
+            
+            # If no data provided, return empty but valid structure
+            if processed_features is None:
+                return {
+                    "global_importance": [],
+                    "total_features": len(self.feature_names),
+                    "base_value": 0.0,
+                    "importance_percentiles": {}
+                }
+            
+            return self.shap_explainer.global_feature_importance(processed_features, top_n=top_n)
 
     def get_feature_interaction(
         self, 
@@ -198,17 +229,28 @@ class ModelService:
         feature2: str
     ) -> Dict:
         """Analyze interaction between two features."""
-        if not self.is_ready or self.shap_explainer is None:
-            raise RuntimeError("Model artifacts are not available or SHAP explainer not initialized.")
-        
-        return self.shap_explainer.feature_interaction_analysis(raw_features, feature1, feature2)
+        with self._lock:
+            if not self.is_ready or self.shap_explainer is None:
+                raise RuntimeError("Model artifacts are not available or SHAP explainer not initialized.")
+            
+            return self.shap_explainer.feature_interaction_analysis(raw_features, feature1, feature2)
 
     def get_shap_summary_statistics(self, processed_features: pd.DataFrame) -> Dict:
         """Get SHAP statistics for dataset."""
-        if not self.is_ready or self.shap_explainer is None:
-            raise RuntimeError("Model artifacts are not available or SHAP explainer not initialized.")
-        
-        return self.shap_explainer.summary_statistics(processed_features)
+        with self._lock:
+            if not self.is_ready or self.shap_explainer is None:
+                raise RuntimeError("Model artifacts are not available or SHAP explainer not initialized.")
+            
+            return self.shap_explainer.summary_statistics(processed_features)
+
+    def reload_model(self, version: str):
+        """Thread-safe method to reload model artifacts."""
+        with self._lock:
+            print(f"Acquired lock to reload model. Attempting to load version '{version}'...")
+            self.load_artifacts(version, as_champion=True)
+            if not self.is_ready or self.champion_version != version:
+                print(f"Failed to reload to version '{version}'. Restoring latest available model.")
+                self.load_latest_model() # Attempt to restore a working model
 
 
 model_service = ModelService()

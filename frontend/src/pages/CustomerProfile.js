@@ -3,7 +3,7 @@ import * as apiService from '../services/api';
 import * as mlModel from '../services/mlModel';
 import { ModelPredictionCard, RiskGauge, PredictionTimeline } from '../components/ModelPredictionCard';
 
-export default function CustomerProfile({ onViewChange, onLogout, selectedCustomerId, setSelectedCustomerId }) {
+export default function CustomerProfile({ onViewChange, onLogout, onNotify, selectedCustomerId, setSelectedCustomerId }) {
   const [customerId, setCustomerId] = useState(selectedCustomerId || 'C10239');
   const [searchId, setSearchId] = useState(selectedCustomerId || 'C10239');
   const [customer, setCustomer] = useState(null);
@@ -38,7 +38,7 @@ export default function CustomerProfile({ onViewChange, onLogout, selectedCustom
       fetchPredictionHistory(id);
     } catch (err) {
       if (err.status === 401) {
-        onLogout();
+        onLogout({ silent: true });
       } else {
         setError(err.message || 'Failed to load customer details');
       }
@@ -56,9 +56,16 @@ export default function CustomerProfile({ onViewChange, onLogout, selectedCustom
       const data = await mlModel.getSinglePrediction(customerId);
       setPrediction(data);
       fetchPredictionHistory(customerId);
+      if (onNotify) {
+        onNotify({
+          type: 'success',
+          title: 'Prediction ready',
+          message: `Churn prediction updated for ${customerId}.`
+        });
+      }
     } catch (err) {
       if (err.status === 401) {
-        onLogout();
+        onLogout({ silent: true });
       } else {
         setError(err.message || 'Failed to run churn prediction model.');
       }

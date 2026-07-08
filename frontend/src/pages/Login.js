@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import * as apiService from '../services/api';
 
-export default function Login({ onLoginSuccess, onNavigateToSignup }) {
+export default function Login({ onLoginSuccess, onNavigateToSignup, onNotify }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -13,6 +13,13 @@ export default function Login({ onLoginSuccess, onNavigateToSignup }) {
     e.preventDefault();
     if (!username || !password) {
       setError('Please enter both username and password.');
+      if (onNotify) {
+        onNotify({
+          type: 'warning',
+          title: 'Missing credentials',
+          message: 'Please enter both username and password.'
+        });
+      }
       return;
     }
 

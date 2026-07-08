@@ -3,7 +3,7 @@ import * as apiService from '../services/api';
 
 const asArray = (value) => (Array.isArray(value) ? value : []);
 
-function AnalyticsDashboard({ onViewChange, onLogout }) {
+function AnalyticsDashboard({ onViewChange, onLogout, onNotify }) {
   const [kpis, setKpis] = useState(null);
   const [riskDistribution, setRiskDistribution] = useState([]);
   const [incomeData, setIncomeData] = useState([]);
@@ -61,7 +61,7 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
       })
       .catch((err) => {
         if (err.status === 401) {
-          if (onLogout) onLogout();
+          if (onLogout) onLogout({ silent: true });
         } else {
           setError(err.message || 'Unable to load analytics data.');
         }
@@ -84,7 +84,7 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
         }
       } catch (err) {
         if (err.status === 401) {
-          if (onLogout) onLogout();
+          if (onLogout) onLogout({ silent: true });
           return;
         }
         setBulkError('Unable to refresh bulk prediction progress right now.');
@@ -116,6 +116,13 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
     event.preventDefault();
     if (!bulkFile) {
       setBulkError('Please select a CSV file before uploading.');
+      if (onNotify) {
+        onNotify({
+          type: 'warning',
+          title: 'No file selected',
+          message: 'Please select a CSV file before uploading.'
+        });
+      }
       return;
     }
 
@@ -126,9 +133,16 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
       const result = await apiService.uploadBulkPredictions(bulkFile);
       setBulkJob(result);
       setBulkPreview([]);
+      if (onNotify) {
+        onNotify({
+          type: 'success',
+          title: 'Bulk job started',
+          message: `Bulk prediction job ${result.job_id} is now processing.`
+        });
+      }
     } catch (err) {
       if (err.status === 401) {
-        if (onLogout) onLogout();
+        if (onLogout) onLogout({ silent: true });
         return;
       }
       setBulkError(err.message || 'Unable to upload bulk predictions.');

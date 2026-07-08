@@ -15,7 +15,7 @@ export default function ModelPerformance({ onViewChange, onLogout }) {
         setMetrics(data);
       } catch (err) {
         if (err.status === 401) {
-          if (onLogout) onLogout();
+          if (onLogout) onLogout({ silent: true });
         } else {
           setError(err.message || 'Error fetching model metrics.');
         }

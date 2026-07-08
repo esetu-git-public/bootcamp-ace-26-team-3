@@ -34,7 +34,7 @@ export default function CustomerDirectory({ onViewChange, onSelectCustomer, onLo
     } catch (err) {
       if (err.status === 401) {
         if (onLogout) {
-          onLogout();
+          onLogout({ silent: true });
         } else {
           localStorage.removeItem('access_token');
           onViewChange('login');

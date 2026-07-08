@@ -66,15 +66,17 @@ function App() {
     });
   }, [addNotification]);
 
-  const handleLogout = useCallback(() => {
+  const handleLogout = useCallback((options = {}) => {
     localStorage.removeItem('access_token');
     setToken(null);
     setView('login');
-    addNotification({
-      type: 'info',
-      title: 'Signed out',
-      message: 'You have been signed out successfully.'
-    });
+    if (!options.silent) {
+      addNotification({
+        type: 'info',
+        title: 'Signed out',
+        message: 'You have been signed out successfully.'
+      });
+    }
   }, [addNotification]);
 
   const isAuth = token && ['dashboard', 'directory', 'profile', 'model', 'board'].includes(view);
@@ -136,27 +138,31 @@ function App() {
           <Login
             onLoginSuccess={handleLoginSuccess}
             onNavigateToSignup={() => setView('signup')}
+            onNotify={addNotification}
           />
         )}
         {view === 'signup' && (
           <SignUp
             onNavigateToLogin={() => setView('login')}
+            onNotify={addNotification}
           />
         )}
         {view === 'dashboard' && (
-          <AnalyticsDashboard onViewChange={setView} onLogout={handleLogout} />
+          <AnalyticsDashboard onViewChange={setView} onLogout={handleLogout} onNotify={addNotification} />
         )}
         {view === 'directory' && (
           <CustomerDirectory
             onViewChange={setView}
             onSelectCustomer={setSelectedCustomerId}
             onLogout={handleLogout}
+            onNotify={addNotification}
           />
         )}
         {view === 'profile' && (
           <CustomerProfile
             onViewChange={setView}
             onLogout={handleLogout}
+            onNotify={addNotification}
             selectedCustomerId={selectedCustomerId}
             setSelectedCustomerId={setSelectedCustomerId}
           />
@@ -165,6 +171,7 @@ function App() {
           <ModelPerformance
             onViewChange={setView}
             onLogout={handleLogout}
+            onNotify={addNotification}
           />
         )}
         {view === 'board' && (

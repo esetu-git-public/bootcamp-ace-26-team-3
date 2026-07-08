@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import * as apiService from '../services/api';
 
-export default function SignUp({ onNavigateToLogin }) {
+export default function SignUp({ onNavigateToLogin, onNotify }) {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
@@ -15,11 +15,25 @@ export default function SignUp({ onNavigateToLogin }) {
     e.preventDefault();
     if (!username || !email || !password) {
       setError('Please fill in all required fields (Username, Email, and Password).');
+      if (onNotify) {
+        onNotify({
+          type: 'warning',
+          title: 'Missing details',
+          message: 'Please fill in username, email, and password.'
+        });
+      }
       return;
     }
 
     if (password.length < 6) {
       setError('Password must be at least 6 characters long.');
+      if (onNotify) {
+        onNotify({
+          type: 'warning',
+          title: 'Password too short',
+          message: 'Password must be at least 6 characters long.'
+        });
+      }
       return;
     }
 
@@ -31,6 +45,13 @@ export default function SignUp({ onNavigateToLogin }) {
       await apiService.signup(username, email, password, fullName || null);
 
       setSuccess('Account created successfully! Redirecting to login...');
+      if (onNotify) {
+        onNotify({
+          type: 'success',
+          title: 'Account created',
+          message: 'Your account was created successfully. Redirecting to login...'
+        });
+      }
       setTimeout(() => {
         onNavigateToLogin();
       }, 2000);

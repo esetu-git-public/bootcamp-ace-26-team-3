@@ -165,7 +165,7 @@ async def get_customers(
         rows = []
         if total > 0:
             # Run paginated list query
-            query_str += " ORDER BY churn_probability DESC LIMIT :limit OFFSET :offset"
+            query_str += " ORDER BY cast(customer_id as integer) ASC LIMIT :limit OFFSET :offset"
             results = db.execute(_expand_list_params(text(query_str), params), params).fetchall()
             
             for r in results:

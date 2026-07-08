@@ -122,9 +122,7 @@ def seed_demo_customers(db: Session) -> None:
 
     with open(csv_path, "r", encoding="utf-8") as f:
         reader = csv.DictReader(f)
-        for i, row in enumerate(reader):
-            if i >= 1000:
-                break
+        for row in reader:
 
             support = int(row["Customer_Support_Interactions"])
             satisfaction = int(row["Satisfaction_Score"])

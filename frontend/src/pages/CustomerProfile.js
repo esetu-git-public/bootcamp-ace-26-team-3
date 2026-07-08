@@ -200,7 +200,7 @@ export default function CustomerProfile({ onViewChange, onLogout, selectedCustom
           <input
             ref={inputRef}
             type="text"
-            placeholder="Enter Customer ID  (e.g. C10239)"
+            placeholder="Enter Customer ID  (e.g. 100)"
             value={searchId}
             onChange={(e) => setSearchId(e.target.value)}
             style={S.searchInput}
@@ -247,7 +247,7 @@ export default function CustomerProfile({ onViewChange, onLogout, selectedCustom
           </p>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ color: '#64748b', fontSize: '.82rem' }}>Try:</span>
-            {['C10001', 'C10239', 'C10500'].map(id => (
+            {['1', '42', '100'].map(id => (
               <button key={id} onClick={() => {
                 setSearchId(id);
                 setCustomerId(id);

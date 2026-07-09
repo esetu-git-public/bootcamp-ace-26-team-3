@@ -133,7 +133,10 @@ UI available at:
 
 ### Authentication
 
-The app requires a login before accessing any dashboard. Use the **Sign Up** page to create a new account, then log in to receive a JWT token stored in `localStorage`.
+The app requires a login before accessing any dashboard. Public signup has been disabled for security (Option B: Admin-Only Signup).
+* A default administrator is seeded on database initialization: **Username:** `admin` (or Email `admin@company.com`), **Password:** `admin123`.
+* New Customer Manager accounts can only be provisioned by the logged-in administrator via the **Manage Users** tab inside the dashboard.
+* Logins support verification using either username or email address.
 
 ### Analytics Dashboard
 
@@ -187,10 +190,26 @@ customer_support_interactions,satisfaction_score,discount_used
 
 ## Running tests
 
-### Frontend unit tests
+### Backend unit tests
+
+From the `backend/` directory:
 
 ```powershell
-cd frontend
+$env:PYTHONPATH = "C:\Users\user\Downloads\Subscription Cancellation Prediction System (OTTSaaS)\bootcamp-ace-26-team-3"
+.\venv\Scripts\python.exe -m pytest
+```
+
+Test files:
+- `tests/test_security_auth.py`
+- `tests/test_bulk_predictions.py`
+- `tests/test_probability_implementation.py`
+- `tests/test_shap_explainability.py`
+
+### Frontend unit tests
+
+From the `frontend/` directory:
+
+```powershell
 npm test -- --watchAll=false
 ```
 
@@ -204,8 +223,8 @@ All routes are under `/api/v1`:
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/auth/login` | Login and obtain JWT token |
-| `POST` | `/auth/signup` | Register a new user |
+| `POST` | `/auth/login` | Login and obtain JWT token (supports username or email lookup) |
+| `POST` | `/auth/signup` | Register a new manager account (requires Administrator token) |
 | `GET`  | `/dashboard/kpis` | KPI summary metrics |
 | `GET`  | `/customers` | Paginated customer list with filters |
 | `GET`  | `/customers/{id}` | Single customer profile |
@@ -229,6 +248,7 @@ All routes are under `/api/v1`:
 
 - **Frontend can't reach backend** — confirm the backend is running on port 8000 and CORS is enabled
 - **`npm start` fails** — run `npm install` first; ensure Node.js ≥ 16 is installed
-- **Login returns 401** — create a new account via Sign Up before logging in
+- **Login returns 401** — ensure you are using the default admin account `admin`/`admin123` or your manager profile has been created by the system administrator
 - **No model metrics shown** — place a `model_metrics.json` file under `backend/app/models/` or seed the `model_metrics` DB table
 - **Switch from SQLite to PostgreSQL** — set `DATABASE_URL` to your connection string before starting the backend
+

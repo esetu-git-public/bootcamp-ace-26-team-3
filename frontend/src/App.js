@@ -27,12 +27,25 @@ function App() {
     setNotifications((current) => current.filter((notification) => notification.id !== id));
   }, []);
 
+  const getUsernameFromToken = useCallback(() => {
+    if (!token) return null;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.sub;
+    } catch {
+      return null;
+    }
+  }, [token]);
+
+  const currentUsername = getUsernameFromToken();
+  const isAdmin = currentUsername === 'admin';
+
   useEffect(() => {
     if (token) {
       if (view === 'login' || view === 'signup') {
         setView('dashboard');
       }
-    } else if (view !== 'signup') {
+    } else {
       setView('login');
     }
   }, [token, view]);
@@ -78,7 +91,7 @@ function App() {
     });
   }, [addNotification]);
 
-  const isAuth = token && ['dashboard', 'directory', 'profile', 'model', 'board'].includes(view);
+  const isAuth = token && ['dashboard', 'directory', 'profile', 'model', 'board', 'users'].includes(view);
 
   return (
     <div className="App" style={styles.appContainer}>
@@ -125,6 +138,14 @@ function App() {
             >
               Scrum Board
             </button>
+            {isAdmin && (
+              <button
+                onClick={() => setView('users')}
+                style={view === 'users' ? styles.activeNavLink : styles.navLink}
+              >
+                Manage Users
+              </button>
+            )}
           </div>
           <button onClick={handleLogout} style={styles.signOutBtn}>
             Sign Out
@@ -171,6 +192,12 @@ function App() {
         {view === 'board' && (
           <ScrumBoard
             onViewChange={setView}
+          />
+        )}
+        {view === 'users' && (
+          <SignUp
+            isAdminPanel={true}
+            onNavigateToLogin={() => setView('login')}
           />
         )}
       </main>

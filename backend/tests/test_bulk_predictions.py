@@ -37,7 +37,7 @@ def test_build_prediction_input_accepts_dashboard_headers():
 def test_process_bulk_predictions_task_writes_real_results(tmp_path, monkeypatch):
     job_id = "job-test"
     monkeypatch.setattr(predictions, "RESULTS_DIR", str(tmp_path))
-    monkeypatch.setattr(predictions.model_service, "is_ready", False)
+    monkeypatch.setattr(predictions.model_service, "champion_version", None)
     predictions.BULK_JOBS_DB.clear()
     predictions.BULK_JOBS_DB[job_id] = {
         "job_id": job_id,

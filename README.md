@@ -80,6 +80,12 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
+For local development and tests, install the dev requirements after activating the virtual environment:
+
+```powershell
+pip install -r requirements-dev.txt
+```
+
 > **Note:** The React frontend requires Node.js and npm. If `npm` is not recognized, install Node.js from https://nodejs.org, restart PowerShell, and verify with:
 >
 > ```powershell
@@ -196,7 +202,7 @@ From the `backend/` directory:
 
 ```powershell
 $env:PYTHONPATH = "C:\Users\user\Downloads\Subscription Cancellation Prediction System (OTTSaaS)\bootcamp-ace-26-team-3"
-.\venv\Scripts\python.exe -m pytest
+.\.venv\Scripts\python.exe -m pytest
 ```
 
 Test files:

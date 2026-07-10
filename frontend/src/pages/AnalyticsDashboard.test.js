@@ -56,7 +56,7 @@ describe('AnalyticsDashboard', () => {
     expect(await screen.findByText('120')).toBeInTheDocument();
     expect(await screen.findByText('18')).toBeInTheDocument();
     expect(await screen.findByText('7')).toBeInTheDocument();
-    expect(await screen.findByText('41.0%')).toBeInTheDocument();
+    expect(await screen.findByText('41%')).toBeInTheDocument();
     // Note: The original test expected .00, but toLocaleString() doesn't do that by default for round numbers.
     // Let's find it by the parts we know are there.
     expect(await screen.findByText(/\$5,400/i)).toBeInTheDocument();
@@ -76,12 +76,12 @@ describe('AnalyticsDashboard', () => {
     render(<AnalyticsDashboard />);
     // Top Segment card
     expect((await screen.findAllByText('High Risk')).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/5 customers - 10.0% of base/i)).toBeInTheDocument();
+    expect(screen.getByText(/5 customers - 10% of base/i)).toBeInTheDocument();
 
     // Customer Segments list
     expect(await screen.findByText('Loyal')).toBeInTheDocument();
     expect(screen.getByText('45 customers')).toBeInTheDocument();
-    expect(screen.getByText('5.0%')).toBeInTheDocument();
+    expect(screen.getByText('5%')).toBeInTheDocument();
   });
 
   it('renders the high-risk customer queue', async () => {
@@ -95,9 +95,9 @@ describe('AnalyticsDashboard', () => {
   it('renders churn by income from the API', async () => {
     render(<AnalyticsDashboard />);
     expect(await screen.findByText('Low')).toBeInTheDocument();
-    expect(screen.getByText('12.0%')).toBeInTheDocument();
+    expect(screen.getByText('12%')).toBeInTheDocument();
     expect((await screen.findAllByText('Medium')).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('24.0%')).toBeInTheDocument();
+    expect(screen.getByText('24%')).toBeInTheDocument();
   });
 
   it('handles API errors gracefully', async () => {

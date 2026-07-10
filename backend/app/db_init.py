@@ -81,6 +81,18 @@ def create_indexes(db: Session) -> None:
         CREATE INDEX IF NOT EXISTS idx_prediction_history_customer_at
         ON prediction_history(customer_id, evaluated_at DESC)
         """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_bulk_prediction_jobs_status_created
+        ON bulk_prediction_jobs(status, created_at DESC)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_retention_interventions_customer_created
+        ON retention_interventions(customer_id, created_at DESC)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_retention_interventions_status
+        ON retention_interventions(status)
+        """,
     ]
 
     for statement in index_statements:

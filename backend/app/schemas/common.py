@@ -284,3 +284,32 @@ class CustomerValidationSchema(BaseModel):
         if v not in ["Credit Card", "UPI", "Debit Card", "Wallet"]:
             raise ValueError("Payment mode must be 'Credit Card', 'UPI', 'Debit Card', or 'Wallet'")
         return v
+
+class RetentionInterventionCreate(BaseModel):
+    customer_id: str = Field(..., min_length=1, max_length=50)
+    prediction_id: Optional[int] = None
+    offer_type: str = Field(..., min_length=1, max_length=50)
+    status: str = Field("planned", pattern="^(planned|sent|accepted|ignored|retained|churned|cancelled)$")
+    notes: Optional[str] = None
+
+
+class RetentionInterventionUpdate(BaseModel):
+    offer_type: Optional[str] = Field(None, min_length=1, max_length=50)
+    status: Optional[str] = Field(None, pattern="^(planned|sent|accepted|ignored|retained|churned|cancelled)$")
+    notes: Optional[str] = None
+    outcome_at: Optional[datetime] = None
+
+
+class RetentionInterventionResponse(BaseModel):
+    intervention_id: int
+    customer_id: str
+    prediction_id: Optional[int] = None
+    offer_type: str
+    status: str
+    notes: Optional[str] = None
+    created_by: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    outcome_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)

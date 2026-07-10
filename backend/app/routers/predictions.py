@@ -10,12 +10,13 @@ import os
 import csv
 import re
 import pandas as pd
-from ..database import get_db
+from ..database import SessionLocal, get_db
 from ..schemas import (
     SinglePredictionResponse, BulkPredictionUploadResponse, 
     BulkPredictionStatusResponse
 )
 from ..core.risk_score import build_risk_profile
+from ..models import BulkPredictionJob
 from ..core.model_service import model_service
 from .auth import get_current_user
 
@@ -105,8 +106,48 @@ def _risk_from_probability(prob: float) -> tuple[str, int, str, str]:
         "Customer behavior shows stable engagement.",
     )
 
-# Global dictionary to track bulk job status in-memory for prototype
+# Compatibility mirror for older tests/utilities. API state is persisted in bulk_prediction_jobs.
 BULK_JOBS_DB = {}
+
+
+def _job_to_dict(job: BulkPredictionJob) -> dict:
+    return {
+        "job_id": job.job_id,
+        "status": job.status,
+        "total_records": job.total_records,
+        "processed_records": job.processed_records,
+        "successful_records": job.successful_records,
+        "failed_records": job.failed_records,
+        "created_at": job.created_at,
+        "completed_at": job.completed_at,
+        "download_url": job.download_url,
+        "error_message": job.error_message,
+    }
+
+
+def _mirror_job(job_data: dict) -> None:
+    BULK_JOBS_DB[job_data["job_id"]] = dict(job_data)
+
+
+def _get_job(db: Session, job_id: str) -> Optional[BulkPredictionJob]:
+    return db.query(BulkPredictionJob).filter(BulkPredictionJob.job_id == job_id).first()
+
+
+def _set_job_fields(db: Session, job_id: str, **fields) -> Optional[BulkPredictionJob]:
+    job = _get_job(db, job_id)
+    if not job:
+        return None
+    for key, value in fields.items():
+        setattr(job, key, value)
+    db.commit()
+    db.refresh(job)
+    _mirror_job(_job_to_dict(job))
+    return job
+
+
+def _update_legacy_job(job_id: str, **fields) -> None:
+    if job_id in BULK_JOBS_DB:
+        BULK_JOBS_DB[job_id].update(fields)
 
 
 def _is_valid_job_id(job_id: str) -> bool:
@@ -159,13 +200,29 @@ def _score_prediction_row(row: dict) -> dict:
 
 
 def process_bulk_predictions_task(job_id: str, file_content: bytes):
-    if job_id not in BULK_JOBS_DB or not _is_valid_job_id(job_id):
+    if not _is_valid_job_id(job_id):
         return
 
-    BULK_JOBS_DB[job_id]["status"] = "PROCESSING"
-    output_path = os.path.join(RESULTS_DIR, f"{job_id}.csv")
-
+    db = SessionLocal()
+    use_db = True
     try:
+        try:
+            job = _get_job(db, job_id)
+        except Exception as lookup_exc:
+            print(f"Bulk job database lookup failed, using legacy tracker: {lookup_exc}")
+            job = None
+            use_db = False
+
+        if not job:
+            use_db = False
+            if job_id not in BULK_JOBS_DB:
+                return
+
+        if use_db:
+            _set_job_fields(db, job_id, status="PROCESSING")
+        _update_legacy_job(job_id, status="PROCESSING")
+
+        output_path = os.path.join(RESULTS_DIR, f"{job_id}.csv")
         decoded = file_content.decode("utf-8-sig", errors="ignore")
         reader = csv.DictReader(StringIO(decoded))
         if not reader.fieldnames:
@@ -177,6 +234,10 @@ def process_bulk_predictions_task(job_id: str, file_content: bytes):
             "Churn Probability", "Confidence Lower", "Confidence Upper",
             "Will Cancel", "Risk Category", "Recommended Offer", "Action Description"
         ]
+
+        processed_records = 0
+        successful_records = 0
+        failed_records = 0
 
         with open(output_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -204,21 +265,63 @@ def process_bulk_predictions_task(job_id: str, file_content: bytes):
                         "Recommended Offer": result["recommendation_type"],
                         "Action Description": result["recommendation_desc"],
                     })
-                    BULK_JOBS_DB[job_id]["successful_records"] += 1
+                    successful_records += 1
                 except Exception as row_exc:
                     print(f"Failed to process bulk row for job {job_id}: {row_exc}")
-                    BULK_JOBS_DB[job_id]["failed_records"] += 1
+                    failed_records += 1
                 finally:
-                    BULK_JOBS_DB[job_id]["processed_records"] += 1
+                    processed_records += 1
+                    if use_db:
+                        _set_job_fields(
+                            db,
+                            job_id,
+                            processed_records=processed_records,
+                            successful_records=successful_records,
+                            failed_records=failed_records,
+                        )
+                    _update_legacy_job(
+                        job_id,
+                        processed_records=processed_records,
+                        successful_records=successful_records,
+                        failed_records=failed_records,
+                    )
 
-        BULK_JOBS_DB[job_id]["status"] = "COMPLETED"
-        BULK_JOBS_DB[job_id]["completed_at"] = datetime.utcnow()
-        BULK_JOBS_DB[job_id]["download_url"] = f"/api/v1/reports/export?format=csv&job_id={job_id}"
+        completed_at = datetime.utcnow()
+        download_url = f"/api/v1/reports/export?format=csv&job_id={job_id}"
+        if use_db:
+            _set_job_fields(
+                db,
+                job_id,
+                status="COMPLETED",
+                completed_at=completed_at,
+                download_url=download_url,
+                error_message=None,
+            )
+        _update_legacy_job(
+            job_id,
+            status="COMPLETED",
+            completed_at=completed_at,
+            download_url=download_url,
+            error_message=None,
+        )
     except Exception as exc:
-        BULK_JOBS_DB[job_id]["status"] = "FAILED"
-        BULK_JOBS_DB[job_id]["error_message"] = str(exc)
-        BULK_JOBS_DB[job_id]["completed_at"] = datetime.utcnow()
-
+        completed_at = datetime.utcnow()
+        if use_db:
+            _set_job_fields(
+                db,
+                job_id,
+                status="FAILED",
+                error_message=str(exc),
+                completed_at=completed_at,
+            )
+        _update_legacy_job(
+            job_id,
+            status="FAILED",
+            error_message=str(exc),
+            completed_at=completed_at,
+        )
+    finally:
+        db.close()
 @router.post("/single/{customer_id}", response_model=SinglePredictionResponse)
 async def predict_single(
     customer_id: str,
@@ -392,6 +495,7 @@ async def predict_single(
 async def predict_bulk(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
+    db: Session = Depends(get_db),
     current_user: str = Depends(get_current_user)
 ):
     if not file.filename or not file.filename.lower().endswith(".csv"):
@@ -420,44 +524,53 @@ async def predict_bulk(
         )
     
     job_id = str(uuid.uuid4())
-    
-    # Initialize job tracking database
-    job_info = {
-        "job_id": job_id,
-        "status": "QUEUED",
-        "total_records": total_records,
-        "processed_records": 0,
-        "successful_records": 0,
-        "failed_records": 0,
-        "created_at": datetime.utcnow(),
-        "completed_at": None,
-        "download_url": None,
-        "error_message": None,
-    }
-    BULK_JOBS_DB[job_id] = job_info
+    job = BulkPredictionJob(
+        job_id=job_id,
+        status="QUEUED",
+        total_records=total_records,
+        processed_records=0,
+        successful_records=0,
+        failed_records=0,
+    )
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+    _mirror_job(_job_to_dict(job))
     
     # Send processing task to background queue
     background_tasks.add_task(process_bulk_predictions_task, job_id, file_content)
     
     return {
-        "job_id": job_id,
-        "status": "QUEUED",
-        "total_records": total_records,
-        "created_at": job_info["created_at"]
+        "job_id": job.job_id,
+        "status": job.status,
+        "total_records": job.total_records,
+        "created_at": job.created_at
     }
-
 @router.get("/bulk/status/{job_id}", response_model=BulkPredictionStatusResponse)
 async def get_bulk_status(
     job_id: str,
+    db: Session = Depends(get_db),
     current_user: str = Depends(get_current_user)
 ):
-    if not _is_valid_job_id(job_id) or job_id not in BULK_JOBS_DB:
+    if not _is_valid_job_id(job_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Bulk prediction job not found."
         )
-    return BULK_JOBS_DB[job_id]
 
+    job = _get_job(db, job_id) if isinstance(db, Session) else None
+    if job:
+        job_data = _job_to_dict(job)
+        _mirror_job(job_data)
+        return job_data
+
+    if job_id in BULK_JOBS_DB:
+        return BULK_JOBS_DB[job_id]
+
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Bulk prediction job not found."
+    )
 @router.get("/bulk/preview/{job_id}")
 async def get_bulk_preview(
     job_id: str,

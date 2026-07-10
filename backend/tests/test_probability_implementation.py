@@ -5,7 +5,7 @@ Tests probability calculation, confidence intervals, and risk categorization.
 
 import pytest
 import numpy as np
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any
 
 
@@ -179,7 +179,7 @@ class TestAPIResponseSchema:
             "discount_used": False,
             "device_type": "Android",
             "payment_mode": "UPI",
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
             "churn_probability": 89.00,
             "probability_confidence_lower": 84.50,
             "probability_confidence_upper": 93.50,
@@ -188,7 +188,7 @@ class TestAPIResponseSchema:
             "explainability": {"Customer_Support_Interactions": 0.42},
             "recommendation_type": "Offer Discount",
             "recommendation_desc": "...",
-            "predicted_at": datetime.utcnow().isoformat()
+            "predicted_at": datetime.now(timezone.utc).isoformat()
         }
         
         probability_fields = [

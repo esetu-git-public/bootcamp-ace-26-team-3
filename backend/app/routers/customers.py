@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import bindparam, text
 from typing import Any, Dict, List, Optional, cast
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from ..database import get_db
 from ..schemas import PaginatedCustomersResponse, CustomerProfileResponse, PredictionHistoryItem
 from .auth import get_current_user
@@ -87,7 +87,7 @@ def get_mock_customer_profile(customer_id: str):
         "discount_used": False,
         "device_type": row["device_type"],
         "payment_mode": row["payment_mode"],
-        "created_at": datetime.utcnow() - timedelta(days=row["tenure_months"] * 30),
+        "created_at": datetime.now(timezone.utc) - timedelta(days=row["tenure_months"] * 30),
         "churn_probability": row["churn_probability"],
         "probability_confidence_lower": max(0.0, row["churn_probability"] - 5.0),
         "probability_confidence_upper": min(100.0, row["churn_probability"] + 5.0),
@@ -103,7 +103,7 @@ def get_mock_customer_profile(customer_id: str):
         },
         "recommendation_type": row["recommendation_type"],
         "recommendation_desc": f"Mock recommendation for customer {customer_id}: {row['recommendation_type']}.",
-        "predicted_at": datetime.utcnow()
+        "predicted_at": datetime.now(timezone.utc)
     }
 
 
@@ -286,9 +286,9 @@ async def get_customer_prediction_history(
         } for r in results]
     except Exception:
         # Fallback Mock history
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
         return [
-            {"history_id": 105, "risk_score": 89.00, "risk_category": "High", "prediction_result": 1, "evaluated_at": datetime.utcnow()},
-            {"history_id": 92, "risk_score": 65.20, "risk_category": "Medium", "prediction_result": 1, "evaluated_at": datetime.utcnow() - timedelta(days=30)},
-            {"history_id": 71, "risk_score": 45.00, "risk_category": "Medium", "prediction_result": 0, "evaluated_at": datetime.utcnow() - timedelta(days=60)}
+            {"history_id": 105, "risk_score": 89.00, "risk_category": "High", "prediction_result": 1, "evaluated_at": datetime.now(timezone.utc)},
+            {"history_id": 92, "risk_score": 65.20, "risk_category": "Medium", "prediction_result": 1, "evaluated_at": datetime.now(timezone.utc) - timedelta(days=30)},
+            {"history_id": 71, "risk_score": 45.00, "risk_category": "Medium", "prediction_result": 0, "evaluated_at": datetime.now(timezone.utc) - timedelta(days=60)}
         ]

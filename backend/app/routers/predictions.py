@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 import uuid
 import json
-from datetime import datetime
-from typing import Optional
+from datetime import datetime, timezone
+from typing import Any, Optional, cast
 from io import StringIO
 import os
 import csv
@@ -54,14 +54,18 @@ def _get_first(data: dict, *keys: str, default: Optional[object] = None) -> Opti
 
 def _to_int(value: Optional[object], default: int) -> int:
     try:
-        return int(float(value))
+        if value is None:
+            return default
+        return int(float(cast(Any, value)))
     except (TypeError, ValueError):
         return default
 
 
 def _to_float(value: Optional[object], default: float) -> float:
     try:
-        return float(value)
+        if value is None:
+            return default
+        return float(cast(Any, value))
     except (TypeError, ValueError):
         return default
 
@@ -286,7 +290,7 @@ def process_bulk_predictions_task(job_id: str, file_content: bytes):
                         failed_records=failed_records,
                     )
 
-        completed_at = datetime.utcnow()
+        completed_at = datetime.now(timezone.utc)
         download_url = f"/api/v1/reports/export?format=csv&job_id={job_id}"
         if use_db:
             _set_job_fields(
@@ -305,7 +309,7 @@ def process_bulk_predictions_task(job_id: str, file_content: bytes):
             error_message=None,
         )
     except Exception as exc:
-        completed_at = datetime.utcnow()
+        completed_at = datetime.now(timezone.utc)
         if use_db:
             _set_job_fields(
                 db,
@@ -442,7 +446,7 @@ async def predict_single(
 
         # Save to database if customer is database-backed
         if customer:
-            now_time = datetime.utcnow()
+            now_time = datetime.now(timezone.utc)
             insert_query = text("""
                 INSERT INTO churn_predictions 
                 (customer_id, churn_probability, risk_category, will_cancel, explainability_json, recommendation_type, recommendation_desc, predicted_at, model_version)

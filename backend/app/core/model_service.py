@@ -2,7 +2,7 @@ import os
 import pickle
 import sys
 import threading
-from typing import Dict, Optional, List
+from typing import Any, Dict, List, Optional, TypedDict, Union, cast
 
 import numpy as np
 import pandas as pd
@@ -62,6 +62,12 @@ def _install_pickle_module_aliases() -> None:
     sys.modules.setdefault("app.core.preprocessing", preprocessing)
 
 
+class ABTestConfigDict(TypedDict):
+    is_active: bool
+    challenger_version: Optional[str]
+    traffic_split_percent: int
+
+
 class ModelService:
     def __init__(self):
         # Main model artifacts
@@ -69,7 +75,7 @@ class ModelService:
         self.models: Dict[str, Dict] = {}  # Stores artifacts for each loaded version
 
         # A/B Test configuration
-        self.ab_test_config = {
+        self.ab_test_config: ABTestConfigDict = {
             "is_active": False,
             "challenger_version": None,
             "traffic_split_percent": 0,  # Percentage of traffic to challenger
@@ -86,14 +92,19 @@ class ModelService:
     def load_latest_model(self):
         """Loads the latest model from the database-backed model registry."""
         # This will become the default "champion" model
-        from app.database import SessionLocal
-        from app.models import ModelMetric
+        from ..database import SessionLocal
+        from ..models import ModelMetric
         db = SessionLocal()
         try:
             latest_metric = db.query(ModelMetric).order_by(ModelMetric.evaluated_at.desc()).first()
-            if latest_metric and latest_metric.model_version:
-                print(f"Found latest model version '{latest_metric.model_version}' in registry. Attempting to load.")
-                self.load_artifacts(latest_metric.model_version, as_champion=True)
+            if latest_metric is not None:
+                model_version = cast(str, latest_metric.model_version)
+                if model_version:
+                    print(f"Found latest model version '{model_version}' in registry. Attempting to load.")
+                    self.load_artifacts(model_version, as_champion=True)
+                else:
+                    print("No models found in the registry. Loading fallback champion model version 'v1.2.0-catboost'.")
+                    self.load_artifacts("v1.2.0-catboost", as_champion=True)
             else:
                 print("No models found in the registry. Loading fallback champion model version 'v1.2.0-catboost'.")
                 self.load_artifacts("v1.2.0-catboost", as_champion=True)
@@ -217,7 +228,7 @@ class ModelService:
             "loaded_models": list(self.models.keys())
         }
 
-    def get_model_version_for_request(self, customer_id: int) -> Optional[str]:
+    def get_model_version_for_request(self, customer_id: Union[int, str]) -> Optional[str]:
         """Determine which model version to use for a given customer based on A/B test config."""
         with self._lock:
             if not self.is_ready:
@@ -240,14 +251,27 @@ class ModelService:
             return self.champion_version
 
     def _shap_values(self, processed_features: pd.DataFrame) -> np.ndarray:
-        raw_values = self.explainer.shap_values(processed_features)
+        if self.explainer is None:
+            # Return an array of zeros if explainer is not available
+            num_features = len(self.feature_names) if self.feature_names else processed_features.shape[1]
+            return np.zeros((processed_features.shape[0], num_features))
+
+        if hasattr(self.explainer, "shap_values"):
+            raw_values = self.explainer.shap_values(processed_features)
+        elif callable(self.explainer):
+            explanation = self.explainer(processed_features)
+            raw_values = explanation.values if hasattr(explanation, "values") else explanation
+        else:
+            num_features = len(self.feature_names) if self.feature_names else processed_features.shape[1]
+            return np.zeros((processed_features.shape[0], num_features))
+
         if isinstance(raw_values, list):
             shap_values = raw_values[1] if len(raw_values) > 1 else raw_values[0]
         else:
             shap_values = raw_values
         return np.array(shap_values)
 
-    def predict_and_explain(self, raw_features: pd.DataFrame, model_version: Optional[str] = None) -> Dict[str, object]:
+    def predict_and_explain(self, raw_features: pd.DataFrame, model_version: Optional[str] = None) -> Dict[str, Any]:
         """Legacy method for backward compatibility."""
         with self._lock:
             version = model_version or self.champion_version
@@ -265,16 +289,26 @@ class ModelService:
             probability = float(probabilities[0])
 
             if explainer is not None:
-                raw_values = explainer.shap_values(processed)
-                if isinstance(raw_values, list):
-                    shap_values = raw_values[1] if len(raw_values) > 1 else raw_values[0]
+                if hasattr(explainer, "shap_values"):
+                    raw_values = explainer.shap_values(processed)
+                elif callable(explainer):
+                    explanation = explainer(processed)
+                    raw_values = explanation.values if hasattr(explanation, "values") else explanation
                 else:
-                    shap_values = raw_values
-                shap_row = np.array(shap_values)[0]
-                explainability = {
-                    feature: float(value)
-                    for feature, value in zip(feature_names, shap_row.tolist())
-                }
+                    raw_values = None
+
+                if raw_values is not None:
+                    if isinstance(raw_values, list):
+                        shap_values = raw_values[1] if len(raw_values) > 1 else raw_values[0]
+                    else:
+                        shap_values = raw_values
+                    shap_row = np.array(shap_values)[0]
+                    explainability = {
+                        feature: float(value)
+                        for feature, value in zip(feature_names, shap_row.tolist())
+                    }
+                else:
+                    explainability = {}
             else:
                 explainability = {}
             
@@ -292,7 +326,7 @@ class ModelService:
                 "explainability": explainability,
             }
 
-    def predict_with_advanced_explanation(self, raw_features: pd.DataFrame, model_version: Optional[str] = None) -> Dict[str, object]:
+    def predict_with_advanced_explanation(self, raw_features: pd.DataFrame, model_version: Optional[str] = None) -> Dict[str, Any]:
         """Enhanced prediction with detailed SHAP explanations."""
         with self._lock:
             version = model_version or self.champion_version

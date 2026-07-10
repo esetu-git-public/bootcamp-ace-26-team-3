@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, Header, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt
 from jose.exceptions import JWTError
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from sqlalchemy.orm import Session
 from ..schemas import LoginRequest, TokenResponse
@@ -67,7 +67,7 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
     
     # Update login frequency and last login timestamp
     user.login_frequency = (user.login_frequency or 0) + 1
-    user.last_login_at = datetime.utcnow()
+    user.last_login_at = datetime.now(timezone.utc)
     db.commit()
         
     access_token = create_access_token(subject=user.username)

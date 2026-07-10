@@ -1,3 +1,9 @@
+"""
+Model Performance Diagnostics and A/B Testing API Router.
+
+Author/Maintainer: Manthena Sri Harshitha
+"""
+
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import text

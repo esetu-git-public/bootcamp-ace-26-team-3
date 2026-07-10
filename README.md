@@ -242,6 +242,14 @@ Test files:
 - `src/pages/AnalyticsDashboard.test.js`
 - `src/pages/ModelPerformance.test.js`
 
+### Backend unit tests
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest backend/tests
+```
+
+For full setup, architecture, and debugging details, see the [TDD & Unit Testing Documentation](file:///d:/Team-3/docs/TDD_TESTING_DOCUMENTATION.md) authored by **Manthena Sri Harshitha**.
+
 ## API reference
 
 All routes are under `/api/v1`:

@@ -108,15 +108,33 @@ class ModelService:
 
     def load_artifacts(self, version: str, as_champion: bool = False):
         """Loads model artifacts for a specific version."""
-        model_path = os.path.join(ARTIFACT_DIR, f"catboost_model_{version}.cbm")
+        sklearn_model_path = os.path.join(ARTIFACT_DIR, f"sklearn_model_{version}.pkl")
+        catboost_model_path = os.path.join(ARTIFACT_DIR, f"catboost_model_{version}.cbm")
         preprocessor_path = os.path.join(ARTIFACT_DIR, f"preprocessor_{version}.pkl")
 
-        if not os.path.exists(preprocessor_path) or not os.path.exists(model_path):
+        is_sklearn = False
+        model_path = None
+
+        if os.path.exists(sklearn_model_path):
+            model_path = sklearn_model_path
+            is_sklearn = True
+        elif os.path.exists(catboost_model_path):
+            model_path = catboost_model_path
+            is_sklearn = False
+        else:
             print(f"Artifacts for version '{version}' not found. Falling back to default unversioned artifacts.")
-            model_path = os.path.join(ARTIFACT_DIR, "catboost_model.cbm")
+            unversioned_sklearn = os.path.join(ARTIFACT_DIR, "sklearn_model.pkl")
+            unversioned_catboost = os.path.join(ARTIFACT_DIR, "catboost_model.cbm")
             preprocessor_path = os.path.join(ARTIFACT_DIR, "preprocessor.pkl")
 
-        if not os.path.exists(preprocessor_path) or not os.path.exists(model_path):
+            if os.path.exists(unversioned_sklearn):
+                model_path = unversioned_sklearn
+                is_sklearn = True
+            elif os.path.exists(unversioned_catboost):
+                model_path = unversioned_catboost
+                is_sklearn = False
+
+        if not model_path or not os.path.exists(preprocessor_path):
             print(f"Artifacts not found. Searched for version '{version}' and default paths.")
             return
 
@@ -124,19 +142,22 @@ class ModelService:
             _install_pickle_module_aliases()
             with open(preprocessor_path, "rb") as f:
                 preprocessor = pickle.load(f)
-        except (ModuleNotFoundError, AttributeError, pickle.UnpicklingError) as e:
-            print(f"Warning: Could not load preprocessor pickle: {e}. Continuing without it.")
-            return # Cannot proceed without a preprocessor
-
-        if not CATBOOST_AVAILABLE or CatBoostClassifier is None:
-            print("Warning: CatBoost not available, ML model service disabled.")
+        except Exception as e:
+            print(f"Warning: Could not load preprocessor pickle: {e}")
             return
 
         try:
-            model = CatBoostClassifier()
-            model.load_model(model_path)
+            if is_sklearn:
+                with open(model_path, "rb") as f:
+                    model = pickle.load(f)
+            else:
+                if not CATBOOST_AVAILABLE or CatBoostClassifier is None:
+                    print("Warning: CatBoost not available, cannot load CatBoost model.")
+                    return
+                model = CatBoostClassifier()
+                model.load_model(model_path)
         except Exception as e:
-            print(f"Warning: Could not load CatBoost model: {e}")
+            print(f"Warning: Could not load model: {e}")
             return
 
         feature_names = []
@@ -144,9 +165,18 @@ class ModelService:
             feature_names = list(preprocessor.feature_names_)
 
         # Only initialize SHAP if available and model loaded
+        explainer = None
+        shap_explainer = None
         if SHAP_AVAILABLE and shap is not None:
             try:
-                explainer = shap.TreeExplainer(model)
+                try:
+                    explainer = shap.TreeExplainer(model)
+                except Exception:
+                    try:
+                        explainer = shap.Explainer(model)
+                    except Exception:
+                        explainer = None
+                
                 # Initialize enhanced SHAP explainer
                 if feature_names and SHAPExplainer is not None:
                     shap_explainer = SHAPExplainer(model, preprocessor, feature_names)
@@ -156,9 +186,6 @@ class ModelService:
                 explainer = None
                 shap_explainer = None
                 print(f"Warning: Could not initialize SHAP explainer: {str(e)}")
-        else:
-            explainer = None
-            shap_explainer = None
 
         # Store loaded artifacts
         self.models[version] = {
@@ -172,7 +199,6 @@ class ModelService:
         if as_champion:
             self.champion_version = version
             print(f"Successfully loaded champion model version '{version}'.")
-            # Setup aliases for backwards compatibility and easy access
             self.model = model
             self.preprocessor = preprocessor
             self.explainer = explainer

@@ -1,29 +1,34 @@
-[
-  {
-    "model_name": "logreg",
-    "roc_auc": 0.9447687696260348,
-    "accuracy": 0.8586206896551725,
-    "precision": 0.703483432455395,
-    "recall": 0.8903225806451613,
-    "f1": 0.7859515899383009,
+{
+  "logreg": {
+    "train_accuracy": 0.8519912198181248,
+    "test_accuracy": 0.8536050156739812,
+    "accuracy_gap": -0.0016137958558564147,
+    "precision": 0.6950294860994103,
+    "recall": 0.8870967741935484,
+    "f1_score": 0.7794048181388757,
+    "roc_auc": 0.9462679607955087,
     "confusion_matrix": [
       [
-        1911,
-        349
+        1898,
+        362
       ],
       [
-        102,
-        828
+        105,
+        825
       ]
-    ]
+    ],
+    "cv_roc_auc": 0.9373812569019935,
+    "cv_f1": 0.7721525653468595,
+    "is_overfitted": "No"
   },
-  {
-    "model_name": "rf",
-    "roc_auc": 1.0,
-    "accuracy": 1.0,
+  "rf": {
+    "train_accuracy": 1.0,
+    "test_accuracy": 1.0,
+    "accuracy_gap": 0.0,
     "precision": 1.0,
     "recall": 1.0,
-    "f1": 1.0,
+    "f1_score": 1.0,
+    "roc_auc": 1.0,
     "confusion_matrix": [
       [
         2260,
@@ -33,15 +38,19 @@
         0,
         930
       ]
-    ]
+    ],
+    "cv_roc_auc": 0.9999959849834539,
+    "cv_f1": 0.9973027609884599,
+    "is_overfitted": "Yes"
   },
-  {
-    "model_name": "catboost",
-    "roc_auc": 1.0,
-    "accuracy": 1.0,
+  "gb": {
+    "train_accuracy": 1.0,
+    "test_accuracy": 1.0,
+    "accuracy_gap": 0.0,
     "precision": 1.0,
     "recall": 1.0,
-    "f1": 1.0,
+    "f1_score": 1.0,
+    "roc_auc": 1.0000000000000002,
     "confusion_matrix": [
       [
         2260,
@@ -51,6 +60,53 @@
         0,
         930
       ]
-    ]
+    ],
+    "cv_roc_auc": 0.9999988095316065,
+    "cv_f1": 0.9989229210870112,
+    "is_overfitted": "Yes"
+  },
+  "xgboost": {
+    "train_accuracy": 1.0,
+    "test_accuracy": 1.0,
+    "accuracy_gap": 0.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1_score": 1.0,
+    "roc_auc": 1.0,
+    "confusion_matrix": [
+      [
+        2260,
+        0
+      ],
+      [
+        0,
+        930
+      ]
+    ],
+    "cv_roc_auc": 1.0,
+    "cv_f1": 1.0,
+    "is_overfitted": "Yes"
+  },
+  "catboost": {
+    "train_accuracy": 1.0,
+    "test_accuracy": 1.0,
+    "accuracy_gap": 0.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1_score": 1.0,
+    "roc_auc": 1.0,
+    "confusion_matrix": [
+      [
+        2260,
+        0
+      ],
+      [
+        0,
+        930
+      ]
+    ],
+    "cv_roc_auc": 1.0,
+    "cv_f1": 1.0,
+    "is_overfitted": "Yes"
   }
-]
+}

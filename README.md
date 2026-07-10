@@ -194,6 +194,25 @@ tenure_months,monthly_total_spend,avg_usage_hours_per_week,app_switch_frequency,
 customer_support_interactions,satisfaction_score,discount_used
 ```
 
+## Model training and comparison
+
+To improve generalization and check for overfitting and data leakage, we support training and comparing multiple classifiers (Logistic Regression, Random Forest, XGBoost, CatBoost, Gradient Boosting).
+
+### 1. Model training notebook
+For interactive experimentation, run the Jupyter Notebook:
+- [notebooks/model_training_comparison.ipynb](file:///c:/Users/user/Downloads/Subscription%20Cancellation%20Prediction%20System%20%28OTTSaaS%29/bootcamp-ace-26-team-3/notebooks/model_training_comparison.ipynb)
+
+### 2. Run model comparison script
+To automate comparison and select/integrate the best leakage-free model:
+```powershell
+.\.venv\Scripts\python.exe backend/experiments/train_compare_models.py
+```
+This script will:
+- Drop leakage features and identifier columns.
+- Evaluate train-test gap and cross-validation scores.
+- Select the best model (under 5% accuracy gap) and save versioned artifacts.
+- Export comparison metrics, summary, and plots to `reports/`.
+
 ## Running tests
 
 ### Backend unit tests

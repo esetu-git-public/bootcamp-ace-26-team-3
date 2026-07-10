@@ -51,14 +51,17 @@ class SHAPExplainer:
         self._initialize_explainer()
     
     def _initialize_explainer(self):
-        """Initialize SHAP TreeExplainer."""
+        """Initialize SHAP explainer with fallbacks."""
         if not SHAP_AVAILABLE or shap is None:
             raise RuntimeError("SHAP is not installed or could not be imported.")
 
         try:
             self.explainer = shap.TreeExplainer(self.model)
         except Exception as e:
-            raise RuntimeError(f"Failed to initialize SHAP TreeExplainer: {str(e)}")
+            try:
+                self.explainer = shap.Explainer(self.model)
+            except Exception as e2:
+                raise RuntimeError(f"Failed to initialize SHAP explainer: {str(e2)}")
 
     @staticmethod
     def _as_shap_array(raw_values) -> np.ndarray:

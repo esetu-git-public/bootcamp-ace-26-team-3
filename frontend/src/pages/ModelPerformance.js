@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import * as apiService from '../services/api';
 import { clampPercent, formatPercent } from '../utils/percent';
 
-export default function ModelPerformance({ onViewChange, onLogout }) {
+export default function ModelPerformance({ onViewChange, onLogout, onNotify }) {
   const [metrics, setMetrics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -16,7 +16,7 @@ export default function ModelPerformance({ onViewChange, onLogout }) {
         setMetrics(data);
       } catch (err) {
         if (err.status === 401) {
-          if (onLogout) onLogout();
+          if (onLogout) onLogout({ silent: true });
         } else {
           setError(err.message || 'Error fetching model metrics.');
         }

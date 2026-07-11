@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import * as apiService from '../services/api';
 
-export default function SignUp({ onNavigateToLogin, isAdminPanel = false }) {
+export default function SignUp({ onNavigateToLogin, onNotify, isAdminPanel = false }) {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
@@ -31,6 +31,25 @@ export default function SignUp({ onNavigateToLogin, isAdminPanel = false }) {
     e.preventDefault();
     if (!username || !email || !password) {
       setError('Please fill in all required fields (Username, Email, and Password).');
+      if (onNotify) {
+        onNotify({
+          type: 'warning',
+          title: 'Missing details',
+          message: 'Please fill in username, email, and password.'
+        });
+      }
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long.');
+      if (onNotify) {
+        onNotify({
+          type: 'warning',
+          title: 'Password too short',
+          message: 'Password must be at least 6 characters long.'
+        });
+      }
       return;
     }
 
@@ -43,6 +62,13 @@ export default function SignUp({ onNavigateToLogin, isAdminPanel = false }) {
 
       if (isAdminPanel) {
         setSuccess(`Manager account "${username}" created successfully!`);
+        if (onNotify) {
+          onNotify({
+            type: 'success',
+            title: 'Account created',
+            message: `Manager account "${username}" was created successfully.`
+          });
+        }
         setUsername('');
         setEmail('');
         setPassword('');
@@ -51,6 +77,13 @@ export default function SignUp({ onNavigateToLogin, isAdminPanel = false }) {
         setTimeout(() => setSuccess(''), 4000);
       } else {
         setSuccess('Account created successfully! Redirecting to login...');
+        if (onNotify) {
+          onNotify({
+            type: 'success',
+            title: 'Account created',
+            message: 'Your account was created successfully. Redirecting to login...'
+          });
+        }
         setTimeout(() => {
           onNavigateToLogin();
         }, 2000);

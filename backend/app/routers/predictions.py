@@ -168,22 +168,59 @@ def _score_prediction_row(row: dict) -> dict:
         score = round(output["probability"] * 100.0, 2)
         score_lower = round(output["probability_confidence_lower"] * 100.0, 2)
         score_upper = round(output["probability_confidence_upper"] * 100.0, 2)
-        risk, will_cancel, rec_type, rec_desc = _risk_from_probability(score / 100.0)
+        
+        from ..core.prediction_service import risk_from_probability, generate_recommendation_details
+        risk, will_cancel = risk_from_probability(score / 100.0)
+        
+        support_interactions = _to_int(_get_first(row, "customer_support_interactions", "Customer_Support_Interactions", "Support Tickets", default=3), 3)
+        satisfaction = _to_int(_get_first(row, "satisfaction_score", "Satisfaction_Score", "Satisfaction (1-5)", default=3), 3)
+        monthly_spend = _to_float(_get_first(row, "monthly_total_spend", "Monthly_Total_Spend", "Monthly Spend ($)", default=75.0), 75.0)
+        usage = _to_float(_get_first(row, "avg_usage_hours_per_week", "Avg_Usage_Hours_Per_Week", "Weekly Usage (Hrs)", default=15.0), 15.0)
+        tenure = _to_int(_get_first(row, "tenure_months", "Tenure_Months", "Tenure (Months)", default=12), 12)
+        app_switch = _to_int(_get_first(row, "app_switch_frequency", "App_Switch_Frequency", default=5), 5)
+        
+        rec_type, rec_desc = generate_recommendation_details(
+            prob=score,
+            risk_category=risk,
+            satisfaction_score=satisfaction,
+            monthly_total_spend=monthly_spend,
+            tenure_months=tenure,
+            customer_support_interactions=support_interactions,
+            avg_usage_hours_per_week=usage,
+            app_switch_frequency=app_switch
+        )
     except Exception as exc:
         print(f"Bulk model prediction failed, falling back to rule-based predictor: {exc}")
+        support_interactions = _to_int(_get_first(row, "customer_support_interactions", "Customer_Support_Interactions", "Support Tickets", default=3), 3)
+        satisfaction = _to_int(_get_first(row, "satisfaction_score", "Satisfaction_Score", "Satisfaction (1-5)", default=3), 3)
+        monthly_spend = _to_float(_get_first(row, "monthly_total_spend", "Monthly_Total_Spend", "Monthly Spend ($)", default=75.0), 75.0)
+        usage = _to_float(_get_first(row, "avg_usage_hours_per_week", "Avg_Usage_Hours_Per_Week", "Weekly Usage (Hrs)", default=15.0), 15.0)
+        tenure = _to_int(_get_first(row, "tenure_months", "Tenure_Months", "Tenure (Months)", default=12), 12)
+        app_switch = _to_int(_get_first(row, "app_switch_frequency", "App_Switch_Frequency", default=5), 5)
+        
         profile = build_risk_profile(
-            customer_support_interactions=_to_int(_get_first(row, "customer_support_interactions", "Customer_Support_Interactions", "Support Tickets", default=3), 3),
-            satisfaction_score=_to_int(_get_first(row, "satisfaction_score", "Satisfaction_Score", "Satisfaction (1-5)", default=3), 3),
-            monthly_total_spend=_to_float(_get_first(row, "monthly_total_spend", "Monthly_Total_Spend", "Monthly Spend ($)", default=75.0), 75.0),
-            avg_usage_hours_per_week=_to_float(_get_first(row, "avg_usage_hours_per_week", "Avg_Usage_Hours_Per_Week", "Weekly Usage (Hrs)", default=15.0), 15.0),
+            customer_support_interactions=support_interactions,
+            satisfaction_score=satisfaction,
+            monthly_total_spend=monthly_spend,
+            avg_usage_hours_per_week=usage,
         )
         score = round(float(profile["risk_score"]), 2)
         score_lower = round(max(0, score - 5.0), 2)
         score_upper = round(min(100, score + 5.0), 2)
         risk = profile["risk_category"]
         will_cancel = profile["will_cancel"]
-        rec_type = profile["recommendation_type"]
-        rec_desc = profile["recommendation_desc"]
+        
+        from ..core.prediction_service import generate_recommendation_details
+        rec_type, rec_desc = generate_recommendation_details(
+            prob=score,
+            risk_category=risk,
+            satisfaction_score=satisfaction,
+            monthly_total_spend=monthly_spend,
+            tenure_months=tenure,
+            customer_support_interactions=support_interactions,
+            avg_usage_hours_per_week=usage,
+            app_switch_frequency=app_switch
+        )
 
     return {
         "customer_id": str(_get_first(row, "customer_id", "Customer ID", "Customer_ID", default="")).strip() or "UNKNOWN",

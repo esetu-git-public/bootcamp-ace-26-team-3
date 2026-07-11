@@ -224,3 +224,73 @@ def test_customers_list_risk_desc_sorting(test_context):
     db.commit()
 
 
+def test_recommendation_classification_rules(test_context):
+    client, db, cust_id, headers = test_context
+    from backend.app.core.prediction_service import calculate_prediction_for_customer
+    
+    # 1. High risk customer case: low satisfaction, high support
+    high_risk_cust = Customer(
+        customer_id="REC_TEST_HIGH",
+        age=30,
+        income_level="Low",
+        number_of_subscriptions=1,
+        tenure_months=12,
+        monthly_total_spend=50.00,
+        avg_usage_hours_per_week=10.0,
+        app_switch_frequency=15,
+        customer_support_interactions=8,
+        satisfaction_score=1,
+        discount_used=False,
+        device_type="Android",
+        payment_mode="UPI"
+    )
+    res_high = calculate_prediction_for_customer(db, high_risk_cust)
+    assert res_high["risk_category"] == "High"
+    assert "High (Urgent)" in res_high["recommendation_desc"]
+    assert "Schedule a direct follow-up call" in res_high["recommendation_desc"]
+    
+    # 2. Medium risk customer case
+    med_risk_cust = Customer(
+        customer_id="REC_TEST_MED",
+        age=30,
+        income_level="Medium",
+        number_of_subscriptions=1,
+        tenure_months=12,
+        monthly_total_spend=50.00,
+        avg_usage_hours_per_week=10.0,
+        app_switch_frequency=2,
+        customer_support_interactions=4,
+        satisfaction_score=4,
+        discount_used=False,
+        device_type="Android",
+        payment_mode="UPI"
+    )
+    res_med = calculate_prediction_for_customer(db, med_risk_cust)
+
+    assert res_med["risk_category"] == "Medium"
+    assert "Medium (Proactive)" in res_med["recommendation_desc"]
+    assert "feedback survey" in res_med["recommendation_desc"]
+    
+    # 3. Low risk customer case: high satisfaction, low support
+    low_risk_cust = Customer(
+        customer_id="REC_TEST_LOW",
+        age=30,
+        income_level="High",
+        number_of_subscriptions=1,
+        tenure_months=24,
+        monthly_total_spend=50.00,
+        avg_usage_hours_per_week=20.0,
+        app_switch_frequency=1,
+        customer_support_interactions=0,
+        satisfaction_score=9,
+        discount_used=False,
+        device_type="iOS",
+        payment_mode="Credit Card"
+    )
+    res_low = calculate_prediction_for_customer(db, low_risk_cust)
+    assert res_low["risk_category"] == "Low"
+    assert "Loyalty Reinforcement" in res_low["recommendation_type"]
+    assert "aggressive discount" in res_low["recommendation_desc"]
+
+
+

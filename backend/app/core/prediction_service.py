@@ -7,27 +7,95 @@ from backend.app.models import ChurnPrediction, PredictionHistory, Customer
 from backend.app.core.risk_score import build_risk_profile
 from backend.app.core.model_service import model_service
 
-def risk_from_probability(prob: float) -> tuple[str, int, str, str]:
+def risk_from_probability(prob: float) -> tuple[str, int]:
     if prob >= 0.7:
-        return (
-            "High",
-            1,
-            "Offer Discount",
-            "Apply 20% discount on renewal to mitigate high interaction friction.",
-        )
+        return "High", 1
     if prob >= 0.3:
-        return (
-            "Medium",
-            1,
-            "Subscription Upgrade",
-            "Provide subscription upgrade incentive for premium benefits.",
+        return "Medium", 1
+    return "Low", 0
+
+def generate_recommendation_details(
+    prob: float,
+    risk_category: str,
+    satisfaction_score: int,
+    monthly_total_spend: float,
+    tenure_months: int,
+    customer_support_interactions: int,
+    avg_usage_hours_per_week: float,
+    app_switch_frequency: int
+) -> tuple[str, str]:
+    if risk_category == "High":
+        if customer_support_interactions >= 5 and satisfaction_score <= 3:
+            rec_type = "High Touch Intervention"
+            rec_desc = (
+                f"Why this customer is at risk: Customer is experiencing severe friction with "
+                f"{customer_support_interactions} support interactions and a low satisfaction score of {satisfaction_score}/10.\n"
+                f"Recommended action: Schedule a direct follow-up call from a senior customer success lead to address open tickets.\n"
+                f"Priority: High (Urgent)\n"
+                f"Expected impact: Resolves underlying support issues and restores trust.\n"
+                f"Next step: Personal support outreach"
+            )
+        elif tenure_months <= 3:
+            rec_type = "Early-Stage Retainer"
+            rec_desc = (
+                f"Why this customer is at risk: New customer showing early warning signs of churn with "
+                f"high spend (${monthly_total_spend:.2f}) and low initial engagement.\n"
+                f"Recommended action: Send a personalized onboarding assistance email with a guide to key features.\n"
+                f"Priority: High (Urgent)\n"
+                f"Expected impact: Boosts early usage and customer confidence.\n"
+                f"Next step: Send onboarding guidance"
+            )
+        else:
+            rec_type = "Contract Win-back Offer"
+            rec_desc = (
+                f"Why this customer is at risk: High churn risk score driven by elevated usage switch behavior "
+                f"({app_switch_frequency} app switches) and declining interaction patterns.\n"
+                f"Recommended action: Offer a 20% discount on renewal or a complimentary month to secure contract extension.\n"
+                f"Priority: High (Urgent)\n"
+                f"Expected impact: Lowers immediate exit probability.\n"
+                f"Next step: Send discount offer"
+            )
+    elif risk_category == "Medium":
+        if satisfaction_score <= 5:
+            rec_type = "Feedback Loop & Nudge"
+            rec_desc = (
+                f"Why this customer is at risk: Moderate churn risk with a low satisfaction score of {satisfaction_score}/10.\n"
+                f"Recommended action: Send a feedback survey to identify primary complaints, accompanied by a plan comparison check.\n"
+                f"Priority: Medium (Proactive)\n"
+                f"Expected impact: Flags areas of dissatisfaction before they escalate.\n"
+                f"Next step: Send feedback survey"
+            )
+        elif monthly_total_spend > 100:
+            rec_type = "Premium Account Review"
+            rec_desc = (
+                f"Why this customer is at risk: Premium high-spending customer (${monthly_total_spend:.2f}) "
+                f"showing moderate engagement decline.\n"
+                f"Recommended action: Offer a proactive account check-in to optimize subscription tier benefits.\n"
+                f"Priority: Medium (Proactive)\n"
+                f"Expected impact: Protects high-value contract revenue.\n"
+                f"Next step: Monitor and review account"
+            )
+        else:
+            rec_type = "Proactive Engagement Plan"
+            rec_desc = (
+                f"Why this customer is at risk: Customer showing moderate churn signs, potentially due to low "
+                f"weekly usage ({avg_usage_hours_per_week} hrs/week).\n"
+                f"Recommended action: Trigger a usage-based email campaign highlighting new feature releases and benefits.\n"
+                f"Priority: Medium (Proactive)\n"
+                f"Expected impact: Increases product adoption and weekly engagement.\n"
+                f"Next step: Trigger feature updates newsletter"
+            )
+    else:  # Low risk
+        rec_type = "Loyalty Reinforcement"
+        rec_desc = (
+            f"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction "
+            f"({satisfaction_score}/10), and a healthy tenure ({tenure_months} months).\n"
+            f"Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.\n"
+            f"Priority: Low\n"
+            f"Expected impact: Maintained stable retention and baseline satisfaction.\n"
+            f"Next step: Monitor metrics"
         )
-    return (
-        "Low",
-        0,
-        "No Action Required",
-        "Customer behavior shows stable engagement.",
-    )
+    return rec_type, rec_desc
 
 def build_customer_prediction_input(customer) -> pd.DataFrame:
     if isinstance(customer, dict):
@@ -93,6 +161,8 @@ def calculate_prediction_for_customer(db: Session, customer) -> dict:
     satisfaction = int(customer.satisfaction_score or 3) if hasattr(customer, "satisfaction_score") else int(customer.get("satisfaction_score", 3))
     monthly_spend = float(customer.monthly_total_spend or 75.0) if hasattr(customer, "monthly_total_spend") else float(customer.get("monthly_total_spend", 75.0))
     usage = float(customer.avg_usage_hours_per_week or 15.0) if hasattr(customer, "avg_usage_hours_per_week") else float(customer.get("avg_usage_hours_per_week", 15.0))
+    tenure = int(customer.tenure_months or 12) if hasattr(customer, "tenure_months") else int(customer.get("tenure_months", 12))
+    app_switch = int(customer.app_switch_frequency or 5) if hasattr(customer, "app_switch_frequency") else int(customer.get("app_switch_frequency", 5))
 
     if model_service.is_ready:
         try:
@@ -101,7 +171,18 @@ def calculate_prediction_for_customer(db: Session, customer) -> dict:
             score = round(output["probability"] * 100.0, 2)
             score_lower = round(output["probability_confidence_lower"] * 100.0, 2)
             score_upper = round(output["probability_confidence_upper"] * 100.0, 2)
-            risk, will_cancel, rec_type, rec_desc = risk_from_probability(score / 100.0)
+            risk, will_cancel = risk_from_probability(score / 100.0)
+            
+            rec_type, rec_desc = generate_recommendation_details(
+                prob=score,
+                risk_category=risk,
+                satisfaction_score=satisfaction,
+                monthly_total_spend=monthly_spend,
+                tenure_months=tenure,
+                customer_support_interactions=support_interactions,
+                avg_usage_hours_per_week=usage,
+                app_switch_frequency=app_switch
+            )
             explainability = output["explainability"]
         except Exception as exc:
             print(f"Model prediction failed, falling back to rule-based predictor: {exc}")
@@ -116,8 +197,17 @@ def calculate_prediction_for_customer(db: Session, customer) -> dict:
             score_upper = min(100.0, score + 5.0)
             risk = profile["risk_category"]
             will_cancel = int(profile["will_cancel"])
-            rec_type = profile["recommendation_type"]
-            rec_desc = profile["recommendation_desc"]
+            
+            rec_type, rec_desc = generate_recommendation_details(
+                prob=score,
+                risk_category=risk,
+                satisfaction_score=satisfaction,
+                monthly_total_spend=monthly_spend,
+                tenure_months=tenure,
+                customer_support_interactions=support_interactions,
+                avg_usage_hours_per_week=usage,
+                app_switch_frequency=app_switch
+            )
             explainability = profile.get("explainability_json", {})
     else:
         profile = build_risk_profile(
@@ -131,8 +221,17 @@ def calculate_prediction_for_customer(db: Session, customer) -> dict:
         score_upper = min(100.0, score + 5.0)
         risk = profile["risk_category"]
         will_cancel = int(profile["will_cancel"])
-        rec_type = profile["recommendation_type"]
-        rec_desc = profile["recommendation_desc"]
+        
+        rec_type, rec_desc = generate_recommendation_details(
+            prob=score,
+            risk_category=risk,
+            satisfaction_score=satisfaction,
+            monthly_total_spend=monthly_spend,
+            tenure_months=tenure,
+            customer_support_interactions=support_interactions,
+            avg_usage_hours_per_week=usage,
+            app_switch_frequency=app_switch
+        )
         explainability = profile.get("explainability_json", {})
         
     return {

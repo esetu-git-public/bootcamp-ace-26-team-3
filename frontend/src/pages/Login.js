@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import * as apiService from '../services/api';
 
-export default function Login({ onLoginSuccess, onNavigateToSignup }) {
+export default function Login({ onLoginSuccess, onNavigateToSignup, onNotify }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -13,6 +13,13 @@ export default function Login({ onLoginSuccess, onNavigateToSignup }) {
     e.preventDefault();
     if (!username || !password) {
       setError('Please enter both username and password.');
+      if (onNotify) {
+        onNotify({
+          type: 'warning',
+          title: 'Missing credentials',
+          message: 'Please enter both username and password.'
+        });
+      }
       return;
     }
 
@@ -170,6 +177,20 @@ export default function Login({ onLoginSuccess, onNavigateToSignup }) {
                 )}
               </button>
             </form>
+
+            <div className="login-signup-prompt" style={{ marginTop: '20px', textAlign: 'center', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+              Don't have an account?{' '}
+              <a
+                href="#signup"
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (onNavigateToSignup) onNavigateToSignup();
+                }}
+                style={{ color: 'var(--color-accent)', fontWeight: '600', textDecoration: 'none' }}
+              >
+                Sign Up
+              </a>
+            </div>
 
             <div className="login-card-footer">
               Credentials issue? Contact your administrator <br />

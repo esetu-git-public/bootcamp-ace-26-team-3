@@ -7,7 +7,7 @@ const INCOME_OPTIONS = ['Low', 'Medium', 'High'];
 const DEVICE_OPTIONS = ['Android', 'iOS', 'Web'];
 const PAYMENT_OPTIONS = ['Credit Card', 'Debit Card', 'UPI', 'Wallet'];
 
-export default function CustomerDirectory({ onViewChange, onSelectCustomer, onLogout }) {
+export default function CustomerDirectory({ onViewChange, onSelectCustomer, onLogout, onNotify }) {
   const [customers, setCustomers] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -41,7 +41,7 @@ export default function CustomerDirectory({ onViewChange, onSelectCustomer, onLo
     } catch (err) {
       if (err.status === 401) {
         if (onLogout) {
-          onLogout();
+          onLogout({ silent: true });
         } else {
           localStorage.removeItem('access_token');
           onViewChange('login');

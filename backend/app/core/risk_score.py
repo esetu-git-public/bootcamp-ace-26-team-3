@@ -16,7 +16,7 @@ def calculate_default_risk_score(
     spend = float(monthly_total_spend or 0.0)
     usage = float(avg_usage_hours_per_week or 0.0)
 
-    score = 30.0 + (support * 15.0) - (satisfaction * 10.0) + (spend * 0.20) - (usage * 0.8)
+    score = 30.0 + (support * 15.0) - (satisfaction * 10.0) + (spend * 0.02) - (usage * 0.8)
     return _normalize_score(score)
 
 

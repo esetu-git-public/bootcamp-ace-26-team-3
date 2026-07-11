@@ -333,30 +333,29 @@ async def predict_single(
     current_user: str = Depends(get_current_user)
 ):
     try:
-        # Check if customer exists in database
-        query = text("SELECT * FROM customers WHERE customer_id = :customer_id")
-        customer = db.execute(query, {"customer_id": customer_id}).fetchone()
+        from ..models import Customer
+        from ..core.prediction_service import calculate_prediction_for_customer, save_customer_prediction
         
-        # Determine features (either from db or fallback values)
+        # Check if customer exists in database
+        customer = db.query(Customer).filter(Customer.customer_id == customer_id).first()
+        
         if customer:
-            support_interactions = customer.customer_support_interactions
-            satisfaction = customer.satisfaction_score
-            usage = float(customer.avg_usage_hours_per_week)
-            monthly_spend = float(customer.monthly_total_spend)
+            pred_data = calculate_prediction_for_customer(db, customer)
+            db_prediction = save_customer_prediction(db, customer_id, pred_data)
             
-            input_data = {
-                "income_level": customer.income_level,
-                "satisfaction_score": customer.satisfaction_score,
-                "discount_used": customer.discount_used,
-                "age": customer.age,
-                "number_of_subscriptions": customer.number_of_subscriptions,
-                "tenure_months": customer.tenure_months,
-                "monthly_total_spend": float(customer.monthly_total_spend),
-                "avg_usage_hours_per_week": float(customer.avg_usage_hours_per_week),
-                "app_switch_frequency": customer.app_switch_frequency,
-                "customer_support_interactions": customer.customer_support_interactions,
-                "device_type": customer.device_type,
-                "payment_mode": customer.payment_mode,
+            return {
+                "customer_id": customer_id,
+                "churn_probability": round(pred_data["churn_probability"], 2),
+                "probability_confidence_lower": pred_data["probability_confidence_lower"],
+                "probability_confidence_upper": pred_data["probability_confidence_upper"],
+                "risk_category": pred_data["risk_category"],
+                "will_cancel": pred_data["will_cancel"],
+                "explainability": pred_data["explainability"],
+                "recommendation_type": pred_data["recommendation_type"],
+                "recommendation_desc": pred_data["recommendation_desc"],
+                "prediction_id": db_prediction.prediction_id,
+                "predicted_at": db_prediction.predicted_at,
+                "model_version": db_prediction.model_version
             }
         else:
             # Check if valid mock ID
@@ -374,127 +373,83 @@ async def predict_single(
                     detail=f"Customer with ID {customer_id} not found."
                 )
             
-            support_interactions = 3 if row["risk_category"] == "High" else 1
-            satisfaction = row["satisfaction_score"]
-            usage = 14.5
-            monthly_spend = row["monthly_total_spend"]
+            row["customer_id"] = customer_id
+            pred_data = calculate_prediction_for_customer(db, row)
             
-            input_data = {
-                "income_level": row["income_level"],
-                "satisfaction_score": row["satisfaction_score"],
-                "discount_used": False,
-                "age": row["age"],
-                "number_of_subscriptions": 2,
-                "tenure_months": row["tenure_months"],
-                "monthly_total_spend": float(row["monthly_total_spend"]),
-                "avg_usage_hours_per_week": 14.5,
-                "app_switch_frequency": 15,
-                "customer_support_interactions": support_interactions,
-                "device_type": row["device_type"],
-                "payment_mode": row["payment_mode"],
+            return {
+                "customer_id": customer_id,
+                "churn_probability": round(pred_data["churn_probability"], 2),
+                "probability_confidence_lower": pred_data["probability_confidence_lower"],
+                "probability_confidence_upper": pred_data["probability_confidence_upper"],
+                "risk_category": pred_data["risk_category"],
+                "will_cancel": pred_data["will_cancel"],
+                "explainability": pred_data["explainability"],
+                "recommendation_type": pred_data["recommendation_type"],
+                "recommendation_desc": pred_data["recommendation_desc"],
+                "prediction_id": None,
+                "predicted_at": datetime.now(timezone.utc),
+                "model_version": pred_data["model_version"]
             }
-
-        # A/B Testing Logic
-        model_version_to_use = model_service.get_model_version_for_request(customer_id)
-
-        if not model_version_to_use:
-             raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="No model is currently available to serve predictions."
-            )
-
-        if model_service.is_ready:
-            try:
-                df_input = _build_prediction_input(input_data)
-                output = model_service.predict_and_explain(df_input, model_version=model_version_to_use)
-                score = round(output["probability"] * 100.0, 2)
-                score_lower = round(output["probability_confidence_lower"] * 100.0, 2)
-                score_upper = round(output["probability_confidence_upper"] * 100.0, 2)
-                risk, will_cancel, rec_type, rec_desc = _risk_from_probability(score / 100.0)
-                explainability = output["explainability"]
-            except Exception as exc:
-                print(f"Model prediction failed, falling back to rule-based predictor: {exc}")
-                profile = build_risk_profile(
-                    customer_support_interactions=support_interactions,
-                    satisfaction_score=satisfaction,
-                    monthly_total_spend=monthly_spend,
-                    avg_usage_hours_per_week=usage,
-                )
-                score = profile["risk_score"]
-                score_lower = max(0, score - 5.0)  # ±5% confidence bounds for rule-based
-                score_upper = min(100, score + 5.0)
-                risk = profile["risk_category"]
-                will_cancel = profile["will_cancel"]
-                rec_type = profile["recommendation_type"]
-                rec_desc = profile["recommendation_desc"]
-                explainability = profile.get("explainability_json", {})
-        else:
-            profile = build_risk_profile(
-                customer_support_interactions=support_interactions,
-                satisfaction_score=satisfaction,
-                monthly_total_spend=monthly_spend,
-                avg_usage_hours_per_week=usage,
-            )
-            score = profile["risk_score"]
-            score_lower = max(0, score - 5.0)  # ±5% confidence bounds for rule-based
-            score_upper = min(100, score + 5.0)
-            risk = profile["risk_category"]
-            will_cancel = profile["will_cancel"]
-            rec_type = profile["recommendation_type"]
-            rec_desc = profile["recommendation_desc"]
-            explainability = profile.get("explainability_json", {})
-
-        # Save to database if customer is database-backed
-        if customer:
-            now_time = datetime.now(timezone.utc)
-            insert_query = text("""
-                INSERT INTO churn_predictions 
-                (customer_id, churn_probability, risk_category, will_cancel, explainability_json, recommendation_type, recommendation_desc, predicted_at, model_version)
-                VALUES (:cust_id, :prob, :risk, :cancel, :explain, :rec_type, :rec_desc, :predicted_at, :model_version)
-            """)
-            db.execute(insert_query, {
-                "cust_id": customer_id,
-                "prob": score,
-                "risk": risk,
-                "cancel": will_cancel,
-                "explain": json.dumps(explainability) if isinstance(explainability, dict) else explainability,
-                "rec_type": rec_type,
-                "rec_desc": rec_desc,
-                "predicted_at": now_time,
-                "model_version": model_version_to_use
-            })
-            
-            history_query = text("""
-                INSERT INTO prediction_history 
-                (customer_id, risk_score, risk_category, prediction_result, evaluated_at)
-                VALUES (:cust_id, :risk_score, :risk_cat, :pred_res, :evaluated_at)
-            """)
-            db.execute(history_query, {
-                "cust_id": customer_id,
-                "risk_score": score,
-                "risk_cat": risk,
-                "pred_res": will_cancel,
-                "evaluated_at": now_time
-            })
-            db.commit()
-
-        return {
-            "customer_id": customer_id,
-            "churn_probability": round(score, 2),
-            "probability_confidence_lower": score_lower,
-            "probability_confidence_upper": score_upper,
-            "risk_category": risk,
-            "will_cancel": will_cancel,
-            "explainability": explainability,
-            "recommendation_type": rec_type,
-            "recommendation_desc": rec_desc
-        }
     except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Inference pipeline execution failed: {str(e)}"
         )
 
+@router.post("/backfill-missing", status_code=status.HTTP_200_OK)
+async def backfill_missing_predictions(
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
+    try:
+        from ..core.prediction_service import ensure_all_customers_have_predictions
+        res = ensure_all_customers_have_predictions(db)
+        return res
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Backfill execution failed: {str(e)}"
+        )
+
+@router.post("/recalculate-all", status_code=status.HTTP_200_OK)
+async def recalculate_all_predictions(
+    customer_id: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
+    try:
+        from ..models import Customer
+        from ..core.prediction_service import calculate_prediction_for_customer, save_customer_prediction
+
+        query = db.query(Customer)
+        if customer_id:
+            query = query.filter(Customer.customer_id == customer_id)
+        customers = query.all()
+
+        created_count = 0
+        failed_ids = []
+
+        for customer in customers:
+            try:
+                pred_data = calculate_prediction_for_customer(db, customer)
+                save_customer_prediction(db, customer.customer_id, pred_data)
+                created_count += 1
+            except Exception:
+                failed_ids.append(customer.customer_id)
+
+        return {
+            "total_checked": len(customers),
+            "predictions_created": created_count,
+            "failed_customers": failed_ids,
+            "status": "success" if not failed_ids else "partial_success"
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Recalculation failed: {str(e)}"
+        )
 @router.post("/bulk", response_model=BulkPredictionUploadResponse, status_code=status.HTTP_202_ACCEPTED)
 async def predict_bulk(
     background_tasks: BackgroundTasks,

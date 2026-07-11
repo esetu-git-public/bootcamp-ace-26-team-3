@@ -14,6 +14,7 @@ function App() {
   const [token, setToken] = useState(localStorage.getItem('access_token'));
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [notifications, setNotifications] = useState([]);
+  const [predictionRefreshToken, setPredictionRefreshToken] = useState(0);
 
   const addNotification = useCallback((notification) => {
     const id = notification.id || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -170,7 +171,7 @@ function App() {
           />
         )}
         {view === 'dashboard' && (
-          <AnalyticsDashboard onViewChange={setView} onSelectCustomer={setSelectedCustomerId} onLogout={handleLogout} onNotify={addNotification} />
+          <AnalyticsDashboard onViewChange={setView} onSelectCustomer={setSelectedCustomerId} onLogout={handleLogout} onNotify={addNotification} predictionRefreshToken={predictionRefreshToken} />
         )}
         {view === 'directory' && (
           <CustomerDirectory
@@ -178,6 +179,7 @@ function App() {
             onSelectCustomer={setSelectedCustomerId}
             onLogout={handleLogout}
             onNotify={addNotification}
+            predictionRefreshToken={predictionRefreshToken}
           />
         )}
         {view === 'profile' && (
@@ -187,6 +189,7 @@ function App() {
             onNotify={addNotification}
             selectedCustomerId={selectedCustomerId}
             setSelectedCustomerId={setSelectedCustomerId}
+            onPredictionRecalculated={() => setPredictionRefreshToken(prev => prev + 1)}
           />
         )}
         {view === 'model' && (

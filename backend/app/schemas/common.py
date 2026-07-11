@@ -135,6 +135,9 @@ class CustomerListRow(BaseModel):
     risk_category: Optional[str] = None
     will_cancel: Optional[int] = None
     recommendation_type: Optional[str] = None
+    prediction_id: Optional[int] = None
+    predicted_at: Optional[datetime] = None
+    model_version: Optional[str] = None
 
 
 class PaginatedCustomersResponse(BaseModel):
@@ -165,6 +168,8 @@ class CustomerProfileResponse(CustomerBase):
     recommendation_type: Optional[str] = None
     recommendation_desc: Optional[str] = None
     predicted_at: Optional[datetime] = None
+    prediction_id: Optional[int] = None
+    model_version: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -179,6 +184,9 @@ class SinglePredictionResponse(BaseModel):
     explainability: Optional[Dict[str, float]] = Field(None, description="SHAP feature importance scores")
     recommendation_type: str
     recommendation_desc: str
+    prediction_id: Optional[int] = None
+    predicted_at: Optional[datetime] = None
+    model_version: Optional[str] = None
 
 
 class BulkPredictionUploadResponse(BaseModel):

@@ -31,7 +31,7 @@ def create_customer_predictions_view(engine: Engine, db: Session) -> None:
         WITH latest_predictions AS (
             SELECT
                 p.*,
-                ROW_NUMBER() OVER(PARTITION BY p.customer_id ORDER BY p.predicted_at DESC) as rn
+                ROW_NUMBER() OVER(PARTITION BY p.customer_id ORDER BY p.predicted_at DESC, p.prediction_id DESC) as rn
             FROM churn_predictions p
         )
         SELECT
@@ -56,7 +56,8 @@ def create_customer_predictions_view(engine: Engine, db: Session) -> None:
             lp.explainability_json,
             lp.recommendation_type,
             lp.recommendation_desc,
-            lp.predicted_at
+            lp.predicted_at,
+            lp.model_version
         FROM customers c
         LEFT JOIN latest_predictions lp ON c.customer_id = lp.customer_id AND lp.rn = 1
     """))

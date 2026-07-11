@@ -90,7 +90,7 @@ function StatPill({ label, value, color = '#38bdf8', icon }) {
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export default function CustomerProfile({ onViewChange, onLogout, onNotify, selectedCustomerId, setSelectedCustomerId }) {
+export default function CustomerProfile({ onViewChange, onLogout, onNotify, selectedCustomerId, setSelectedCustomerId, onPredictionRecalculated }) {
   const [customerId, setCustomerId]   = useState(selectedCustomerId || '');
   const [searchId,   setSearchId]     = useState(selectedCustomerId || '');
   const [customer,   setCustomer]     = useState(null);
@@ -140,7 +140,10 @@ export default function CustomerProfile({ onViewChange, onLogout, onNotify, sele
     try {
       const data = await mlModel.getSinglePrediction(customerId);
       setPrediction(data);
-      fetchPredictionHistory(customerId);
+      if (onPredictionRecalculated) {
+        onPredictionRecalculated();
+      }
+      await fetchCustomerDetails(customerId);
       if (onNotify) {
         onNotify({
           type: 'success',
@@ -385,7 +388,7 @@ export default function CustomerProfile({ onViewChange, onLogout, onNotify, sele
                 >
                   {predicting
                     ? <><span style={S.btnSpinner} />Calculating Churn Model…</>
-                    : <>⚡ Generate Model Prediction</>
+                    : <>⚡ Recalculate Prediction</>
                   }
                 </button>
               </div>

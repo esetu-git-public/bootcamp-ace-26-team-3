@@ -3,8 +3,17 @@ import * as apiService from '../services/api';
 import { clampPercent, formatPercent } from '../utils/percent';
 
 const asArray = (value) => (Array.isArray(value) ? value : []);
+const riskPriority = { High: 1, Medium: 2, Low: 3, Pending: 4 };
+const sortCustomersByRisk = (rows) =>
+  [...asArray(rows)].sort((a, b) => {
+    const riskDiff = (riskPriority[a.risk_category] || 4) - (riskPriority[b.risk_category] || 4);
+    if (riskDiff !== 0) return riskDiff;
+    const probabilityDiff = Number(b.churn_probability || 0) - Number(a.churn_probability || 0);
+    if (probabilityDiff !== 0) return probabilityDiff;
+    return String(a.customer_id || '').localeCompare(String(b.customer_id || ''), undefined, { numeric: true });
+  });
 
-function AnalyticsDashboard({ onViewChange, onSelectCustomer, onLogout }) {
+function AnalyticsDashboard({ onViewChange, onSelectCustomer, onLogout, onNotify, predictionRefreshToken }) {
   const [kpis, setKpis] = useState(null);
   const [riskDistribution, setRiskDistribution] = useState([]);
   const [incomeData, setIncomeData] = useState([]);
@@ -46,7 +55,7 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, onLogout }) {
       apiService.getChurnByTenure(),
       apiService.getChurnBySatisfaction(),
       apiService.getCustomerSegmentation(),
-      apiService.getCustomers(1, 6),
+      apiService.getCustomers(1, 6, { sortBy: 'risk_desc' }),
       apiService.getChurnTrends(),
     ])
       .then(([
@@ -72,7 +81,7 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, onLogout }) {
         setTenureData(asArray(tenureDataResult));
         setSatisfactionData(asArray(satisfactionDataResult));
         setSegmentData(asArray(segmentDataResult));
-        setCustomerRows(asArray(customersData.results));
+        setCustomerRows(sortCustomersByRisk(customersData.results));
         setTrendData(asArray(trendDataResult));
       })
       .catch((err) => {
@@ -85,8 +94,7 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, onLogout }) {
       })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  // eslint-disable-next-line
-  }, []); // Run once on mount — onLogout accessed via ref
+  }, [predictionRefreshToken]); // Run on mount and when predictions are recalculated
 
   useEffect(() => {
     if (!bulkJob?.job_id || ['COMPLETED', 'FAILED'].includes(bulkJob.status)) {

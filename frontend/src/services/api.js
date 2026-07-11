@@ -194,6 +194,7 @@ export async function getCustomers(page = 1, limit = 20, filters = {}) {
   appendFilter('device_types', filters.deviceType || filters.deviceTypes);
   appendFilter('payment_modes', filters.paymentMode || filters.paymentModes);
   appendFilter('risk_categories', filters.riskCategory || filters.riskCategories);
+  if (filters.sortBy) params.append('sort_by', filters.sortBy);
 
   return request(`/customers?${params.toString()}`);
 }

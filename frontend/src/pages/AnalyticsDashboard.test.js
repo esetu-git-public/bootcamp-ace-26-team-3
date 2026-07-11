@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import AnalyticsDashboard from './AnalyticsDashboard';
 
@@ -93,12 +93,31 @@ describe('AnalyticsDashboard', () => {
     expect(screen.getByText('5%')).toBeInTheDocument();
   });
 
-  it('renders the high-risk customer queue', async () => {
+  it('renders the high-risk customer queue ordered by risk level', async () => {
+    apiService.getCustomers.mockResolvedValue({
+      results: [
+        { customer_id: '1001', risk_category: 'Low', churn_probability: 10, monthly_total_spend: 80, tenure_months: 8, satisfaction_score: 6 },
+        { customer_id: '1002', risk_category: 'Medium', churn_probability: 60, monthly_total_spend: 95, tenure_months: 4, satisfaction_score: 4 },
+        { customer_id: '1003', risk_category: 'High', churn_probability: 80, monthly_total_spend: 120, tenure_months: 2, satisfaction_score: 2 },
+        { customer_id: '1004', risk_category: 'High', churn_probability: 90, monthly_total_spend: 150, tenure_months: 1, satisfaction_score: 1 },
+      ]
+    });
+
     render(<AnalyticsDashboard />);
-    expect(await screen.findByText('1001')).toBeInTheDocument();
-    expect(screen.getByText('$80.00')).toBeInTheDocument();
-    expect(screen.getByText('8 months')).toBeInTheDocument();
-    expect(screen.getByText('6')).toBeInTheDocument();
+
+    expect(await screen.findByText('1004')).toBeInTheDocument();
+    expect(apiService.getCustomers).toHaveBeenCalledWith(1, 6, { sortBy: 'risk_desc' });
+
+    const customerIds = screen.getAllByRole('row').slice(1).map((row) =>
+      within(row).getAllByRole('cell')[0].textContent
+    );
+    expect(customerIds).toEqual([
+      expect.stringContaining('1004'),
+      expect.stringContaining('1003'),
+      expect.stringContaining('1002'),
+      expect.stringContaining('1001'),
+    ]);
+    expect(screen.getByText('$150.00')).toBeInTheDocument();
   });
 
   it('renders churn by income from the API', async () => {

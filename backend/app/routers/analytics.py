@@ -26,8 +26,8 @@ async def get_risk_distribution(db: Session = Depends(get_db), current_user: str
             GROUP BY risk_category;
         """)
         results = db.execute(query).fetchall()
-        if not results:
-            raise Exception("No data")
+        if not results or not results[0][0]:
+            return []
         return [{"risk_category": r.risk_category, "customer_count": r.customer_count, "percentage": float(r.percentage)} for r in results]
     except Exception:
         return [
@@ -45,8 +45,8 @@ async def get_churn_by_income(db: Session = Depends(get_db), current_user: str =
             FROM v_customer_predictions GROUP BY income_level;
         """)
         results = db.execute(query).fetchall()
-        if not results:
-            raise Exception("No data")
+        if not results or not results[0][0]:
+            return []
         return [{
             "income_level": r.income_level, 
             "total_customers": r.total_customers, 
@@ -69,8 +69,8 @@ async def get_churn_by_device(db: Session = Depends(get_db), current_user: str =
             FROM v_customer_predictions GROUP BY device_type;
         """)
         results = db.execute(query).fetchall()
-        if not results:
-            raise Exception("No data")
+        if not results or not results[0][0]:
+            return []
         return [{
             "device_type": r.device_type, 
             "total_customers": r.total_customers, 
@@ -94,8 +94,8 @@ async def get_churn_by_payment(db: Session = Depends(get_db), current_user: str 
             FROM v_customer_predictions GROUP BY payment_mode;
         """)
         results = db.execute(query).fetchall()
-        if not results:
-            raise Exception("No data")
+        if not results or not results[0][0]:
+            return []
         return [{
             "payment_mode": r.payment_mode, 
             "total_customers": r.total_customers, 
@@ -136,8 +136,8 @@ async def get_churn_by_spend(db: Session = Depends(get_db), current_user: str = 
             END;
         """)
         results = db.execute(query).fetchall()
-        if not results:
-            raise Exception("No data")
+        if not results or not results[0][0]:
+            return []
         return [{
             "spend_bucket": r.spend_bucket, 
             "total_customers": r.total_customers, 
@@ -177,8 +177,8 @@ async def get_churn_by_tenure(db: Session = Depends(get_db), current_user: str =
             END;
         """)
         results = db.execute(query).fetchall()
-        if not results:
-            raise Exception("No data")
+        if not results or not results[0][0]:
+            return []
         return [{
             "tenure_bucket": r.tenure_bucket, 
             "total_customers": r.total_customers, 
@@ -203,8 +203,8 @@ async def get_churn_by_satisfaction(db: Session = Depends(get_db), current_user:
             FROM v_customer_predictions GROUP BY satisfaction_score ORDER BY satisfaction_score DESC;
         """)
         results = db.execute(query).fetchall()
-        if not results:
-            raise Exception("No data")
+        if not results or not results[0][0]:
+            return []
         return [{
             "satisfaction_score": r.satisfaction_score, 
             "total_customers": r.total_customers, 
@@ -246,8 +246,8 @@ async def get_customer_segmentation(db: Session = Depends(get_db), current_user:
             ORDER BY average_churn_risk DESC;
         """)
         results = db.execute(query).fetchall()
-        if not results:
-            raise Exception("No data")
+        if not results or not results[0][0]:
+            return []
         return [{
             "segment": r.segment, 
             "customer_count": r.customer_count, 

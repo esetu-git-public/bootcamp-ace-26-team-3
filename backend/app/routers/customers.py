@@ -2,10 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import bindparam, text
 from typing import Any, Dict, List, Optional, cast
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from ..database import get_db
 from ..schemas import PaginatedCustomersResponse, CustomerProfileResponse, PredictionHistoryItem
 from .auth import get_current_user
+import json
 
 router = APIRouter(prefix="/customers", tags=["Customer Management"])
 
@@ -62,40 +63,49 @@ def _filter_mock_customer_rows(
 
     return sorted(filtered, key=lambda row: row.get("churn_probability") or 0.0, reverse=True)
 
+def is_valid_mock_id(customer_id: str) -> bool:
+    return str(customer_id) in {"1", "2", "3", "4", "5"}
+
 # Mock single customer fallback helper
 def get_mock_customer_profile(customer_id: str):
+    mock_rows = _mock_customer_rows()
+    row = next((r for r in mock_rows if str(r["customer_id"]) == str(customer_id)), None)
+    if not row:
+        row = mock_rows[0]
+        
     return {
-        "customer_id": customer_id,
-        "age": 34,
-        "income_level": "Medium",
-        "number_of_subscriptions": 2,
-        "tenure_months": 8,
-        "monthly_total_spend": 79.50,
+        "customer_id": str(customer_id),
+        "age": row["age"],
+        "income_level": row["income_level"],
+        "number_of_subscriptions": 2 if str(customer_id) != "3" else 4,
+        "tenure_months": row["tenure_months"],
+        "monthly_total_spend": row["monthly_total_spend"],
         "avg_usage_hours_per_week": 14.5,
         "app_switch_frequency": 15,
-        "customer_support_interactions": 3,
-        "satisfaction_score": 2,
+        "customer_support_interactions": 3 if row["risk_category"] == "High" else 1,
+        "satisfaction_score": row["satisfaction_score"],
         "discount_used": False,
-        "device_type": "Android",
-        "payment_mode": "UPI",
-        "created_at": datetime.utcnow(),
-        "churn_probability": 89.00,
-        "probability_confidence_lower": 84.50,
-        "probability_confidence_upper": 93.50,
-        "risk_category": "High",
-        "will_cancel": 1,
+        "device_type": row["device_type"],
+        "payment_mode": row["payment_mode"],
+        "created_at": datetime.now(timezone.utc) - timedelta(days=row["tenure_months"] * 30),
+        "churn_probability": row["churn_probability"],
+        "probability_confidence_lower": max(0.0, row["churn_probability"] - 5.0),
+        "probability_confidence_upper": min(100.0, row["churn_probability"] + 5.0),
+        "risk_category": row["risk_category"],
+        "will_cancel": row["will_cancel"],
         "explainability": {
-            "Customer_Support_Interactions": 0.42,
-            "Satisfaction_Score": 0.38,
+            "Customer_Support_Interactions": 0.42 if row["risk_category"] == "High" else 0.05,
+            "Satisfaction_Score": 0.38 if row["satisfaction_score"] < 3 else 0.10,
             "Avg_Usage_Hours_Per_Week": 0.22,
             "Tenure_Months": 0.15,
             "monthly_total_spend": -0.10,
             "Age": -0.05
         },
-        "recommendation_type": "Offer Discount",
-        "recommendation_desc": "Customer has high spend ($79.50) but poor satisfaction (2/10) and low weekly usage. Recommend calling customer support or offering a 20% discount offer for renewal.",
-        "predicted_at": datetime.utcnow()
+        "recommendation_type": row["recommendation_type"],
+        "recommendation_desc": f"Mock recommendation for customer {customer_id}: {row['recommendation_type']}.",
+        "predicted_at": datetime.now(timezone.utc)
     }
+
 
 
 def _expand_list_params(query, params: Dict[str, Any]):
@@ -155,7 +165,7 @@ async def get_customers(
         rows = []
         if total > 0:
             # Run paginated list query
-            query_str += " ORDER BY churn_probability DESC LIMIT :limit OFFSET :offset"
+            query_str += " ORDER BY cast(customer_id as integer) ASC LIMIT :limit OFFSET :offset"
             results = db.execute(_expand_list_params(text(query_str), params), params).fetchall()
             
             for r in results:
@@ -211,8 +221,12 @@ async def get_customer_profile(
         result = db.execute(query, {"customer_id": customer_id}).fetchone()
         
         if not result:
-            # Fallback to realistic mock customer
-            return get_mock_customer_profile(customer_id)
+            if is_valid_mock_id(customer_id):
+                return get_mock_customer_profile(customer_id)
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Customer with ID {customer_id} not found."
+            )
             
         return {
             "customer_id": result.customer_id,
@@ -234,13 +248,24 @@ async def get_customer_profile(
             "probability_confidence_upper": min(100.0, float(result.churn_probability or 0.0) + 5.0) if result.churn_probability else None,
             "risk_category": result.risk_category,
             "will_cancel": result.will_cancel,
-            "explainability": result.explainability_json,
+            "explainability": (
+                json.loads(result.explainability_json)
+                if isinstance(result.explainability_json, str)
+                else result.explainability_json
+            ),
             "recommendation_type": result.recommendation_type,
             "recommendation_desc": result.recommendation_desc,
             "predicted_at": result.predicted_at
         }
-    except Exception:
-        return get_mock_customer_profile(customer_id)
+    except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
+        if is_valid_mock_id(customer_id):
+            return get_mock_customer_profile(customer_id)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Customer with ID {customer_id} not found."
+        )
 
 @router.get("/{customer_id}/history", response_model=List[PredictionHistoryItem])
 async def get_customer_prediction_history(
@@ -261,9 +286,9 @@ async def get_customer_prediction_history(
         } for r in results]
     except Exception:
         # Fallback Mock history
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
         return [
-            {"history_id": 105, "risk_score": 89.00, "risk_category": "High", "prediction_result": 1, "evaluated_at": datetime.utcnow()},
-            {"history_id": 92, "risk_score": 65.20, "risk_category": "Medium", "prediction_result": 1, "evaluated_at": datetime.utcnow() - timedelta(days=30)},
-            {"history_id": 71, "risk_score": 45.00, "risk_category": "Medium", "prediction_result": 0, "evaluated_at": datetime.utcnow() - timedelta(days=60)}
+            {"history_id": 105, "risk_score": 89.00, "risk_category": "High", "prediction_result": 1, "evaluated_at": datetime.now(timezone.utc)},
+            {"history_id": 92, "risk_score": 65.20, "risk_category": "Medium", "prediction_result": 1, "evaluated_at": datetime.now(timezone.utc) - timedelta(days=30)},
+            {"history_id": 71, "risk_score": 45.00, "risk_category": "Medium", "prediction_result": 0, "evaluated_at": datetime.now(timezone.utc) - timedelta(days=60)}
         ]

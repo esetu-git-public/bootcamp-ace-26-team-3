@@ -1,5 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import * as apiService from '../services/api';
+import { formatPercent } from '../utils/percent';
+
+const RISK_OPTIONS = ['Low', 'Medium', 'High'];
+const INCOME_OPTIONS = ['Low', 'Medium', 'High'];
+const DEVICE_OPTIONS = ['Android', 'iOS', 'Web'];
+const PAYMENT_OPTIONS = ['Credit Card', 'Debit Card', 'UPI', 'Wallet'];
 
 export default function CustomerDirectory({ onViewChange, onSelectCustomer, onLogout }) {
   const [customers, setCustomers] = useState([]);
@@ -11,6 +17,7 @@ export default function CustomerDirectory({ onViewChange, onSelectCustomer, onLo
 
   // Filters State
   const [searchId, setSearchId] = useState('');
+  const [debouncedSearchId, setDebouncedSearchId] = useState('');
   const [selectedRisk, setSelectedRisk] = useState([]);
   const [selectedIncome, setSelectedIncome] = useState([]);
   const [selectedDevice, setSelectedDevice] = useState([]);
@@ -22,7 +29,7 @@ export default function CustomerDirectory({ onViewChange, onSelectCustomer, onLo
     setError('');
     try {
       const data = await apiService.getCustomers(page, limit, {
-        searchId,
+        searchId: debouncedSearchId,
         willCancel,
         riskCategories: selectedRisk,
         incomeLevels: selectedIncome,
@@ -34,7 +41,7 @@ export default function CustomerDirectory({ onViewChange, onSelectCustomer, onLo
     } catch (err) {
       if (err.status === 401) {
         if (onLogout) {
-          onLogout({ silent: true });
+          onLogout();
         } else {
           localStorage.removeItem('access_token');
           onViewChange('login');
@@ -48,8 +55,27 @@ export default function CustomerDirectory({ onViewChange, onSelectCustomer, onLo
   };
 
   useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchId(searchId.trim());
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchId]);
+
+  useEffect(() => {
     fetchCustomers();
-  }, [page, searchId, selectedRisk, selectedIncome, selectedDevice, selectedPayment, willCancel]);
+  }, [page, debouncedSearchId, selectedRisk, selectedIncome, selectedDevice, selectedPayment, willCancel]);
+
+  const activeFilterCount = useMemo(() => {
+    return [
+      debouncedSearchId,
+      willCancel !== null,
+      ...selectedRisk,
+      ...selectedIncome,
+      ...selectedDevice,
+      ...selectedPayment
+    ].filter(Boolean).length;
+  }, [debouncedSearchId, willCancel, selectedRisk, selectedIncome, selectedDevice, selectedPayment]);
 
   const handleFilterToggle = (list, setList, value) => {
     setPage(1);
@@ -83,6 +109,7 @@ export default function CustomerDirectory({ onViewChange, onSelectCustomer, onLo
         <div style={styles.headerCard}>
           <span style={styles.headerCardLabel}>matched records</span>
           <strong style={styles.headerCardValue}>{total.toLocaleString()}</strong>
+          <span style={styles.headerCardMeta}>{activeFilterCount} active filter{activeFilterCount === 1 ? '' : 's'}</span>
         </div>
       </header>
 
@@ -98,7 +125,7 @@ export default function CustomerDirectory({ onViewChange, onSelectCustomer, onLo
             <label style={styles.filterLabel}>Customer ID Search</label>
             <input
               type="text"
-              placeholder="e.g., C10239"
+              placeholder="e.g., 1"
               value={searchId}
               onChange={(e) => { setSearchId(e.target.value); setPage(1); }}
               style={styles.searchInput}
@@ -107,7 +134,7 @@ export default function CustomerDirectory({ onViewChange, onSelectCustomer, onLo
 
           <div style={styles.filterSection}>
             <label style={styles.filterLabel}>Churn Risk Category</label>
-            {['Low', 'Medium', 'High'].map(risk => (
+            {RISK_OPTIONS.map(risk => (
               <label key={risk} style={styles.checkboxLabel}>
                 <input
                   type="checkbox"
@@ -122,7 +149,7 @@ export default function CustomerDirectory({ onViewChange, onSelectCustomer, onLo
 
           <div style={styles.filterSection}>
             <label style={styles.filterLabel}>Income Level</label>
-            {['Low', 'Medium', 'High'].map(income => (
+            {INCOME_OPTIONS.map(income => (
               <label key={income} style={styles.checkboxLabel}>
                 <input
                   type="checkbox"
@@ -137,7 +164,7 @@ export default function CustomerDirectory({ onViewChange, onSelectCustomer, onLo
 
           <div style={styles.filterSection}>
             <label style={styles.filterLabel}>Device Type</label>
-            {['Android', 'iOS', 'Web', 'Mobile', 'Tablet', 'Desktop', 'Smart TV'].map(device => (
+            {DEVICE_OPTIONS.map(device => (
               <label key={device} style={styles.checkboxLabel}>
                 <input
                   type="checkbox"
@@ -152,7 +179,7 @@ export default function CustomerDirectory({ onViewChange, onSelectCustomer, onLo
 
           <div style={styles.filterSection}>
             <label style={styles.filterLabel}>Payment Mode</label>
-            {['Credit Card', 'Debit Card', 'Net Banking', 'UPI', 'Wallet', 'Digital Wallet'].map(mode => (
+            {PAYMENT_OPTIONS.map(mode => (
               <label key={mode} style={styles.checkboxLabel}>
                 <input
                   type="checkbox"
@@ -237,7 +264,7 @@ export default function CustomerDirectory({ onViewChange, onSelectCustomer, onLo
                         <td style={styles.td}>{row.satisfaction_score}/10</td>
                         <td style={styles.td}>
                           <span style={styles.riskBadge(row.risk_category)}>
-                            {row.risk_category} ({row.churn_probability.toFixed(1)}%)
+                            {row.risk_category} ({formatPercent(row.churn_probability)})
                           </span>
                         </td>
                         <td style={styles.td}>
@@ -262,7 +289,7 @@ export default function CustomerDirectory({ onViewChange, onSelectCustomer, onLo
             {!loading && total > 0 && (
               <div style={styles.paginationRow}>
                 <span style={styles.pageInfo}>
-                  Page {page} of {totalPages}
+                  Page {page} of {totalPages} - Showing {customers.length} of {total.toLocaleString()}
                 </span>
                 <div style={styles.paginationButtons}>
                   <button
@@ -298,6 +325,7 @@ const styles = {
   headerCard: { background: 'rgba(17,24,39,0.85)', border: '1px solid rgba(255,255,255,0.08)', padding: '16px 20px', borderRadius: '16px', minWidth: '200px', display: 'flex', flexDirection: 'column', gap: '4px', textAlign: 'right' },
   headerCardLabel: { color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.14em', fontSize: '0.7rem' },
   headerCardValue: { fontSize: '2rem', lineHeight: 1.05, margin: 0 },
+  headerCardMeta: { color: '#cbd5e1', fontSize: '0.82rem' },
   mainLayout: { display: 'grid', gridTemplateColumns: '280px 1fr', gap: '24px', alignItems: 'start' },
   sidebar: { background: 'rgba(17,24,39,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '18px', position: 'sticky', top: '24px' },
   sidebarHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '10px' },

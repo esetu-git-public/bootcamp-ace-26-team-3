@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as apiService from '../services/api';
+import { clampPercent, formatPercent } from '../utils/percent';
 
 const asArray = (value) => (Array.isArray(value) ? value : []);
 
-function AnalyticsDashboard({ onViewChange, onLogout, onNotify }) {
+function AnalyticsDashboard({ onViewChange, onLogout }) {
   const [kpis, setKpis] = useState(null);
   const [riskDistribution, setRiskDistribution] = useState([]);
   const [incomeData, setIncomeData] = useState([]);
@@ -21,9 +22,15 @@ function AnalyticsDashboard({ onViewChange, onLogout, onNotify }) {
   const [bulkError, setBulkError] = useState('');
   const [bulkJob, setBulkJob] = useState(null);
   const [bulkPreview, setBulkPreview] = useState([]);
-  const backendOrigin = apiService.getBackendOrigin();
+  const [reportDownloading, setReportDownloading] = useState(false);
+
+  // Keep a stable ref to onLogout so we can call it inside the effect
+  // without adding it as a dependency (avoids infinite refetch loop on re-render).
+  const onLogoutRef = useRef(onLogout);
+  useEffect(() => { onLogoutRef.current = onLogout; }, [onLogout]);
 
   useEffect(() => {
+    let cancelled = false;
     Promise.all([
       apiService.getDashboardKPIs(),
       apiService.getChurnRiskDistribution(),
@@ -48,6 +55,7 @@ function AnalyticsDashboard({ onViewChange, onLogout, onNotify }) {
         segmentDataResult,
         customersData,
       ]) => {
+        if (cancelled) return;
         setKpis(kpisData);
         setRiskDistribution(asArray(riskData));
         setIncomeData(asArray(incomeDataResult));
@@ -60,14 +68,17 @@ function AnalyticsDashboard({ onViewChange, onLogout, onNotify }) {
         setCustomerRows(asArray(customersData.results));
       })
       .catch((err) => {
+        if (cancelled) return;
         if (err.status === 401) {
-          if (onLogout) onLogout({ silent: true });
+          if (onLogoutRef.current) onLogoutRef.current();
         } else {
           setError(err.message || 'Unable to load analytics data.');
         }
       })
-      .finally(() => setLoading(false));
-  }, [onLogout]);
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount — onLogout accessed via ref
 
   useEffect(() => {
     if (!bulkJob?.job_id || ['COMPLETED', 'FAILED'].includes(bulkJob.status)) {
@@ -84,7 +95,7 @@ function AnalyticsDashboard({ onViewChange, onLogout, onNotify }) {
         }
       } catch (err) {
         if (err.status === 401) {
-          if (onLogout) onLogout({ silent: true });
+          if (onLogout) onLogout();
           return;
         }
         setBulkError('Unable to refresh bulk prediction progress right now.');
@@ -116,13 +127,6 @@ function AnalyticsDashboard({ onViewChange, onLogout, onNotify }) {
     event.preventDefault();
     if (!bulkFile) {
       setBulkError('Please select a CSV file before uploading.');
-      if (onNotify) {
-        onNotify({
-          type: 'warning',
-          title: 'No file selected',
-          message: 'Please select a CSV file before uploading.'
-        });
-      }
       return;
     }
 
@@ -133,21 +137,39 @@ function AnalyticsDashboard({ onViewChange, onLogout, onNotify }) {
       const result = await apiService.uploadBulkPredictions(bulkFile);
       setBulkJob(result);
       setBulkPreview([]);
-      if (onNotify) {
-        onNotify({
-          type: 'success',
-          title: 'Bulk job started',
-          message: `Bulk prediction job ${result.job_id} is now processing.`
-        });
-      }
     } catch (err) {
       if (err.status === 401) {
-        if (onLogout) onLogout({ silent: true });
+        if (onLogout) onLogout();
         return;
       }
       setBulkError(err.message || 'Unable to upload bulk predictions.');
     } finally {
       setBulkUploading(false);
+    }
+  };
+
+  const downloadReport = async (filters = {}) => {
+    setBulkError('');
+    setReportDownloading(true);
+
+    try {
+      const { blob, filename } = await apiService.exportReport('csv', filters);
+      const objectUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+      if (err.status === 401) {
+        if (onLogout) onLogout();
+        return;
+      }
+      setBulkError(err.message || 'Unable to download the report.');
+    } finally {
+      setReportDownloading(false);
     }
   };
 
@@ -194,6 +216,24 @@ function AnalyticsDashboard({ onViewChange, onLogout, onNotify }) {
         </form>
         <p style={styles.helperText}>Expected columns include customer_id, age, income_level, device_type, payment_mode, number_of_subscriptions, tenure_months, monthly_total_spend, avg_usage_hours_per_week, app_switch_frequency, customer_support_interactions, satisfaction_score, and discount_used.</p>
         {bulkError ? <p style={styles.errorText}>{bulkError}</p> : null}
+        <div style={styles.reportActions}>
+          <button
+            type="button"
+            onClick={() => downloadReport()}
+            disabled={reportDownloading}
+            style={styles.secondaryButton}
+          >
+            {reportDownloading ? 'Preparing CSV...' : 'Download customer report CSV'}
+          </button>
+          <button
+            type="button"
+            onClick={() => downloadReport({ riskCategory: 'High' })}
+            disabled={reportDownloading}
+            style={styles.secondaryButton}
+          >
+            High-risk CSV
+          </button>
+        </div>
         {bulkJob ? (
           <div style={styles.jobPanel}>
             <div style={styles.jobHeader}>
@@ -202,7 +242,14 @@ function AnalyticsDashboard({ onViewChange, onLogout, onNotify }) {
                 <p style={styles.helperText}>Status: {bulkJob.status}</p>
               </div>
               {bulkJob.download_url ? (
-                <a href={`${backendOrigin}${bulkJob.download_url}`} target="_blank" rel="noreferrer" style={styles.link}>Download CSV</a>
+                <button
+                  type="button"
+                  onClick={() => downloadReport({ jobId: bulkJob.job_id })}
+                  disabled={reportDownloading}
+                  style={styles.linkButton}
+                >
+                  Download CSV
+                </button>
               ) : null}
             </div>
             <div style={styles.progressTrack}>
@@ -212,7 +259,14 @@ function AnalyticsDashboard({ onViewChange, onLogout, onNotify }) {
             {bulkJob.error_message ? <p style={styles.errorText}>{bulkJob.error_message}</p> : null}
             {bulkJob.status === 'COMPLETED' && bulkJob.download_url ? (
               <div style={{ marginTop: '10px' }}>
-                <a href={`${backendOrigin}${bulkJob.download_url}`} target="_blank" rel="noreferrer" style={styles.link}>Download report CSV</a>
+                <button
+                  type="button"
+                  onClick={() => downloadReport({ jobId: bulkJob.job_id })}
+                  disabled={reportDownloading}
+                  style={styles.linkButton}
+                >
+                  Download report CSV
+                </button>
               </div>
             ) : null}
             {bulkPreview.length ? (
@@ -232,9 +286,9 @@ function AnalyticsDashboard({ onViewChange, onLogout, onNotify }) {
                       <tr key={row.customer_id}>
                         <td style={styles.td}>{row.customer_id}</td>
                         <td style={styles.td}>{row.risk_category}</td>
-                        <td style={styles.td}>{row.churn_probability.toFixed(1)}%</td>
+                        <td style={styles.td}>{formatPercent(row.churn_probability)}</td>
                         <td style={styles.td}>
-                          {Number(row.probability_confidence_lower || 0).toFixed(1)}%-{Number(row.probability_confidence_upper || 0).toFixed(1)}%
+                          {formatPercent(row.probability_confidence_lower)}-{formatPercent(row.probability_confidence_upper)}
                         </td>
                         <td style={styles.td}>{row.recommendation_type}</td>
                       </tr>
@@ -253,7 +307,7 @@ function AnalyticsDashboard({ onViewChange, onLogout, onNotify }) {
           <div style={styles.metricGrid}>
             <MetricCard label="Predicted churn" value={kpis?.predicted_churn_customers || 0} tone="warn" />
             <MetricCard label="High risk" value={kpis?.high_risk_customers || 0} tone="danger" />
-            <MetricCard label="Avg churn risk" value={`${kpis?.average_churn_risk || 0}%`} tone="accent" />
+            <MetricCard label="Avg churn risk" value={formatPercent(kpis?.average_churn_risk ?? 0, 0)} tone="accent" />
             <MetricCard label="Revenue at risk" value={`$${(kpis?.monthly_revenue_at_risk || 0).toLocaleString()}`} tone="success" />
           </div>
         </div>
@@ -263,11 +317,11 @@ function AnalyticsDashboard({ onViewChange, onLogout, onNotify }) {
           {topSegment ? (
             <div style={styles.segmentPanel}>
               <span style={styles.segmentName}>{topSegment.segment}</span>
-              <p style={styles.segmentDetail}>{topSegment.customer_count.toLocaleString()} customers - {topSegment.percentage}% of base</p>
+              <p style={styles.segmentDetail}>{topSegment.customer_count.toLocaleString()} customers - {formatPercent(topSegment.percentage, 0)} of base</p>
               <div style={styles.segmentBarTrack}>
-                <div style={{ ...styles.segmentBarFill, width: `${Math.min(topSegment.percentage, 100)}%` }} />
+                <div style={{ ...styles.segmentBarFill, width: `${clampPercent(topSegment.percentage)}%` }} />
               </div>
-              <div style={styles.segmentMeta}>Average churn risk: {topSegment.average_churn_risk}%</div>
+              <div style={styles.segmentMeta}>Average churn risk: {formatPercent(topSegment.average_churn_risk, 0)}</div>
             </div>
           ) : (
             <p style={styles.helperText}>Segmentation data is unavailable.</p>
@@ -283,7 +337,7 @@ function AnalyticsDashboard({ onViewChange, onLogout, onNotify }) {
               <div key={item.risk_category} style={styles.riskRow}>
                 <div>
                   <strong>{item.risk_category}</strong>
-                  <div style={styles.smallText}>{item.percentage}% of customers</div>
+                  <div style={styles.smallText}>{formatPercent(item.percentage)} of customers</div>
                 </div>
                 <div style={styles.riskCount}>{item.customer_count.toLocaleString()}</div>
               </div>
@@ -301,7 +355,7 @@ function AnalyticsDashboard({ onViewChange, onLogout, onNotify }) {
                   <strong>{segment.segment}</strong>
                   <div style={styles.smallText}>{segment.customer_count.toLocaleString()} customers</div>
                 </div>
-                <div style={styles.segmentValue}>{segment.percentage}%</div>
+                <div style={styles.segmentValue}>{formatPercent(segment.percentage, 0)}</div>
               </div>
             ))}
           </div>
@@ -315,10 +369,10 @@ function AnalyticsDashboard({ onViewChange, onLogout, onNotify }) {
             <div key={item.income_level} style={styles.barRow}>
               <div style={styles.barHeader}>
                 <span>{item.income_level}</span>
-                <strong>{item.churn_rate}%</strong>
+                <strong>{formatPercent(item.churn_rate, 0)}</strong>
               </div>
               <div style={styles.barTrack}>
-                <div style={{ ...styles.barFill, width: `${Math.min(item.churn_rate * 2.2, 100)}%` }} />
+                <div style={{ ...styles.barFill, width: `${clampPercent(item.churn_rate)}%` }} />
               </div>
             </div>
           ))}
@@ -330,10 +384,10 @@ function AnalyticsDashboard({ onViewChange, onLogout, onNotify }) {
             <div key={item.device_type} style={styles.barRow}>
               <div style={styles.barHeader}>
                 <span>{item.device_type}</span>
-                <strong>{item.churn_rate}%</strong>
+                <strong>{formatPercent(item.churn_rate, 0)}</strong>
               </div>
               <div style={styles.barTrack}>
-                <div style={{ ...styles.barFill, width: `${Math.min(item.churn_rate * 2.2, 100)}%` }} />
+                <div style={{ ...styles.barFill, width: `${clampPercent(item.churn_rate)}%` }} />
               </div>
             </div>
           ))}
@@ -347,10 +401,10 @@ function AnalyticsDashboard({ onViewChange, onLogout, onNotify }) {
             <div key={item.payment_mode} style={styles.barRow}>
               <div style={styles.barHeader}>
                 <span>{item.payment_mode}</span>
-                <strong>{item.churn_rate}%</strong>
+                <strong>{formatPercent(item.churn_rate, 0)}</strong>
               </div>
               <div style={styles.barTrack}>
-                <div style={{ ...styles.barFill, width: `${Math.min(item.churn_rate * 2.2, 100)}%` }} />
+                <div style={{ ...styles.barFill, width: `${clampPercent(item.churn_rate)}%` }} />
               </div>
             </div>
           ))}
@@ -362,10 +416,10 @@ function AnalyticsDashboard({ onViewChange, onLogout, onNotify }) {
             <div key={item.spend_bucket} style={styles.barRow}>
               <div style={styles.barHeader}>
                 <span>{item.spend_bucket}</span>
-                <strong>{item.churn_rate}%</strong>
+                <strong>{formatPercent(item.churn_rate, 0)}</strong>
               </div>
               <div style={styles.barTrack}>
-                <div style={{ ...styles.barFill, width: `${Math.min(item.churn_rate * 2.2, 100)}%` }} />
+                <div style={{ ...styles.barFill, width: `${clampPercent(item.churn_rate)}%` }} />
               </div>
             </div>
           ))}
@@ -379,10 +433,10 @@ function AnalyticsDashboard({ onViewChange, onLogout, onNotify }) {
             <div key={item.tenure_bucket} style={styles.barRow}>
               <div style={styles.barHeader}>
                 <span>{item.tenure_bucket}</span>
-                <strong>{item.churn_rate}%</strong>
+                <strong>{formatPercent(item.churn_rate, 0)}</strong>
               </div>
               <div style={styles.barTrack}>
-                <div style={{ ...styles.barFill, width: `${Math.min(item.churn_rate * 2.2, 100)}%` }} />
+                <div style={{ ...styles.barFill, width: `${clampPercent(item.churn_rate)}%` }} />
               </div>
             </div>
           ))}
@@ -394,10 +448,10 @@ function AnalyticsDashboard({ onViewChange, onLogout, onNotify }) {
             <div key={item.satisfaction_score} style={styles.barRow}>
               <div style={styles.barHeader}>
                 <span>Score {item.satisfaction_score}</span>
-                <strong>{item.churn_rate}%</strong>
+                <strong>{formatPercent(item.churn_rate, 0)}</strong>
               </div>
               <div style={styles.barTrack}>
-                <div style={{ ...styles.barFill, width: `${Math.min(item.churn_rate * 2.2, 100)}%` }} />
+                <div style={{ ...styles.barFill, width: `${clampPercent(item.churn_rate)}%` }} />
               </div>
             </div>
           ))}
@@ -469,12 +523,14 @@ const styles = {
   uploadRow: { display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '8px' },
   uploadInput: { flex: 1, minWidth: '260px', color: '#f7f8fc' },
   primaryButton: { background: '#10b981', color: '#07111f', border: 'none', borderRadius: '999px', padding: '10px 16px', fontWeight: 700, cursor: 'pointer' },
+  secondaryButton: { background: 'rgba(56,189,248,0.1)', color: '#7dd3fc', border: '1px solid rgba(56,189,248,0.24)', borderRadius: '999px', padding: '10px 16px', fontWeight: 700, cursor: 'pointer' },
   errorText: { color: '#fca5a5', marginTop: '8px' },
+  reportActions: { display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '12px' },
   jobPanel: { marginTop: '14px', padding: '14px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' },
   jobHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '8px' },
   progressTrack: { height: '8px', width: '100%', background: 'rgba(255,255,255,0.08)', borderRadius: '999px', overflow: 'hidden', marginBottom: '6px' },
   progressFill: { height: '100%', background: 'linear-gradient(90deg, #10b981, #22d3ee)', borderRadius: '999px' },
-  link: { color: '#7dd3fc', textDecoration: 'none' },
+  linkButton: { background: 'none', border: 'none', color: '#7dd3fc', cursor: 'pointer', font: 'inherit', fontWeight: 700, padding: 0 },
   metricGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' },
   metricCard: { border: '1px solid', borderRadius: '12px', padding: '14px', background: 'rgba(255,255,255,0.03)' },
   metricLabel: { display: 'block', color: '#cbd5e1', fontSize: '0.9rem', marginBottom: '6px' },

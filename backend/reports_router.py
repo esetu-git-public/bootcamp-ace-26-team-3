@@ -3,7 +3,7 @@
 
 from enum import Enum
 from typing import Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import FileResponse
@@ -73,7 +73,7 @@ async def generate_report(request: ReportGenerateRequest):
         return ReportGenerateResponse(
             task_id=task_id,
             status="PENDING",
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
             estimated_duration_seconds=5.0
         )
     except Exception as e:

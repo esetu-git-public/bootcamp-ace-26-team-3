@@ -1,0 +1,27 @@
+{
+  "logreg": {
+    "accuracy_gap": -0.0016137958558564147,
+    "is_overfitted": "No",
+    "potential_data_leakage": "No"
+  },
+  "rf": {
+    "accuracy_gap": 0.0,
+    "is_overfitted": "No",
+    "potential_data_leakage": "Yes"
+  },
+  "gb": {
+    "accuracy_gap": 0.0,
+    "is_overfitted": "No",
+    "potential_data_leakage": "Yes"
+  },
+  "xgboost": {
+    "accuracy_gap": 0.0,
+    "is_overfitted": "No",
+    "potential_data_leakage": "Yes"
+  },
+  "catboost": {
+    "accuracy_gap": 0.0,
+    "is_overfitted": "No",
+    "potential_data_leakage": "Yes"
+  }
+}

@@ -17,6 +17,7 @@ jest.mock('../services/api', () => ({
   getCustomers: jest.fn(),
   uploadBulkPredictions: jest.fn(),
   getBulkPredictionStatus: jest.fn(),
+  getChurnTrends: jest.fn(),
 }));
 
 // Import the mocked service after the mock setup
@@ -42,6 +43,14 @@ describe('AnalyticsDashboard', () => {
     ]);
     apiService.getCustomers.mockResolvedValue({ results: [{ customer_id: '1001', risk_category: 'High', monthly_total_spend: 80, tenure_months: 8, satisfaction_score: 6 }] });
     apiService.uploadBulkPredictions.mockResolvedValue({ job_id: 'job-1', status: 'QUEUED', total_records: 2 });
+    apiService.getChurnTrends.mockResolvedValue([
+      {"period": "Feb 2026", "churn_rate": 15.42, "churn_count": 2458, "total_customers": 15946, "average_risk": 20.30},
+      {"period": "Mar 2026", "churn_rate": 14.85, "churn_count": 2368, "total_customers": 15946, "average_risk": 18.90},
+      {"period": "Apr 2026", "churn_rate": 13.91, "churn_count": 2218, "total_customers": 15946, "average_risk": 16.40},
+      {"period": "May 2026", "churn_rate": 13.10, "churn_count": 2089, "total_customers": 15946, "average_risk": 14.80},
+      {"period": "Jun 2026", "churn_rate": 12.82, "churn_count": 2045, "total_customers": 15946, "average_risk": 13.50},
+      {"period": "Jul 2026", "churn_rate": 12.40, "churn_count": 1977, "total_customers": 15946, "average_risk": 12.40},
+    ]);
   });
 
   it('shows a loading state initially', () => {

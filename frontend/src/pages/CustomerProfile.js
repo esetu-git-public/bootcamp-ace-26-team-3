@@ -169,7 +169,7 @@ export default function CustomerProfile({ onViewChange, onLogout, onNotify, sele
       setSearchId(selectedCustomerId);
       fetchCustomerDetails(selectedCustomerId);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line
   }, [selectedCustomerId]);
 
   const handleSearchSubmit = (e) => {

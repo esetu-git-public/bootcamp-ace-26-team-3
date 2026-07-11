@@ -49,17 +49,33 @@ BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "
 ARTIFACT_DIR = os.path.join(os.path.dirname(__file__), "model_artifacts")
 
 def _install_pickle_module_aliases() -> None:
-    """Allow older artifacts pickled as app.core.* to load as backend.app.core.*."""
+    """Allow older artifacts pickled as app.core.* to load as backend.app.core.*, and alias numpy._core to numpy.core for numpy 1.x vs 2.x compatibility."""
+    # Install app namespace aliases
     try:
         import backend.app as backend_app
         import backend.app.core as backend_core
         from backend.app.core import preprocessing
+        sys.modules.setdefault("app", backend_app)
+        sys.modules.setdefault("app.core", backend_core)
+        sys.modules.setdefault("app.core.preprocessing", preprocessing)
     except Exception:
-        return
+        pass
 
-    sys.modules.setdefault("app", backend_app)
-    sys.modules.setdefault("app.core", backend_core)
-    sys.modules.setdefault("app.core.preprocessing", preprocessing)
+    # Alias numpy._core to numpy.core for compatibility with model pickles from different numpy versions
+    try:
+        import numpy
+        import numpy.core
+        sys.modules.setdefault("numpy._core", numpy.core)
+        
+        if hasattr(numpy.core, "numeric"):
+            sys.modules.setdefault("numpy._core.numeric", numpy.core.numeric)
+        if hasattr(numpy.core, "multiarray"):
+            sys.modules.setdefault("numpy._core.multiarray", numpy.core.multiarray)
+        if hasattr(numpy.core, "umath"):
+            sys.modules.setdefault("numpy._core.umath", numpy.core.umath)
+    except Exception as e:
+        print(f"Warning: Could not install numpy._core aliases: {e}")
+
 
 
 class ABTestConfigDict(TypedDict):

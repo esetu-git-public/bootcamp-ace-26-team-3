@@ -87,6 +87,15 @@ class SegmentStats(BaseModel):
     average_churn_risk: float
 
 
+class ChurnTrendItem(BaseModel):
+    period: str
+    churn_rate: float
+    churn_count: int
+    total_customers: int
+    average_risk: float
+
+
+
 class CustomerBase(BaseModel):
     customer_id: str
     age: int

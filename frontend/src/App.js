@@ -170,7 +170,7 @@ function App() {
           />
         )}
         {view === 'dashboard' && (
-          <AnalyticsDashboard onViewChange={setView} onLogout={handleLogout} onNotify={addNotification} />
+          <AnalyticsDashboard onViewChange={setView} onSelectCustomer={setSelectedCustomerId} onLogout={handleLogout} onNotify={addNotification} />
         )}
         {view === 'directory' && (
           <CustomerDirectory

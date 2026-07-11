@@ -159,6 +159,14 @@ export async function getCustomerSegmentation() {
 }
 
 /**
+ * Historical churn trends
+ */
+export async function getChurnTrends() {
+  return request('/analytics/churn-trends');
+}
+
+
+/**
  * List customers with pagination and filtering
  */
 export async function getCustomers(page = 1, limit = 20, filters = {}) {

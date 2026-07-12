@@ -140,4 +140,32 @@ async def list_users(
     return db.query(User).all()
 
 
+@router.delete("/users/{username}", status_code=status.HTTP_200_OK)
+async def delete_user(
+    username: str,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
+    if current_user != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can delete users."
+        )
+    if username == "admin":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The default administrator account cannot be deleted."
+        )
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User '{username}' not found."
+        )
+    db.delete(user)
+    db.commit()
+    return {"status": "success", "message": f"User '{username}' was deleted successfully."}
+
+
+
 

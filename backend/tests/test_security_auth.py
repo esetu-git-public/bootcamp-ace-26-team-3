@@ -223,4 +223,90 @@ class TestUserListConstraints:
         assert "admin" in usernames
 
 
+class TestUserDeletionConstraints:
+    """Integration tests for the DELETE /auth/users/{username} endpoint."""
+
+    def test_delete_user_without_auth_fails(self):
+        response = client.delete("/api/v1/auth/users/some_manager")
+        assert response.status_code == 401
+
+    def test_delete_user_by_non_admin_fails(self):
+        import uuid
+        from backend.tests.test_security_auth import get_admin_token_headers
+        unique_id = uuid.uuid4().hex[:8]
+        admin_headers = get_admin_token_headers()
+        
+        # 1. Create a non-admin manager user first
+        signup_res = client.post(
+            "/api/v1/auth/signup",
+            headers=admin_headers,
+            json={
+                "username": f"user{unique_id}",
+                "email": f"user_{unique_id}@example.com",
+                "full_name": "Regular Manager",
+                "password": "SecurePassword123!"
+            }
+        )
+        assert signup_res.status_code == 201
+        
+        # 2. Log in as that regular user
+        login_res = client.post(
+            "/api/v1/auth/login",
+            json={"username": f"user{unique_id}", "password": "SecurePassword123!"}
+        )
+        assert login_res.status_code == 200
+        user_token = login_res.json()["access_token"]
+        user_headers = {"Authorization": f"Bearer {user_token}"}
+        
+        # 3. Attempt to delete another user
+        del_res = client.delete(f"/api/v1/auth/users/user{unique_id}", headers=user_headers)
+        assert del_res.status_code == 403
+
+    def test_delete_admin_fails(self):
+        from backend.tests.test_security_auth import get_admin_token_headers
+        admin_headers = get_admin_token_headers()
+        response = client.delete("/api/v1/auth/users/admin", headers=admin_headers)
+        assert response.status_code == 400
+        assert "default administrator account cannot be deleted" in response.json()["detail"]
+
+    def test_delete_nonexistent_user_fails(self):
+        from backend.tests.test_security_auth import get_admin_token_headers
+        admin_headers = get_admin_token_headers()
+        response = client.delete("/api/v1/auth/users/nonexistent_manager_12345", headers=admin_headers)
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"]
+
+    def test_delete_user_succeeds(self):
+        import uuid
+        from backend.tests.test_security_auth import get_admin_token_headers
+        unique_id = uuid.uuid4().hex[:8]
+        admin_headers = get_admin_token_headers()
+        
+        # 1. Create user
+        username = f"del{unique_id}"
+        signup_res = client.post(
+            "/api/v1/auth/signup",
+            headers=admin_headers,
+            json={
+                "username": username,
+                "email": f"del_{unique_id}@example.com",
+                "full_name": "ToDelete Manager",
+                "password": "SecurePassword123!"
+            }
+        )
+        assert signup_res.status_code == 201
+        
+        # 2. Delete user
+        del_res = client.delete(f"/api/v1/auth/users/{username}", headers=admin_headers)
+        assert del_res.status_code == 200
+        assert del_res.json()["status"] == "success"
+        
+        # 3. Verify user is no longer listed or queryable
+        list_res = client.get("/api/v1/auth/users", headers=admin_headers)
+        assert list_res.status_code == 200
+        usernames = [u["username"] for u in list_res.json()]
+        assert username not in usernames
+
+
+
 

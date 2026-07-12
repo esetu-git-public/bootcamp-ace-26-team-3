@@ -330,12 +330,19 @@ export async function signup(username, email, password, fullName = null) {
   });
 }
 
-/**
- * List registered manager accounts (Admin only)
- */
 export async function listUsers() {
   return request('/auth/users');
 }
+
+/**
+ * Delete a manager account (Admin only)
+ */
+export async function deleteUser(username) {
+  return request(`/auth/users/${username}`, {
+    method: 'DELETE',
+  });
+}
+
 
 /**
  * Get backend origin for file downloads and other absolute URLs

@@ -27,7 +27,46 @@ export default function SignUp({ onNavigateToLogin, onNotify, isAdminPanel = fal
     }
   }, [isAdminPanel, fetchUsers]);
 
+  const handleDeleteUser = async (targetUsername) => {
+    if (targetUsername === 'admin') {
+      setError('The default administrator account cannot be deleted.');
+      return;
+    }
+    
+    const confirmDelete = window.confirm(`Are you sure you want to permanently delete the account for "${targetUsername}"?`);
+    if (!confirmDelete) return;
+
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    try {
+      await apiService.deleteUser(targetUsername);
+      setSuccess(`Manager account "${targetUsername}" deleted successfully!`);
+      if (onNotify) {
+        onNotify({
+          type: 'success',
+          title: 'Account deleted',
+          message: `Manager account "${targetUsername}" was deleted successfully.`
+        });
+      }
+      fetchUsers(); // Refresh the list
+      setTimeout(() => setSuccess(''), 4000);
+    } catch (err) {
+      setError(err.message || 'Failed to delete user.');
+      if (onNotify) {
+        onNotify({
+          type: 'error',
+          title: 'Deletion failed',
+          message: err.message || 'Failed to delete user.'
+        });
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
+
     e.preventDefault();
     if (!username || !email || !password) {
       setError('Please fill in all required fields (Username, Email, and Password).');
@@ -251,7 +290,9 @@ export default function SignUp({ onNavigateToLogin, onNotify, isAdminPanel = fal
                   <th style={styles.th}>Status</th>
                   <th style={styles.th}>Last Login</th>
                   <th style={styles.th}>Sessions</th>
+                  <th style={styles.th}>Actions</th>
                 </tr>
+
               </thead>
               <tbody>
                 {users.map((user) => (
@@ -277,7 +318,27 @@ export default function SignUp({ onNavigateToLogin, onNotify, isAdminPanel = fal
                       {user.last_login_at ? new Date(user.last_login_at).toLocaleString() : 'Never logged in'}
                     </td>
                     <td style={styles.td}>{user.login_frequency || 0}</td>
+                    <td style={styles.td}>
+                      {user.username === 'admin' ? (
+                        <button
+                          disabled
+                          style={styles.deleteBtnDisabled}
+                        >
+                          System
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleDeleteUser(user.username)}
+                          disabled={loading}
+                          style={styles.deleteBtn}
+                          className="cp-delete-user-btn"
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </td>
                   </tr>
+
                 ))}
               </tbody>
             </table>
@@ -532,6 +593,28 @@ const styles = {
     padding: '16px 20px',
     color: '#cbd5e1',
     fontSize: '0.9rem'
+  },
+  deleteBtn: {
+    background: 'rgba(239, 68, 68, 0.1)',
+    color: '#f87171',
+    border: '1px solid rgba(239, 68, 68, 0.2)',
+    padding: '6px 12px',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontSize: '0.8rem',
+    fontWeight: 600,
+    transition: 'all 0.15s'
+  },
+  deleteBtnDisabled: {
+    background: 'rgba(255, 255, 255, 0.04)',
+    color: '#64748b',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
+    padding: '6px 12px',
+    borderRadius: '8px',
+    cursor: 'not-allowed',
+    fontSize: '0.8rem',
+    fontWeight: 600
   }
 };
+
 

@@ -148,7 +148,7 @@ export default function CustomerProfile({ onViewChange, onLogout, onNotify, sele
     }
   };
 
-  const runChurnPrediction = async () => {
+  const handleCalculatePrediction = async () => {
     if (!customer) return;
     setPredicting(true);
     setError(null);
@@ -171,6 +171,7 @@ export default function CustomerProfile({ onViewChange, onLogout, onNotify, sele
       else { setError(err.message || 'Failed to run churn prediction model.'); }
     } finally { setPredicting(false); }
   };
+
 
   const fetchPredictionHistory = async (id) => {
     try {
@@ -397,15 +398,16 @@ export default function CustomerProfile({ onViewChange, onLogout, onNotify, sele
 
                 <button
                   className="cp-predict-btn"
-                  onClick={runChurnPrediction}
+                  onClick={handleCalculatePrediction}
                   disabled={predicting}
                   style={predicting ? S.predictBtnDisabled : S.predictBtn}
                 >
                   {predicting
-                    ? <><span style={S.btnSpinner} />Calculating Churn Model…</>
-                    : <>⚡ Recalculate Prediction</>
+                    ? <><span style={S.btnSpinner} />Calculating...</>
+                    : <>Calculate Prediction</>
                   }
                 </button>
+
               </div>
 
               {/* Segment Benchmarks */}
@@ -446,7 +448,7 @@ export default function CustomerProfile({ onViewChange, onLogout, onNotify, sele
                 prediction={prediction}
                 loading={predicting}
                 error={null}
-                onRegenerate={runChurnPrediction}
+                onRegenerate={null}
               />
 
               {/* Prediction Timeline */}

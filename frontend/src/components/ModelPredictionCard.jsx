@@ -100,11 +100,8 @@ export function ModelPredictionCard({ prediction, loading = false, error = null,
 
 
 
-      {onRegenerate && (
-        <button onClick={onRegenerate} style={styles.regenerateBtn}>
-          Recalculate Prediction
-        </button>
-      )}
+
+
     </div>
   );
 }

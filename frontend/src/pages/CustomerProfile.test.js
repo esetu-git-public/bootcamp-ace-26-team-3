@@ -61,18 +61,25 @@ describe('CustomerProfile', () => {
     expect(screen.getByText('Next action step')).toBeInTheDocument();
   });
 
-  it('allows recalculating predictions via the button click', async () => {
+  it('allows calculating predictions via the unified Calculate Prediction button click', async () => {
     const onRecalcMock = jest.fn();
     render(<CustomerProfile selectedCustomerId="12345" onPredictionRecalculated={onRecalcMock} />);
 
     expect((await screen.findAllByText('12345')).length).toBeGreaterThanOrEqual(1);
 
+    // Confirm that old button labels are not present
+    expect(screen.queryByText('Generate Model Prediction')).not.toBeInTheDocument();
+    expect(screen.queryByText('Recalculate Prediction')).not.toBeInTheDocument();
 
-    const recalcBtn = screen.getAllByRole('button', { name: /Recalculate Prediction/i })[0];
+    // Confirm that "Calculate Prediction" is visible
+    const calcBtn = screen.getByRole('button', { name: /Calculate Prediction/i });
+    expect(calcBtn).toBeInTheDocument();
 
-    fireEvent.click(recalcBtn);
+    // Trigger calculation
+    fireEvent.click(calcBtn);
 
     await waitFor(() => {
+      expect(apiService.runSinglePrediction).toHaveBeenCalledTimes(1);
       expect(apiService.runSinglePrediction).toHaveBeenCalledWith('12345');
       expect(onRecalcMock).toHaveBeenCalled();
     });

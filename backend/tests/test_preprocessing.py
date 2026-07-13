@@ -1,3 +1,8 @@
+import sys
+import os
+# Add the project root directory to sys.path to resolve the 'backend' import
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+
 import pytest
 import pandas as pd
 import numpy as np
@@ -129,3 +134,6 @@ def test_fit_transform_consistency(sample_raw_data):
     transformed2 = preprocessor2.transform(sample_raw_data)
     
     pd.testing.assert_frame_equal(transformed1, transformed2)
+
+if __name__ == "__main__":
+    sys.exit(pytest.main([__file__]))

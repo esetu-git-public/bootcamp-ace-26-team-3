@@ -6,6 +6,7 @@ import io
 import csv
 import os
 import re
+import pandas as pd
 from datetime import datetime
 from typing import Optional
 from ..database import get_db
@@ -54,31 +55,20 @@ async def export_report(
             detail="Bulk prediction report not found."
         )
 
-    # In-memory text stream
-    output = io.StringIO()
-    writer = csv.writer(output)
-    
-    # Headers
-    writer.writerow([
-        "Customer ID", "Age", "Tenure (Months)", "Monthly Spend ($)", 
-        "Weekly Usage (Hrs)", "Support Tickets", "Satisfaction (1-5)", 
-        "Churn Probability", "Risk Category", "Recommended Offer", "Action Description"
-    ])
-    
     try:
         # Build report query
         query_str = """
+            WITH max_p AS (
+                SELECT customer_id, MAX(prediction_id) as max_id
+                FROM churn_predictions
+                GROUP BY customer_id
+            )
             SELECT c.customer_id, c.age, c.tenure_months, c.monthly_total_spend, c.avg_usage_hours_per_week,
                    c.customer_support_interactions, c.satisfaction_score, p.churn_probability, p.risk_category,
                    p.recommendation_type, p.recommendation_desc
             FROM customers c
-            LEFT JOIN churn_predictions p ON c.customer_id = p.customer_id AND p.prediction_id = (
-                SELECT prediction_id 
-                FROM churn_predictions 
-                WHERE customer_id = c.customer_id 
-                ORDER BY predicted_at DESC, prediction_id DESC 
-                LIMIT 1
-            )
+            LEFT JOIN max_p ON c.customer_id = max_p.customer_id
+            LEFT JOIN churn_predictions p ON max_p.max_id = p.prediction_id
             WHERE 1=1
         """
         params = {}
@@ -90,21 +80,32 @@ async def export_report(
             params["recommendation_type"] = recommendation_type
             
         query_str += " ORDER BY p.churn_probability DESC"
-        results = db.execute(text(query_str), params).fetchall()
         
-        if not results:
+        df = pd.read_sql_query(text(query_str), db.bind, params=params)
+        
+        if df.empty:
             raise Exception("No data")
             
-        for r in results:
-            writer.writerow([
-                r.customer_id, r.age, r.tenure_months, float(r.monthly_total_spend),
-                float(r.avg_usage_hours_per_week), r.customer_support_interactions,
-                r.satisfaction_score, f"{float(r.churn_probability)}%", r.risk_category,
-                r.recommendation_type, r.recommendation_desc
-            ])
-            
+        df["churn_probability"] = df["churn_probability"].apply(lambda x: f"{float(x)}%" if x is not None else "0.0%")
+        df["monthly_total_spend"] = df["monthly_total_spend"].fillna(0.0).astype(float)
+        df["avg_usage_hours_per_week"] = df["avg_usage_hours_per_week"].fillna(0.0).astype(float)
+
+        df.columns = [
+            "Customer ID", "Age", "Tenure (Months)", "Monthly Spend ($)", 
+            "Weekly Usage (Hrs)", "Support Tickets", "Satisfaction (1-5)", 
+            "Churn Probability", "Risk Category", "Recommended Offer", "Action Description"
+        ]
+        csv_data = df.to_csv(index=False)
+        
     except Exception:
         # Stream realistic mock customer data for demo purposes
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow([
+            "Customer ID", "Age", "Tenure (Months)", "Monthly Spend ($)", 
+            "Weekly Usage (Hrs)", "Support Tickets", "Satisfaction (1-5)", 
+            "Churn Probability", "Risk Category", "Recommended Offer", "Action Description"
+        ])
         mock_records = [
             ["1", 34, 8, 79.50, 14.5, 3, 2, "89.0%", "High", "Offer Discount", "Apply 20% discount offer for renewal."],
             ["2", 45, 2, 35.00, 8.2, 5, 1, "84.5%", "High", "Provide Free Trial", "Offer a 14-day premium free trial extension."],
@@ -112,7 +113,6 @@ async def export_report(
             ["12", 50, 1, 110.00, 5.5, 3, 1, "92.1%", "High", "Contact Customer Support", "Flag customer success agent for call follow-up."],
             ["25", 39, 6, 65.00, 10.1, 2, 2, "74.6%", "High", "Subscription Upgrade", "Offer subscription tier upgrade at existing price."]
         ]
-        # Filter mock records if params provided
         if risk_category:
             mock_records = [r for r in mock_records if r[8].lower() == risk_category.lower()]
         if recommendation_type:
@@ -120,13 +120,10 @@ async def export_report(
             
         for row in mock_records:
             writer.writerow(row)
-            
-    # Seek to start
-    output.seek(0)
-    
-    # Return streaming response
+        csv_data = output.getvalue()
+        
     return StreamingResponse(
-        io.StringIO(output.getvalue()), 
+        io.StringIO(csv_data), 
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=high_risk_customers_report.csv"}
     )

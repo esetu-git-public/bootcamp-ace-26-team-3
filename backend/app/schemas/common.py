@@ -330,3 +330,11 @@ class RetentionInterventionResponse(BaseModel):
     outcome_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class SimulationRequest(BaseModel):
+    satisfaction_score: Optional[int] = Field(None, ge=1, le=10, json_schema_extra={"example": 8})
+    customer_support_interactions: Optional[int] = Field(None, ge=0, le=15, json_schema_extra={"example": 1})
+    monthly_total_spend: Optional[float] = Field(None, ge=0.0, json_schema_extra={"example": 75.0})
+    discount_used: Optional[bool] = Field(None, json_schema_extra={"example": True})
+

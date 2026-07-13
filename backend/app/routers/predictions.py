@@ -13,7 +13,7 @@ import pandas as pd
 from ..database import SessionLocal, get_db
 from ..schemas import (
     SinglePredictionResponse, BulkPredictionUploadResponse, 
-    BulkPredictionStatusResponse
+    BulkPredictionStatusResponse, SimulationRequest
 )
 from ..core.risk_score import build_risk_profile
 from ..models import BulkPredictionJob
@@ -622,3 +622,82 @@ async def get_bulk_preview(
         )
         
     return preview_data
+
+
+@router.post("/simulate/{customer_id}")
+async def simulate_prediction(
+    customer_id: str,
+    payload: SimulationRequest,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
+    try:
+        from ..models import Customer
+        from ..core.prediction_service import calculate_prediction_for_customer
+        from .customers import is_valid_mock_id, get_mock_customer_profile
+        
+        # 1. Check if customer exists in database
+        customer = db.query(Customer).filter(Customer.customer_id == customer_id).first()
+        
+        if customer:
+            # Convert to dictionary representation
+            cust_dict = {
+                "customer_id": customer.customer_id,
+                "age": customer.age,
+                "income_level": customer.income_level,
+                "number_of_subscriptions": customer.number_of_subscriptions,
+                "tenure_months": customer.tenure_months,
+                "monthly_total_spend": customer.monthly_total_spend,
+                "avg_usage_hours_per_week": customer.avg_usage_hours_per_week,
+                "app_switch_frequency": customer.app_switch_frequency,
+                "customer_support_interactions": customer.customer_support_interactions,
+                "satisfaction_score": customer.satisfaction_score,
+                "discount_used": customer.discount_used,
+                "device_type": customer.device_type,
+                "payment_mode": customer.payment_mode
+            }
+        else:
+            # Check if it's a valid mock ID
+            if is_valid_mock_id(customer_id):
+                cust_dict = get_mock_customer_profile(customer_id)
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Customer with ID {customer_id} not found."
+                )
+                
+        # 2. Overlay simulation overrides
+        if payload.satisfaction_score is not None:
+            cust_dict["satisfaction_score"] = payload.satisfaction_score
+        if payload.customer_support_interactions is not None:
+            cust_dict["customer_support_interactions"] = payload.customer_support_interactions
+        if payload.monthly_total_spend is not None:
+            cust_dict["monthly_total_spend"] = payload.monthly_total_spend
+        if payload.discount_used is not None:
+            cust_dict["discount_used"] = payload.discount_used
+
+        # 3. Calculate prediction on-the-fly using the shared helper
+        # Note: We do NOT call save_customer_prediction, keeping database records untouched
+        pred_data = calculate_prediction_for_customer(db, cust_dict)
+        
+        return {
+            "customer_id": customer_id,
+            "churn_probability": round(pred_data["churn_probability"], 2),
+            "probability_confidence_lower": pred_data["probability_confidence_lower"],
+            "probability_confidence_upper": pred_data["probability_confidence_upper"],
+            "risk_category": pred_data["risk_category"],
+            "will_cancel": pred_data["will_cancel"],
+            "explainability": pred_data["explainability"],
+            "recommendation_type": pred_data["recommendation_type"],
+            "recommendation_desc": pred_data["recommendation_desc"],
+            "model_version": pred_data["model_version"]
+        }
+        
+    except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Simulation failed: {str(e)}"
+        )
+

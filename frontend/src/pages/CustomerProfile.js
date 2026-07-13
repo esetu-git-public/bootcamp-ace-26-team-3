@@ -125,6 +125,16 @@ export default function CustomerProfile({ onViewChange, onLogout, onNotify, sele
   const [newNotes, setNewNotes] = useState('');
   const [loggingIntervention, setLoggingIntervention] = useState(false);
 
+  // Simulation State
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [simSatisfaction, setSimSatisfaction] = useState(5);
+  const [simInteractions, setSimInteractions] = useState(3);
+  const [simSpend, setSimSpend] = useState(75.0);
+  const [simDiscount, setSimDiscount] = useState(false);
+  const [simResult, setSimResult] = useState(null);
+  const [simulatingLoading, setSimulatingLoading] = useState(false);
+
+
   const fetchInterventions = async (id) => {
     setLoadingInterventions(true);
     try {
@@ -217,6 +227,14 @@ export default function CustomerProfile({ onViewChange, onLogout, onNotify, sele
           recommendation_type:         data.recommendation_type,
           recommendation_desc:         data.recommendation_desc,
         });
+
+        // Initialize Simulator values to match the customer record
+        setSimSatisfaction(data.satisfaction_score || 5);
+        setSimInteractions(data.customer_support_interactions || 0);
+        setSimSpend(Number(data.monthly_total_spend) || 75.0);
+        setSimDiscount(!!data.discount_used);
+        setIsSimulating(false);
+        setSimResult(null);
       }
       fetchPredictionHistory(id);
       fetchInterventions(id);
@@ -228,6 +246,55 @@ export default function CustomerProfile({ onViewChange, onLogout, onNotify, sele
       setLoading(false);
     }
   };
+
+  const handleSimulateChange = async (overrides) => {
+    if (!customerId) return;
+    setSimulatingLoading(true);
+    setIsSimulating(true);
+    try {
+      const payload = {
+        satisfaction_score: overrides.satisfaction_score !== undefined ? overrides.satisfaction_score : simSatisfaction,
+        customer_support_interactions: overrides.customer_support_interactions !== undefined ? overrides.customer_support_interactions : simInteractions,
+        monthly_total_spend: overrides.monthly_total_spend !== undefined ? overrides.monthly_total_spend : simSpend,
+        discount_used: overrides.discount_used !== undefined ? overrides.discount_used : simDiscount,
+      };
+      
+      const res = await mlModel.simulatePrediction(customerId, payload);
+      setSimResult(res);
+    } catch (err) {
+      console.error('Failed to run simulation', err);
+      if (onNotify) {
+        onNotify({
+          type: 'error',
+          title: 'Simulation failed',
+          message: err.message || 'Failed to simulate custom values.'
+        });
+      }
+    } finally {
+      setSimulatingLoading(false);
+    }
+  };
+
+  const handleResetSimulation = () => {
+    if (!customer) return;
+    setSimSatisfaction(customer.satisfaction_score || 5);
+    setSimInteractions(customer.customer_support_interactions || 0);
+    setSimSpend(Number(customer.monthly_total_spend) || 75.0);
+    setSimDiscount(!!customer.discount_used);
+    setIsSimulating(false);
+    setSimResult(null);
+  };
+
+  const activePrediction = (isSimulating && simResult) ? simResult : prediction;
+  const riskColor   = activePrediction?.risk_category === 'High'   ? '#ef4444'
+                    : activePrediction?.risk_category === 'Medium' ? '#f59e0b'
+                    : '#10b981';
+
+  const displaySatisfaction = isSimulating ? simSatisfaction : (customer?.satisfaction_score || 5);
+  const displaySpend = isSimulating ? simSpend : (customer?.monthly_total_spend || 75.0);
+  const displayInteractions = isSimulating ? simInteractions : (customer?.customer_support_interactions || 0);
+  const displayDiscount = isSimulating ? simDiscount : (customer?.discount_used || false);
+
 
   const handleCalculatePrediction = async () => {
     if (!customer) return;
@@ -282,9 +349,7 @@ export default function CustomerProfile({ onViewChange, onLogout, onNotify, sele
   };
 
   const avatarColor = getAvatarColor(customer?.customer_id || '');
-  const riskColor   = prediction?.risk_category === 'High'   ? '#ef4444'
-                    : prediction?.risk_category === 'Medium' ? '#f59e0b'
-                    : '#10b981';
+
 
   return (
     <div style={S.page}>
@@ -374,9 +439,9 @@ export default function CustomerProfile({ onViewChange, onLogout, onNotify, sele
           <div className="cp-card" style={S.heroBanner}>
             <div style={{ ...S.avatar, background: avatarColor }}>
               {getInitials(customer.customer_id)}
-              {prediction && (
+              {activePrediction && (
                 <div style={{ ...S.avatarBadge, background: riskColor }}>
-                  {prediction.risk_category?.[0] || '?'}
+                  {activePrediction.risk_category?.[0] || '?'}
                 </div>
               )}
             </div>
@@ -384,15 +449,15 @@ export default function CustomerProfile({ onViewChange, onLogout, onNotify, sele
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
                 <h2 style={S.heroId}>{customer.customer_id}</h2>
-                {prediction && (
+                {activePrediction && (
                   <span style={{ ...S.heroBadge, background: `${riskColor}22`, color: riskColor, border: `1px solid ${riskColor}44` }}>
-                    {prediction.risk_category} Risk
+                    {activePrediction.risk_category} Risk
                   </span>
                 )}
-                {prediction?.will_cancel === 1 && (
+                {activePrediction?.will_cancel === 1 && (
                   <span style={S.churnFlag}>🔴 Predicted Churn</span>
                 )}
-                {prediction?.will_cancel === 0 && (
+                {activePrediction?.will_cancel === 0 && (
                   <span style={S.stableFlag}>🟢 Predicted Stable</span>
                 )}
               </div>
@@ -406,9 +471,9 @@ export default function CustomerProfile({ onViewChange, onLogout, onNotify, sele
               )}
             </div>
 
-            {prediction && (
+            {activePrediction && (
               <div style={{ marginLeft: 'auto', flexShrink: 0 }}>
-                <RiskGauge probability={prediction.churn_probability} />
+                <RiskGauge probability={activePrediction.churn_probability} />
               </div>
             )}
           </div>
@@ -416,16 +481,17 @@ export default function CustomerProfile({ onViewChange, onLogout, onNotify, sele
           {/* KPI Strip */}
           <div style={S.kpiStrip}>
             <StatPill icon="📅" label="Tenure"          value={`${customer.tenure_months}m`}     color="#38bdf8" />
-            <StatPill icon="💳" label="Monthly Spend"   value={`$${Number(customer.monthly_total_spend).toFixed(0)}`} color="#a78bfa" />
+            <StatPill icon="💳" label="Monthly Spend"   value={`$${Number(displaySpend).toFixed(0)}`} color="#a78bfa" />
             <StatPill icon="📺" label="Subscriptions"   value={customer.number_of_subscriptions} color="#34d399" />
             <StatPill icon="⏱️" label="Wkly Usage"      value={`${customer.avg_usage_hours_per_week}h`} color="#fb923c" />
-            <StatPill icon="🎫" label="Support Tickets" value={customer.customer_support_interactions} color="#f87171" />
-            <StatPill icon="⭐" label="Satisfaction"    value={`${customer.satisfaction_score}/10`}
-              color={customer.satisfaction_score <= 3 ? '#ef4444' : customer.satisfaction_score <= 6 ? '#f59e0b' : '#10b981'} />
-            {prediction && (
-              <StatPill icon="📊" label="Churn Risk" value={formatPercent(prediction.churn_probability)} color={riskColor} />
+            <StatPill icon="🎫" label="Support Tickets" value={displayInteractions} color="#f87171" />
+            <StatPill icon="⭐" label="Satisfaction"    value={`${displaySatisfaction}/10`}
+              color={displaySatisfaction <= 3 ? '#ef4444' : displaySatisfaction <= 6 ? '#f59e0b' : '#10b981'} />
+            {activePrediction && (
+              <StatPill icon="📊" label="Churn Risk" value={formatPercent(activePrediction.churn_probability)} color={riskColor} />
             )}
           </div>
+
 
           {/* Main 2-column Grid */}
           <div style={S.mainGrid}>
@@ -446,13 +512,136 @@ export default function CustomerProfile({ onViewChange, onLogout, onNotify, sele
                     { label: 'Income Level',   value: customer.income_level },
                     { label: 'Device',         value: customer.device_type },
                     { label: 'Payment Mode',   value: customer.payment_mode },
-                    { label: 'Discounts Used', value: customer.discount_used ? '✅ Yes' : '❌ No' },
+                    { label: 'Discounts Used', value: displayDiscount ? '✅ Yes' : '❌ No' },
                   ].map(({ label, value }) => (
                     <div key={label} style={S.profileRow}>
                       <span style={S.profileLabel}>{label}</span>
                       <span style={S.profileValue}>{value}</span>
                     </div>
                   ))}
+                </div>
+              </div>
+
+              {/* What-If Risk Simulator Card */}
+              <div className="cp-card" style={{ ...S.card, border: isSimulating ? '1.5px solid #818cf8' : '1px solid rgba(255,255,255,.09)' }}>
+                <h3 style={S.cardTitle}>
+                  <span style={{ ...S.titleDot, background: '#818cf8' }} />
+                  What-If Churn Risk Simulator
+                  {simulatingLoading && (
+                    <span style={{ fontSize: '0.75rem', color: '#818cf8', marginLeft: 'auto', fontWeight: 'normal', fontStyle: 'italic' }}>
+                      Calculating...
+                    </span>
+                  )}
+                </h3>
+                <p style={S.helperText}>
+                  Simulate behavior updates to see how the model's risk score changes. No database records will be modified.
+                </p>
+
+                {isSimulating && (
+                  <div style={{
+                    background: 'rgba(129, 140, 248, 0.1)',
+                    border: '1px solid rgba(129, 140, 248, 0.3)',
+                    borderRadius: '8px',
+                    padding: '8px 12px',
+                    marginBottom: '16px',
+                    fontSize: '0.8rem',
+                    color: '#c7d2fe',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <span>⚠️ Simulator Mode Active</span>
+                    <button
+                      onClick={handleResetSimulation}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#a5b4fc',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        textDecoration: 'underline'
+                      }}
+                    >
+                      Reset to DB values
+                    </button>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {/* Slider: Satisfaction */}
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '.82rem' }}>
+                      <span style={{ color: '#cbd5e1' }}>Satisfaction Score</span>
+                      <strong style={{ color: '#38bdf8' }}>{simSatisfaction} / 10</strong>
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="10"
+                      value={simSatisfaction}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        setSimSatisfaction(val);
+                        handleSimulateChange({ satisfaction_score: val });
+                      }}
+                      style={{ width: '100%', accentColor: '#818cf8', cursor: 'pointer' }}
+                    />
+                  </div>
+
+                  {/* Slider: Support Interactions */}
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '.82rem' }}>
+                      <span style={{ color: '#cbd5e1' }}>Support Interactions</span>
+                      <strong style={{ color: '#f87171' }}>{simInteractions} tickets</strong>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="15"
+                      value={simInteractions}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        setSimInteractions(val);
+                        handleSimulateChange({ customer_support_interactions: val });
+                      }}
+                      style={{ width: '100%', accentColor: '#818cf8', cursor: 'pointer' }}
+                    />
+                  </div>
+
+                  {/* Slider: Monthly Total Spend */}
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '.82rem' }}>
+                      <span style={{ color: '#cbd5e1' }}>Monthly Total Spend</span>
+                      <strong style={{ color: '#a78bfa' }}>${simSpend}</strong>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="250"
+                      value={simSpend}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        setSimSpend(val);
+                        handleSimulateChange({ monthly_total_spend: val });
+                      }}
+                      style={{ width: '100%', accentColor: '#818cf8', cursor: 'pointer' }}
+                    />
+                  </div>
+
+                  {/* Toggle Checkbox: Discount Used */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                    <span style={{ fontSize: '.82rem', color: '#cbd5e1' }}>Discount applied to renewal</span>
+                    <input
+                      type="checkbox"
+                      checked={simDiscount}
+                      onChange={(e) => {
+                        const val = e.target.checked;
+                        setSimDiscount(val);
+                        handleSimulateChange({ discount_used: val });
+                      }}
+                      style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#818cf8' }}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -466,16 +655,17 @@ export default function CustomerProfile({ onViewChange, onLogout, onNotify, sele
                 <div style={{ marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px solid rgba(255,255,255,.07)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                     <span style={{ fontSize: '.82rem', color: '#94a3b8' }}>Satisfaction Score</span>
-                    <SatisfactionDots score={customer.satisfaction_score} />
+                    <SatisfactionDots score={displaySatisfaction} />
                   </div>
                 </div>
 
                 <MetricBar label="Weekly Usage Hours"    value={customer.avg_usage_hours_per_week}      max={50}  unit="h"   color="#38bdf8" delay={0}    />
-                <MetricBar label="Monthly Spend"         value={Number(customer.monthly_total_spend).toFixed(0)} max={250} unit=""    color="#a78bfa" delay={0.05} />
+                <MetricBar label="Monthly Spend"         value={Number(displaySpend).toFixed(0)} max={250} unit=""    color="#a78bfa" delay={0.05} />
                 <MetricBar label="App Switch Frequency"  value={customer.app_switch_frequency}          max={50}  unit="/hr" color="#fb923c" delay={0.10} />
-                <MetricBar label="Support Interactions"  value={customer.customer_support_interactions} max={15}  unit=""    color="#f87171" delay={0.15} />
+                <MetricBar label="Support Interactions"  value={displayInteractions} max={15}  unit=""    color="#f87171" delay={0.15} />
                 <MetricBar label="Active Subscriptions"  value={customer.number_of_subscriptions}       max={10}  unit=""    color="#34d399" delay={0.20} />
                 <MetricBar label="Tenure Months"         value={customer.tenure_months}                 max={60}  unit="m"   color="#06b6d4" delay={0.25} />
+
 
                 <button
                   className="cp-predict-btn"
@@ -634,8 +824,8 @@ export default function CustomerProfile({ onViewChange, onLogout, onNotify, sele
 
               {/* Model Prediction Card */}
               <ModelPredictionCard
-                prediction={prediction}
-                loading={predicting}
+                prediction={activePrediction}
+                loading={predicting || simulatingLoading}
                 error={null}
                 onRegenerate={null}
               />
@@ -644,10 +834,9 @@ export default function CustomerProfile({ onViewChange, onLogout, onNotify, sele
               <PredictionTimeline predictions={history} />
 
               {/* Retention Recommendation */}
-              {/* Retention Recommendation */}
-              {prediction && (() => {
-                const parsedRec = parseRecommendationDesc(prediction.recommendation_desc);
-                const riskPriority = prediction.risk_category || 'Low';
+              {activePrediction && (() => {
+                const parsedRec = parseRecommendationDesc(activePrediction.recommendation_desc);
+                const riskPriority = activePrediction.risk_category || 'Low';
                 const recColor = riskPriority === 'High' ? '#fca5a5' : riskPriority === 'Medium' ? '#fde047' : '#a7f3d0';
                 const recBg = riskPriority === 'High' ? 'rgba(239,68,68,0.1)' : riskPriority === 'Medium' ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)';
                 const recBorder = riskPriority === 'High' ? 'rgba(239,68,68,0.2)' : riskPriority === 'Medium' ? 'rgba(245,158,11,0.2)' : 'rgba(16,185,129,0.2)';
@@ -656,7 +845,7 @@ export default function CustomerProfile({ onViewChange, onLogout, onNotify, sele
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', marginBottom: '14px', flexWrap: 'wrap' }}>
                       <div>
                         <h4 style={{ margin: '0 0 4px', fontSize: '1.05rem', fontWeight: 700, color: '#e2e8f0' }}>
-                          {prediction.will_cancel === 1 ? '🚨' : '✅'} Retention Recommendation: {prediction.recommendation_type}
+                          {activePrediction.will_cancel === 1 ? '🚨' : '✅'} Retention Recommendation: {activePrediction.recommendation_type}
                         </h4>
                         <p style={{ margin: 0, fontSize: '.78rem', color: '#94a3b8' }}>Based on latest model execution and active customer profile metrics</p>
                       </div>
@@ -701,7 +890,7 @@ export default function CustomerProfile({ onViewChange, onLogout, onNotify, sele
                         )}
                       </div>
                     ) : (
-                      <p style={{ margin: 0, color: '#cbd5e1', fontSize: '.9rem', lineHeight: 1.65 }}>{prediction.recommendation_desc}</p>
+                      <p style={{ margin: 0, color: '#cbd5e1', fontSize: '.9rem', lineHeight: 1.65 }}>{activePrediction.recommendation_desc}</p>
                     )}
                   </div>
                 );
@@ -709,7 +898,7 @@ export default function CustomerProfile({ onViewChange, onLogout, onNotify, sele
 
 
               {/* SHAP Explainability */}
-              {prediction?.explainability && (
+              {activePrediction?.explainability && (
                 <div className="cp-card" style={S.card}>
                   <h3 style={S.cardTitle}>
                     <span style={{ ...S.titleDot, background: '#a78bfa' }} />
@@ -720,7 +909,7 @@ export default function CustomerProfile({ onViewChange, onLogout, onNotify, sele
                     <span style={{ color: '#34d399' }}>Green = reduces</span> churn risk
                   </p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {Object.entries(prediction.explainability)
+                    {Object.entries(activePrediction.explainability)
                       .sort(([, a], [, b]) => Math.abs(b) - Math.abs(a))
                       .map(([key, val]) => {
                         const isIncrease = val > 0;
@@ -743,6 +932,7 @@ export default function CustomerProfile({ onViewChange, onLogout, onNotify, sele
                   </div>
                 </div>
               )}
+
 
               {/* Prediction Audit Log */}
               <div className="cp-card" style={S.card}>

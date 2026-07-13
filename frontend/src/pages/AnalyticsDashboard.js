@@ -261,24 +261,6 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, setSelectedJobId, 
         </form>
         <p style={styles.helperText}>Expected columns include customer_id, age, income_level, device_type, payment_mode, number_of_subscriptions, tenure_months, monthly_total_spend, avg_usage_hours_per_week, app_switch_frequency, customer_support_interactions, satisfaction_score, and discount_used.</p>
         {bulkError ? <p style={styles.errorText}>{bulkError}</p> : null}
-        <div style={styles.reportActions}>
-          <button
-            type="button"
-            onClick={() => downloadReport()}
-            disabled={reportDownloading}
-            style={styles.secondaryButton}
-          >
-            {reportDownloading ? 'Preparing CSV...' : 'Download customer report CSV'}
-          </button>
-          <button
-            type="button"
-            onClick={() => downloadReport({ riskCategory: 'High' })}
-            disabled={reportDownloading}
-            style={styles.secondaryButton}
-          >
-            High-risk CSV
-          </button>
-        </div>
         {bulkJob ? (
           <div style={styles.jobPanel}>
             <div style={styles.jobHeader}>
@@ -1080,13 +1062,31 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, setSelectedJobId, 
             <h3 className="db-card-title">High-Risk Customer Queue</h3>
             <p className="db-card-subtitle">Real-time listing of active subscribers with elevated risk scores requiring mitigation actions</p>
           </div>
-          <button 
-            type="button" 
-            className="drilldown-btn" 
-            onClick={() => onViewChange('directory')}
-          >
-            Open Customer Directory &rarr;
-          </button>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={() => downloadReport()}
+              disabled={reportDownloading}
+              style={styles.secondaryButton}
+            >
+              {reportDownloading ? 'Preparing CSV...' : 'Download customer report CSV'}
+            </button>
+            <button
+              type="button"
+              onClick={() => downloadReport({ riskCategory: 'High' })}
+              disabled={reportDownloading}
+              style={styles.secondaryButton}
+            >
+              High-risk CSV
+            </button>
+            <button 
+              type="button" 
+              className="drilldown-btn" 
+              onClick={() => onViewChange('directory')}
+            >
+              Open Customer Directory &rarr;
+            </button>
+          </div>
         </div>
 
         <div className="tableWrap">

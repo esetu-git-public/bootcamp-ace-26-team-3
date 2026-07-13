@@ -14,13 +14,15 @@ const INITIAL_TASKS = [
   { id: 'US-404', title: 'Frontend Service Abstract', type: 'story', sp: 5, status: 'Done', sprint: 'Sprint 3', desc: 'Refactor fetch routines into dedicated services (api.js, mlModel.js) to reduce component logic.' },
   { id: 'US-501', title: 'Bulk Prediction Studio', type: 'story', sp: 8, status: 'Done', sprint: 'Sprint 3', desc: 'Provide asynchronous CSV uploader, execution status pollers, results preview, and file downloads.' },
   { id: 'US-502', title: 'Export Reporting Service', type: 'story', sp: 5, status: 'Done', sprint: 'Sprint 3', desc: 'Implement report exporters formatting PDF summaries, Excel sheets, and filtered CSV downloads.' },
+  { id: 'US-503', title: 'Seed & Recalculation Prediction Alignment', type: 'story', sp: 3, status: 'Done', sprint: 'Sprint 4', desc: 'Ensure database seed predictions and dynamic recalculate buttons use identical model pipelines to prevent values shifting.' },
   
-  { id: 'BUG-001', title: 'Async Test Suite Failure', type: 'bug', sp: 3, status: 'Todo', sprint: 'Sprint 4', desc: 'Async bulk prediction tests fail because pytest-asyncio is not installed or configured.', priority: 'High' },
-  { id: 'BUG-002', title: 'FastAPI Query Deprecation Warning', type: 'bug', sp: 1, status: 'Todo', sprint: 'Sprint 4', desc: 'Query parameter regex is deprecated in reports.py, replace with pattern parameter.', priority: 'Low' },
-  { id: 'BUG-003', title: 'Pydantic Field example Warning', type: 'bug', sp: 1, status: 'Todo', sprint: 'Sprint 4', desc: 'Attribute example is deprecated in common.py schemas, replace with json_schema_extra.', priority: 'Low' },
+  { id: 'BUG-001', title: 'Async Test Suite Failure', type: 'bug', sp: 3, status: 'Done', sprint: 'Sprint 4', desc: 'Async bulk prediction tests fail because pytest-asyncio is not installed or configured.', priority: 'High' },
+  { id: 'BUG-002', title: 'FastAPI Query Deprecation Warning', type: 'bug', sp: 1, status: 'Done', sprint: 'Sprint 4', desc: 'Query parameter regex is deprecated in reports.py, replace with pattern parameter.', priority: 'Low' },
+  { id: 'BUG-003', title: 'Pydantic Field example Warning', type: 'bug', sp: 1, status: 'Done', sprint: 'Sprint 4', desc: 'Attribute example is deprecated in common.py schemas, replace with json_schema_extra.', priority: 'Low' },
   { id: 'BUG-004', title: 'ML Model Pickle Version Mismatch', type: 'bug', sp: 3, status: 'Backlog', sprint: 'Backlog', desc: 'SimpleImputer / StandardScaler pickled with newer sklearn version 1.8.0 throws unpickling warnings in 1.6.1.', priority: 'Medium' },
   { id: 'BUG-005', title: 'datetime.utcnow() Deprecations', type: 'bug', sp: 1, status: 'Backlog', sprint: 'Backlog', desc: 'Code relies on deprecated timezone-naive datetime.utcnow(), use timezone-aware datetime.now(datetime.UTC).', priority: 'Low' },
   { id: 'BUG-006', title: 'Webpack Dev Server Warnings', type: 'bug', sp: 2, status: 'Backlog', sprint: 'Backlog', desc: 'fs.F_OK and setupMiddlewares deprecation warnings on npm start, update react-scripts dependencies.', priority: 'Low' }
+
 ];
 
 const COLUMNS = [

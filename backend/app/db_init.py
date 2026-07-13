@@ -17,6 +17,16 @@ def initialize_database(engine: Engine, db: Session) -> None:
     create_indexes(db)
     seed_default_admin(db)
     seed_demo_customers(db)
+    
+    # Backfill missing predictions for any existing customers who do not have one yet
+    try:
+        from .core.prediction_service import ensure_all_customers_have_predictions
+        res = ensure_all_customers_have_predictions(db)
+        if res["predictions_created"] > 0:
+            print(f"Startup backfilled {res['predictions_created']} missing predictions successfully.")
+    except Exception as e:
+        print(f"Warning: Startup backfill failed: {e}")
+
 
 
 def create_customer_predictions_view(engine: Engine, db: Session) -> None:

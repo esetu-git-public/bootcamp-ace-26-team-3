@@ -24,6 +24,20 @@ def generate_recommendation_details(
     avg_usage_hours_per_week: float,
     app_switch_frequency: int
 ) -> tuple[str, str]:
+    # Specific personalization: Low usage and high spend check
+    if risk_category in ("High", "Medium") and avg_usage_hours_per_week < 10 and monthly_total_spend > 100:
+        rec_type = "Plan Optimization"
+        priority_label = "High (Urgent)" if risk_category == "High" else "Medium (Proactive)"
+        rec_desc = (
+            f"Why this customer is at risk: Low usage ({avg_usage_hours_per_week} hrs/week) "
+            f"and high spend (${monthly_total_spend:.2f}) detected, indicating poor value-to-cost alignment.\n"
+            f"Recommended action: Offer a discount or plan downgrade to align costs with actual usage.\n"
+            f"Priority: {priority_label}\n"
+            f"Expected impact: Lowers price-to-value friction and builds long-term retention.\n"
+            f"Next step: Offer plan optimization or discount"
+        )
+        return rec_type, rec_desc
+
     if risk_category == "High":
         if customer_support_interactions >= 5 and satisfaction_score <= 3:
             rec_type = "High Touch Intervention"

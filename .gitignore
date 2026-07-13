@@ -40,3 +40,6 @@ catboost_info/
 # Pyrefly
 pyrefly.toml
 **/pyrefly.toml
+
+# System files
+*.lnk

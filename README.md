@@ -80,11 +80,7 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-For local development and tests, install the dev requirements after activating the virtual environment:
-
-```powershell
-pip install -r requirements-dev.txt
-```
+For local development and tests, the required dependencies (such as `pytest` and `pytest-asyncio`) are already included at the bottom of `requirements.txt` and were installed in the previous step, so no additional setup is required.
 
 > **Note:** The React frontend requires Node.js and npm. If `npm` is not recognized, install Node.js from https://nodejs.org, restart PowerShell, and verify with:
 >

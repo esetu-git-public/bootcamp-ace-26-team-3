@@ -68,21 +68,28 @@ async def export_report(
     try:
         # Build report query
         query_str = """
-            SELECT customer_id, age, tenure_months, monthly_total_spend, avg_usage_hours_per_week,
-                   customer_support_interactions, satisfaction_score, churn_probability, risk_category,
-                   recommendation_type, recommendation_desc
-            FROM v_customer_predictions
+            SELECT c.customer_id, c.age, c.tenure_months, c.monthly_total_spend, c.avg_usage_hours_per_week,
+                   c.customer_support_interactions, c.satisfaction_score, p.churn_probability, p.risk_category,
+                   p.recommendation_type, p.recommendation_desc
+            FROM customers c
+            LEFT JOIN churn_predictions p ON c.customer_id = p.customer_id AND p.prediction_id = (
+                SELECT prediction_id 
+                FROM churn_predictions 
+                WHERE customer_id = c.customer_id 
+                ORDER BY predicted_at DESC, prediction_id DESC 
+                LIMIT 1
+            )
             WHERE 1=1
         """
         params = {}
         if risk_category:
-            query_str += " AND risk_category = :risk_category"
+            query_str += " AND p.risk_category = :risk_category"
             params["risk_category"] = risk_category
         if recommendation_type:
-            query_str += " AND recommendation_type = :recommendation_type"
+            query_str += " AND p.recommendation_type = :recommendation_type"
             params["recommendation_type"] = recommendation_type
             
-        query_str += " ORDER BY churn_probability DESC"
+        query_str += " ORDER BY p.churn_probability DESC"
         results = db.execute(text(query_str), params).fetchall()
         
         if not results:

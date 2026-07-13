@@ -33,7 +33,7 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, setSelectedJobId, 
   const [bulkJob, setBulkJob] = useState(null);
   const [bulkPreview, setBulkPreview] = useState([]);
   const [bulkJobs, setBulkJobs] = useState([]);
-  const [reportDownloading, setReportDownloading] = useState(false);
+  const [downloadingType, setDownloadingType] = useState(null);
   const [activeTrendTab, setActiveTrendTab] = useState('rate'); // 'rate' or 'volume'
   const [hoveredTrendIdx, setHoveredTrendIdx] = useState(null);
   const [hoveredDonutIdx, setHoveredDonutIdx] = useState(null);
@@ -193,9 +193,9 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, setSelectedJobId, 
     }
   };
 
-  const downloadReport = async (filters = {}) => {
+  const downloadReport = async (type, filters = {}) => {
     setBulkError('');
-    setReportDownloading(true);
+    setDownloadingType(type);
 
     try {
       const { blob, filename } = await apiService.exportReport('csv', filters);
@@ -214,7 +214,7 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, setSelectedJobId, 
       }
       setBulkError(err.message || 'Unable to download the report.');
     } finally {
-      setReportDownloading(false);
+      setDownloadingType(null);
     }
   };
 
@@ -271,11 +271,11 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, setSelectedJobId, 
               {bulkJob.download_url ? (
                 <button
                   type="button"
-                  onClick={() => downloadReport({ jobId: bulkJob.job_id })}
-                  disabled={reportDownloading}
+                  onClick={() => downloadReport(bulkJob.job_id, { jobId: bulkJob.job_id })}
+                  disabled={downloadingType !== null}
                   style={styles.linkButton}
                 >
-                  Download CSV
+                  {downloadingType === bulkJob.job_id ? 'Preparing CSV...' : 'Download CSV'}
                 </button>
               ) : null}
             </div>
@@ -288,11 +288,11 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, setSelectedJobId, 
               <div style={{ marginTop: '10px', display: 'flex', gap: '12px' }}>
                 <button
                   type="button"
-                  onClick={() => downloadReport({ jobId: bulkJob.job_id })}
-                  disabled={reportDownloading}
+                  onClick={() => downloadReport(bulkJob.job_id, { jobId: bulkJob.job_id })}
+                  disabled={downloadingType !== null}
                   style={styles.linkButton}
                 >
-                  Download report CSV
+                  {downloadingType === bulkJob.job_id ? 'Preparing CSV...' : 'Download report CSV'}
                 </button>
                 <button
                   type="button"
@@ -1065,19 +1065,19 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, setSelectedJobId, 
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             <button
               type="button"
-              onClick={() => downloadReport()}
-              disabled={reportDownloading}
+              onClick={() => downloadReport('all')}
+              disabled={downloadingType !== null}
               style={styles.secondaryButton}
             >
-              {reportDownloading ? 'Preparing CSV...' : 'Download customer report CSV'}
+              {downloadingType === 'all' ? 'Preparing CSV...' : 'Download customer report CSV'}
             </button>
             <button
               type="button"
-              onClick={() => downloadReport({ riskCategory: 'High' })}
-              disabled={reportDownloading}
+              onClick={() => downloadReport('high', { riskCategory: 'High' })}
+              disabled={downloadingType !== null}
               style={styles.secondaryButton}
             >
-              High-risk CSV
+              {downloadingType === 'high' ? 'Preparing CSV...' : 'High-risk CSV'}
             </button>
             <button 
               type="button" 

@@ -16,7 +16,7 @@ from ..schemas import (
     BulkPredictionStatusResponse
 )
 from ..core.risk_score import build_risk_profile
-from ..models import BulkPredictionJob
+from ..models import BulkPredictionJob, BulkPredictionResult
 from ..core.model_service import model_service
 from .auth import get_current_user
 
@@ -279,6 +279,7 @@ def process_bulk_predictions_task(job_id: str, file_content: bytes):
         processed_records = 0
         successful_records = 0
         failed_records = 0
+        results_to_insert = []
 
         with open(output_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -306,6 +307,30 @@ def process_bulk_predictions_task(job_id: str, file_content: bytes):
                         "Recommended Offer": result["recommendation_type"],
                         "Action Description": result["recommendation_desc"],
                     })
+                    results_to_insert.append({
+                        "job_id": job_id,
+                        "customer_id": result["customer_id"],
+                        "age": result["age"],
+                        "income_level": _get_first(row, "income_level", "Income_Level", "Income Level", default="Medium"),
+                        "number_of_subscriptions": _to_int(_get_first(row, "number_of_subscriptions", "Number_of_Subscriptions", "Number of Subscriptions", default=1), 1),
+                        "tenure_months": result["tenure_months"],
+                        "monthly_total_spend": result["monthly_total_spend"],
+                        "avg_usage_hours_per_week": result["avg_usage_hours_per_week"],
+                        "app_switch_frequency": _to_int(_get_first(row, "app_switch_frequency", "App_Switch_Frequency", default=5), 5),
+                        "customer_support_interactions": result["customer_support_interactions"],
+                        "satisfaction_score": result["satisfaction_score"],
+                        "discount_used": _normalize_bool(_get_first(row, "discount_used", "Discount_Used", "Discount Used", default=False)),
+                        "device_type": _get_first(row, "device_type", "Device_Type", "Device Type", default="Mobile"),
+                        "payment_mode": _get_first(row, "payment_mode", "Payment_Mode", "Payment Mode", default="UPI"),
+                        "churn_probability": result["churn_probability"],
+                        "probability_confidence_lower": result["probability_confidence_lower"],
+                        "probability_confidence_upper": result["probability_confidence_upper"],
+                        "risk_category": result["risk_category"],
+                        "will_cancel": result["will_cancel"],
+                        "recommendation_type": result["recommendation_type"],
+                        "recommendation_desc": result["recommendation_desc"],
+                        "model_version": model_service.champion_version or "v1.2.0-catboost"
+                    })
                     successful_records += 1
                 except Exception as row_exc:
                     print(f"Failed to process bulk row for job {job_id}: {row_exc}")
@@ -326,6 +351,22 @@ def process_bulk_predictions_task(job_id: str, file_content: bytes):
                         successful_records=successful_records,
                         failed_records=failed_records,
                     )
+
+        if use_db and results_to_insert:
+            try:
+                db.bulk_insert_mappings(BulkPredictionResult, results_to_insert)
+                db.commit()
+            except Exception as db_exc:
+                print(f"Failed to save bulk prediction results to database for job {job_id}: {db_exc}")
+                failed_records += len(results_to_insert)
+                successful_records = 0
+                _set_job_fields(
+                    db,
+                    job_id,
+                    successful_records=0,
+                    failed_records=failed_records,
+                    error_message=f"Database save failed: {str(db_exc)}"
+                )
 
         completed_at = datetime.now(timezone.utc)
         download_url = f"/api/v1/reports/export?format=csv&job_id={job_id}"
@@ -622,3 +663,259 @@ async def get_bulk_preview(
         )
         
     return preview_data
+
+
+@router.get("/bulk/jobs")
+async def list_bulk_jobs(
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
+    jobs = db.query(BulkPredictionJob).order_by(BulkPredictionJob.created_at.desc()).all()
+    return [_job_to_dict(j) for j in jobs]
+
+
+@router.get("/bulk/jobs/{job_id}/results")
+async def get_bulk_results(
+    job_id: str,
+    page: int = 1,
+    limit: int = 15,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
+    if not _is_valid_job_id(job_id):
+        raise HTTPException(status_code=404, detail="Invalid job ID format.")
+    
+    offset = (page - 1) * limit
+    query = db.query(BulkPredictionResult).filter(BulkPredictionResult.job_id == job_id)
+    total = query.count()
+    results = query.offset(offset).limit(limit).all()
+    
+    return {
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "results": [
+            {
+                "customer_id": r.customer_id,
+                "age": r.age,
+                "income_level": r.income_level,
+                "number_of_subscriptions": r.number_of_subscriptions,
+                "tenure_months": r.tenure_months,
+                "monthly_total_spend": float(r.monthly_total_spend),
+                "avg_usage_hours_per_week": float(r.avg_usage_hours_per_week),
+                "app_switch_frequency": r.app_switch_frequency,
+                "customer_support_interactions": r.customer_support_interactions,
+                "satisfaction_score": r.satisfaction_score,
+                "discount_used": r.discount_used,
+                "device_type": r.device_type,
+                "payment_mode": r.payment_mode,
+                "churn_probability": float(r.churn_probability),
+                "probability_confidence_lower": float(r.probability_confidence_lower),
+                "probability_confidence_upper": float(r.probability_confidence_upper),
+                "risk_category": r.risk_category,
+                "will_cancel": r.will_cancel,
+                "recommendation_type": r.recommendation_type,
+                "recommendation_desc": r.recommendation_desc,
+                "predicted_at": r.predicted_at,
+                "model_version": r.model_version
+            }
+            for r in results
+        ]
+    }
+
+
+@router.get("/bulk/jobs/{job_id}/insights")
+async def get_bulk_insights(
+    job_id: str,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
+    if not _is_valid_job_id(job_id):
+        raise HTTPException(status_code=404, detail="Invalid job ID format.")
+    
+    rows = db.query(BulkPredictionResult).filter(BulkPredictionResult.job_id == job_id).all()
+    if not rows:
+        raise HTTPException(status_code=404, detail="No insights found for this bulk prediction job.")
+    
+    # Load into pandas for simple, complete metrics computations
+    data = []
+    for r in rows:
+        data.append({
+            "customer_id": r.customer_id,
+            "age": r.age,
+            "income_level": r.income_level,
+            "number_of_subscriptions": r.number_of_subscriptions,
+            "tenure_months": r.tenure_months,
+            "monthly_total_spend": float(r.monthly_total_spend),
+            "avg_usage_hours_per_week": float(r.avg_usage_hours_per_week),
+            "app_switch_frequency": r.app_switch_frequency,
+            "customer_support_interactions": r.customer_support_interactions,
+            "satisfaction_score": r.satisfaction_score,
+            "discount_used": r.discount_used,
+            "device_type": r.device_type,
+            "payment_mode": r.payment_mode,
+            "churn_probability": float(r.churn_probability),
+            "risk_category": r.risk_category,
+            "will_cancel": r.will_cancel,
+            "recommendation_type": r.recommendation_type,
+            "recommendation_desc": r.recommendation_desc
+        })
+    df = pd.DataFrame(data)
+    
+    # Calculate Executive KPIs
+    total_customers = len(df)
+    predicted_churn_customers = int(df["will_cancel"].sum())
+    high_risk_customers = int((df["risk_category"] == "High").sum())
+    average_churn_risk = round(float(df["churn_probability"].mean()), 2)
+    average_satisfaction = round(float(df["satisfaction_score"].mean()), 2)
+    average_monthly_spend = round(float(df["monthly_total_spend"].mean()), 2)
+    average_tenure_months = round(float(df["tenure_months"].mean()), 1)
+    monthly_revenue_at_risk = round(float(df[df["will_cancel"] == 1]["monthly_total_spend"].sum()), 2)
+    
+    kpis = {
+        "total_customers": total_customers,
+        "predicted_churn_customers": predicted_churn_customers,
+        "high_risk_customers": high_risk_customers,
+        "average_churn_risk": average_churn_risk,
+        "average_satisfaction": average_satisfaction,
+        "average_monthly_spend": average_monthly_spend,
+        "average_tenure_months": average_tenure_months,
+        "monthly_revenue_at_risk": monthly_revenue_at_risk
+    }
+    
+    # Charts & Breakdowns
+    risk_counts = df["risk_category"].value_counts().to_dict()
+    risk_distribution = [
+        {
+            "risk_category": cat,
+            "customer_count": int(risk_counts.get(cat, 0)),
+            "percentage": round(float(risk_counts.get(cat, 0) * 100.0 / total_customers), 2)
+        }
+        for cat in ["Low", "Medium", "High"]
+    ]
+    
+    prob_bins = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+    prob_labels = ["0-10%", "10-20%", "20-30%", "30-40%", "40-50%", "50-60%", "60-70%", "70-80%", "80-90%", "90-100%"]
+    df["prob_bucket"] = pd.cut(df["churn_probability"], bins=prob_bins, labels=prob_labels, include_lowest=True)
+    bucket_counts = df["prob_bucket"].value_counts().to_dict()
+    churn_probability_buckets = [
+        {"bucket": label, "count": int(bucket_counts.get(label, 0))}
+        for label in prob_labels
+    ]
+    
+    rev_by_cat = df.groupby("risk_category")["monthly_total_spend"].sum().to_dict()
+    revenue_at_risk_by_category = [
+        {"risk_category": cat, "revenue": round(float(rev_by_cat.get(cat, 0.0)), 2)}
+        for cat in ["Low", "Medium", "High"]
+    ]
+    
+    rec_counts = df["recommendation_type"].value_counts().to_dict()
+    recommendation_type_counts = [
+        {"recommendation_type": k, "count": int(v)}
+        for k, v in rec_counts.items()
+    ]
+    
+    device_grp = df.groupby(["device_type", "risk_category"]).size().unstack(fill_value=0)
+    device_risk_breakdown = []
+    for device, row_data in device_grp.iterrows():
+        total_dev = int(row_data.sum())
+        device_risk_breakdown.append({
+            "device_type": device,
+            "total_customers": total_dev,
+            "low_risk": int(row_data.get("Low", 0)),
+            "medium_risk": int(row_data.get("Medium", 0)),
+            "high_risk": int(row_data.get("High", 0)),
+            "churn_rate": round(float(row_data.get("High", 0) * 100.0 / total_dev) if total_dev > 0 else 0.0, 2)
+        })
+        
+    pay_grp = df.groupby(["payment_mode", "risk_category"]).size().unstack(fill_value=0)
+    payment_risk_breakdown = []
+    for payment, row_data in pay_grp.iterrows():
+        total_pay = int(row_data.sum())
+        payment_risk_breakdown.append({
+            "payment_mode": payment,
+            "total_customers": total_pay,
+            "low_risk": int(row_data.get("Low", 0)),
+            "medium_risk": int(row_data.get("Medium", 0)),
+            "high_risk": int(row_data.get("High", 0)),
+            "churn_rate": round(float(row_data.get("High", 0) * 100.0 / total_pay) if total_pay > 0 else 0.0, 2)
+        })
+        
+    inc_grp = df.groupby(["income_level", "risk_category"]).size().unstack(fill_value=0)
+    income_risk_breakdown = []
+    for income, row_data in inc_grp.iterrows():
+        total_inc = int(row_data.sum())
+        income_risk_breakdown.append({
+            "income_level": income,
+            "total_customers": total_inc,
+            "low_risk": int(row_data.get("Low", 0)),
+            "medium_risk": int(row_data.get("Medium", 0)),
+            "high_risk": int(row_data.get("High", 0)),
+            "churn_rate": round(float(row_data.get("High", 0) * 100.0 / total_inc) if total_inc > 0 else 0.0, 2)
+        })
+        
+    def tenure_bucket(months):
+        if months < 6: return "< 6m"
+        if months <= 12: return "6-12m"
+        if months <= 24: return "12-24m"
+        return "24m+"
+    df["tenure_bucket"] = df["tenure_months"].apply(tenure_bucket)
+    ten_grp = df.groupby(["tenure_bucket", "risk_category"]).size().unstack(fill_value=0)
+    tenure_risk_breakdown = []
+    for bucket in ["< 6m", "6-12m", "12-24m", "24m+"]:
+        if bucket in ten_grp.index:
+            row_data = ten_grp.loc[bucket]
+            total_ten = int(row_data.sum())
+            tenure_risk_breakdown.append({
+                "tenure_bucket": bucket,
+                "total_customers": total_ten,
+                "low_risk": int(row_data.get("Low", 0)),
+                "medium_risk": int(row_data.get("Medium", 0)),
+                "high_risk": int(row_data.get("High", 0))
+            })
+            
+    sat_grp = df.groupby("satisfaction_score")
+    satisfaction_vs_churn = []
+    for score_val, grp in sat_grp:
+        satisfaction_vs_churn.append({
+            "satisfaction_score": int(score_val),
+            "total_customers": len(grp),
+            "avg_churn_probability": round(float(grp["churn_probability"].mean()), 2),
+            "avg_support_interactions": round(float(grp["customer_support_interactions"].mean()), 2)
+        })
+        
+    risk_grp = df.groupby("risk_category")
+    engagement_by_risk = []
+    for cat in ["Low", "Medium", "High"]:
+        if cat in risk_grp.groups:
+            grp = risk_grp.get_group(cat)
+            engagement_by_risk.append({
+                "risk_category": cat,
+                "avg_usage_hours": round(float(grp["avg_usage_hours_per_week"].mean()), 2),
+                "avg_support_interactions": round(float(grp["customer_support_interactions"].mean()), 2),
+                "avg_app_switches": round(float(grp["app_switch_frequency"].mean()), 2)
+            })
+            
+    top_high_risk = df.sort_values(by="churn_probability", ascending=False).head(10).to_dict("records")
+    top_rev_at_risk = df.sort_values(by="monthly_total_spend", ascending=False).head(10).to_dict("records")
+    low_eng_high_risk = df[(df["risk_category"] == "High") & (df["avg_usage_hours_per_week"] < 12.0)].sort_values(by="churn_probability", ascending=False).head(10).to_dict("records")
+    
+    return {
+        "kpis": kpis,
+        "risk_distribution": risk_distribution,
+        "churn_probability_buckets": churn_probability_buckets,
+        "revenue_at_risk_by_category": revenue_at_risk_by_category,
+        "recommendation_type_counts": recommendation_type_counts,
+        "device_risk_breakdown": device_risk_breakdown,
+        "payment_risk_breakdown": payment_risk_breakdown,
+        "income_risk_breakdown": income_risk_breakdown,
+        "tenure_risk_breakdown": tenure_risk_breakdown,
+        "satisfaction_vs_churn_risk": satisfaction_vs_churn,
+        "engagement_by_risk": engagement_by_risk,
+        "tables": {
+            "top_high_risk_customers": top_high_risk,
+            "top_revenue_at_risk_customers": top_rev_at_risk,
+            "low_engagement_high_risk_customers": low_eng_high_risk
+        }
+    }
+

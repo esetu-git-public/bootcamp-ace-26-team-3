@@ -263,6 +263,56 @@ export async function getBulkPredictionPreview(jobId) {
 }
 
 /**
+ * Get all bulk prediction jobs
+ */
+export async function getBulkJobs() {
+  return request('/predictions/bulk/jobs');
+}
+
+/**
+ * Get results of a bulk job (paginated)
+ */
+export async function getBulkJobResults(jobId, page = 1, limit = 15) {
+  return request(`/predictions/bulk/jobs/${jobId}/results?page=${page}&limit=${limit}`);
+}
+
+/**
+ * Get insights of a bulk job
+ */
+export async function getBulkJobInsights(jobId) {
+  return request(`/predictions/bulk/jobs/${jobId}/insights`);
+}
+
+/**
+ * Export bulk PDF report
+ */
+export async function exportBulkPdfReport(jobId) {
+  const endpoint = `/reports/bulk/${jobId}/pdf`;
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(response);
+    const error = {
+      status: response.status,
+      message: errorMessage,
+      endpoint,
+    };
+    notifyApiError(error);
+    throw error;
+  }
+
+  const disposition = response.headers?.get?.('Content-Disposition') || '';
+  const filenameMatch = disposition.match(/filename="?([^"]+)"?/i);
+  const filename = filenameMatch?.[1] || `bulk_insights_${jobId}.pdf`;
+  const blob = await response.blob();
+
+  return { blob, filename };
+}
+
+
+/**
  * Export report file with auth headers.
  */
 export async function exportReport(format = 'csv', filters = {}) {

@@ -6,6 +6,7 @@ import io
 import csv
 import os
 import re
+from datetime import datetime
 from typing import Optional
 from ..database import get_db
 from .auth import get_current_user
@@ -122,3 +123,154 @@ async def export_report(
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=high_risk_customers_report.csv"}
     )
+
+
+@router.get("/bulk/{job_id}/pdf")
+async def export_bulk_pdf_report(
+    job_id: str,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
+    if not _is_valid_job_id(job_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Bulk prediction report not found."
+        )
+
+    # 1. Fetch insights from bulk_prediction_results table
+    from .predictions import get_bulk_insights
+    try:
+        insights = await get_bulk_insights(job_id=job_id, db=db, current_user=current_user)
+    except HTTPException:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Bulk prediction report not found or has no records."
+        )
+
+    # 2. Build PDF Document in-memory
+    pdf_buffer = io.BytesIO()
+    
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
+
+    doc = SimpleDocTemplate(
+        pdf_buffer,
+        pagesize=letter,
+        rightMargin=36,
+        leftMargin=36,
+        topMargin=36,
+        bottomMargin=36
+    )
+
+    styles = getSampleStyleSheet()
+    
+    # Custom Styles for Sleek Look
+    title_style = ParagraphStyle(
+        'DocTitle',
+        parent=styles['Heading1'],
+        fontName='Helvetica-Bold',
+        fontSize=22,
+        textColor=colors.HexColor('#1e1b4b'), # Indigo
+        spaceAfter=15
+    )
+    subtitle_style = ParagraphStyle(
+        'DocSubtitle',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=10,
+        textColor=colors.HexColor('#475569'),
+        spaceAfter=25
+    )
+    section_heading = ParagraphStyle(
+        'SectionHeading',
+        parent=styles['Heading2'],
+        fontName='Helvetica-Bold',
+        fontSize=14,
+        textColor=colors.HexColor('#0f172a'),
+        spaceBefore=20,
+        spaceAfter=10
+    )
+
+    story = []
+
+    # Title & Metadata
+    story.append(Paragraph("Dataset Insights Report", title_style))
+    story.append(Paragraph(f"Bulk Job ID: {job_id}  &nbsp;•&nbsp; Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", subtitle_style))
+    
+    story.append(Spacer(1, 10))
+
+    # Executive KPIs Section
+    story.append(Paragraph("Executive KPIs", section_heading))
+    kpi_data = [
+        ["Metric", "Value", "Metric", "Value"],
+        ["Total Customers", str(insights["kpis"]["total_customers"]), "Predicted Churn Customers", str(insights["kpis"]["predicted_churn_customers"])],
+        ["High Risk Customers", str(insights["kpis"]["high_risk_customers"]), "Avg Churn Risk", f"{insights['kpis']['average_churn_risk']}%"],
+        ["Avg Satisfaction", f"{insights['kpis']['average_satisfaction']}/10", "Avg Spend", f"${insights['kpis']['average_monthly_spend']}"],
+        ["Avg Tenure", f"{insights['kpis']['average_tenure_months']} months", "Monthly Revenue at Risk", f"${insights['kpis']['monthly_revenue_at_risk']}"]
+    ]
+    t_kpi = Table(kpi_data, colWidths=[130, 130, 150, 130])
+    t_kpi.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e2e8f0')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#0f172a')),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+    ]))
+    story.append(t_kpi)
+
+    story.append(Spacer(1, 15))
+
+    # Risk Category Distribution Table
+    story.append(Paragraph("Risk Category Distribution", section_heading))
+    dist_data = [["Risk Category", "Customer Count", "Percentage"]]
+    for item in insights["risk_distribution"]:
+        dist_data.append([item["risk_category"], str(item["customer_count"]), f"{item['percentage']}%"])
+    t_dist = Table(dist_data, colWidths=[180, 180, 180])
+    t_dist.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f1f5f9')),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+    ]))
+    story.append(t_dist)
+
+    story.append(Spacer(1, 15))
+
+    # Top High Risk Customers Table
+    story.append(Paragraph("Top High-Risk Customers (Inference)", section_heading))
+    top_cust_data = [["Customer ID", "Age", "Tenure", "Monthly Spend", "Churn Prob", "Recommendation"]]
+    for r in insights["tables"]["top_high_risk_customers"][:5]:
+        top_cust_data.append([
+            r["customer_id"],
+            str(r["age"]),
+            f"{r['tenure_months']}m",
+            f"${r['monthly_total_spend']}",
+            f"{r['churn_probability']}%",
+            r["recommendation_type"]
+        ])
+    t_top = Table(top_cust_data, colWidths=[90, 60, 60, 90, 80, 160])
+    t_top.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f8fafc')),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('FONTSIZE', (0, 0), (-1, -1), 8.5),
+    ]))
+    story.append(t_top)
+
+    doc.build(story)
+    
+    # Seek to start
+    pdf_buffer.seek(0)
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=dataset_insights_{job_id}.pdf"}
+    )
+

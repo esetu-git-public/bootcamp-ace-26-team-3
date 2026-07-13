@@ -7,12 +7,14 @@ import CustomerProfile from './pages/CustomerProfile';
 import CustomerDirectory from './pages/CustomerDirectory';
 import ModelPerformance from './pages/ModelPerformance';
 import ScrumBoard from './pages/ScrumBoard';
+import DatasetInsights from './pages/DatasetInsights';
 import AlertNotifications from './components/AlertNotifications';
 
 function App() {
   const [view, setView] = useState('login');
   const [token, setToken] = useState(localStorage.getItem('access_token') || sessionStorage.getItem('access_token'));
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
+  const [selectedJobId, setSelectedJobId] = useState('');
   const [notifications, setNotifications] = useState([]);
   const [predictionRefreshToken, setPredictionRefreshToken] = useState(0);
 
@@ -98,7 +100,7 @@ function App() {
     }
   }, [addNotification]);
 
-  const isAuth = token && ['dashboard', 'directory', 'profile', 'model', 'board', 'users'].includes(view);
+  const isAuth = token && ['dashboard', 'directory', 'profile', 'model', 'board', 'users', 'bulk_insights'].includes(view);
 
   return (
     <div className="App" style={styles.appContainer}>
@@ -175,7 +177,7 @@ function App() {
           />
         )}
         {view === 'dashboard' && (
-          <AnalyticsDashboard onViewChange={setView} onSelectCustomer={setSelectedCustomerId} onLogout={handleLogout} onNotify={addNotification} predictionRefreshToken={predictionRefreshToken} />
+          <AnalyticsDashboard onViewChange={setView} onSelectCustomer={setSelectedCustomerId} setSelectedJobId={setSelectedJobId} onLogout={handleLogout} onNotify={addNotification} predictionRefreshToken={predictionRefreshToken} />
         )}
         {view === 'directory' && (
           <CustomerDirectory
@@ -212,6 +214,14 @@ function App() {
           <SignUp
             isAdminPanel={true}
             onNavigateToLogin={() => setView('login')}
+          />
+        )}
+        {view === 'bulk_insights' && (
+          <DatasetInsights
+            jobId={selectedJobId}
+            onViewChange={setView}
+            setSelectedJobId={setSelectedJobId}
+            onNotify={addNotification}
           />
         )}
       </main>

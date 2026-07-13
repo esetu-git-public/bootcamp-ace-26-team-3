@@ -85,6 +85,43 @@ class BulkPredictionJob(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     completed_at = Column(DateTime(timezone=True), nullable=True)
 
+    # Relationships
+    results = relationship("BulkPredictionResult", back_populates="job", cascade="all, delete-orphan")
+
+
+class BulkPredictionResult(Base):
+    __tablename__ = "bulk_prediction_results"
+
+    result_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    job_id = Column(String(64), ForeignKey("bulk_prediction_jobs.job_id", ondelete="CASCADE"), nullable=False)
+    customer_id = Column(String(50), nullable=False, index=True)
+    age = Column(Integer, nullable=False)
+    income_level = Column(String(10), nullable=False)
+    number_of_subscriptions = Column(Integer, nullable=False, default=1)
+    tenure_months = Column(Integer, nullable=False)
+    monthly_total_spend = Column(Numeric(10, 2), nullable=False)
+    avg_usage_hours_per_week = Column(Numeric(5, 2), nullable=False)
+    app_switch_frequency = Column(Integer, nullable=False)
+    customer_support_interactions = Column(Integer, nullable=False, default=0)
+    satisfaction_score = Column(Integer, nullable=False)
+    discount_used = Column(Boolean, nullable=False, default=False)
+    device_type = Column(String(20), nullable=False)
+    payment_mode = Column(String(30), nullable=False)
+    
+    # Prediction details
+    churn_probability = Column(Numeric(5, 2), nullable=False)
+    probability_confidence_lower = Column(Numeric(5, 2), nullable=False)
+    probability_confidence_upper = Column(Numeric(5, 2), nullable=False)
+    risk_category = Column(String(10), nullable=False)
+    will_cancel = Column(Integer, nullable=False)
+    recommendation_type = Column(String(50), nullable=False)
+    recommendation_desc = Column(Text, nullable=False)
+    predicted_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    model_version = Column(String(20), nullable=True)
+
+    # Relationship to Job
+    job = relationship("BulkPredictionJob", back_populates="results")
+
 
 class RetentionIntervention(Base):
     __tablename__ = "retention_interventions"

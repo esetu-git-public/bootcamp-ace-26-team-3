@@ -13,7 +13,7 @@ const sortCustomersByRisk = (rows) =>
     return String(a.customer_id || '').localeCompare(String(b.customer_id || ''), undefined, { numeric: true });
   });
 
-function AnalyticsDashboard({ onViewChange, onSelectCustomer, onLogout, onNotify, predictionRefreshToken }) {
+function AnalyticsDashboard({ onViewChange, onSelectCustomer, setSelectedJobId, onLogout, onNotify, predictionRefreshToken }) {
   const [kpis, setKpis] = useState(null);
   const [riskDistribution, setRiskDistribution] = useState([]);
   const [incomeData, setIncomeData] = useState([]);
@@ -32,11 +32,25 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, onLogout, onNotify
   const [bulkError, setBulkError] = useState('');
   const [bulkJob, setBulkJob] = useState(null);
   const [bulkPreview, setBulkPreview] = useState([]);
+  const [bulkJobs, setBulkJobs] = useState([]);
   const [reportDownloading, setReportDownloading] = useState(false);
   const [activeTrendTab, setActiveTrendTab] = useState('rate'); // 'rate' or 'volume'
   const [hoveredTrendIdx, setHoveredTrendIdx] = useState(null);
   const [hoveredDonutIdx, setHoveredDonutIdx] = useState(null);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function loadBulkJobs() {
+      try {
+        const jobs = await apiService.getBulkJobs();
+        if (!cancelled) setBulkJobs(jobs);
+      } catch (err) {
+        console.error('Failed to load bulk jobs list:', err);
+      }
+    }
+    loadBulkJobs();
+    return () => { cancelled = true; };
+  }, [bulkJob?.status]);
 
   // Keep a stable ref to onLogout so we can call it inside the effect
   // without adding it as a dependency (avoids infinite refetch loop on re-render).
@@ -288,8 +302,8 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, onLogout, onNotify
             </div>
             <p style={styles.helperText}>{bulkJob.processed_records || 0} of {bulkJob.total_records || 0} records processed</p>
             {bulkJob.error_message ? <p style={styles.errorText}>{bulkJob.error_message}</p> : null}
-            {bulkJob.status === 'COMPLETED' && bulkJob.download_url ? (
-              <div style={{ marginTop: '10px' }}>
+             {bulkJob.status === 'COMPLETED' && bulkJob.download_url ? (
+              <div style={{ marginTop: '10px', display: 'flex', gap: '12px' }}>
                 <button
                   type="button"
                   onClick={() => downloadReport({ jobId: bulkJob.job_id })}
@@ -297,6 +311,18 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, onLogout, onNotify
                   style={styles.linkButton}
                 >
                   Download report CSV
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (setSelectedJobId) {
+                      setSelectedJobId(bulkJob.job_id);
+                      onViewChange('bulk_insights');
+                    }
+                  }}
+                  style={{ ...styles.linkButton, color: '#818cf8', fontWeight: 'bold' }}
+                >
+                  View Dataset Insights →
                 </button>
               </div>
             ) : null}
@@ -328,6 +354,56 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, onLogout, onNotify
                 </table>
               </div>
             ) : null}
+          </div>
+        ) : null}
+
+        {bulkJobs.length > 0 ? (
+          <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
+            <h4 style={{ color: '#e2e8f0', fontSize: '0.95rem', marginBottom: '12px', fontWeight: 600 }}>Previous Bulk Reports</h4>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+              {bulkJobs.map((job) => (
+                <div 
+                  key={job.job_id} 
+                  onClick={() => {
+                    if (setSelectedJobId) {
+                      setSelectedJobId(job.job_id);
+                      onViewChange('bulk_insights');
+                    }
+                  }}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.02)',
+                    border: '1px solid rgba(255, 255, 255, 0.06)',
+                    borderRadius: '8px',
+                    padding: '10px 14px',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem',
+                    transition: 'all 0.2s',
+                    flex: '1 1 calc(33% - 12px)',
+                    minWidth: '220px',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(99, 102, 241, 0.08)';
+                    e.currentTarget.style.borderColor = 'rgba(99, 102, 241, 0.3)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.06)';
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ color: '#cbd5e1', fontWeight: 500 }}>Job: {job.job_id.slice(0, 8)}...</span>
+                    <span style={{ 
+                      color: job.status === 'COMPLETED' ? '#34d399' : job.status === 'FAILED' ? '#f87171' : '#fbbf24',
+                      fontWeight: 'bold',
+                      fontSize: '0.75rem'
+                    }}>{job.status}</span>
+                  </div>
+                  <div style={{ color: '#64748b', fontSize: '0.8rem' }}>
+                    {job.processed_records || 0} records processed &bull; {new Date(job.created_at).toLocaleDateString()}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         ) : null}
       </section>

@@ -17,6 +17,7 @@ jest.mock('../services/api', () => ({
   getCustomers: jest.fn(),
   uploadBulkPredictions: jest.fn(),
   getBulkPredictionStatus: jest.fn(),
+  getBulkJobs: jest.fn(),
   getChurnTrends: jest.fn(),
 }));
 
@@ -43,6 +44,7 @@ describe('AnalyticsDashboard', () => {
     ]);
     apiService.getCustomers.mockResolvedValue({ results: [{ customer_id: '1001', risk_category: 'High', monthly_total_spend: 80, tenure_months: 8, satisfaction_score: 6 }] });
     apiService.uploadBulkPredictions.mockResolvedValue({ job_id: 'job-1', status: 'QUEUED', total_records: 2 });
+    apiService.getBulkJobs.mockResolvedValue([]);
     apiService.getChurnTrends.mockResolvedValue([
       {"period": "Feb 2026", "churn_rate": 15.42, "churn_count": 2458, "total_customers": 15946, "average_risk": 20.30},
       {"period": "Mar 2026", "churn_rate": 14.85, "churn_count": 2368, "total_customers": 15946, "average_risk": 18.90},

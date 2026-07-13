@@ -117,6 +117,86 @@ export default function CustomerProfile({ onViewChange, onLogout, onNotify, sele
   const [notFound,   setNotFound]     = useState(false);
   const inputRef = useRef(null);
 
+  // Retention Interventions State
+  const [interventions, setInterventions] = useState([]);
+  const [loadingInterventions, setLoadingInterventions] = useState(false);
+  const [newOfferType, setNewOfferType] = useState('');
+  const [newStatus, setNewStatus] = useState('planned');
+  const [newNotes, setNewNotes] = useState('');
+  const [loggingIntervention, setLoggingIntervention] = useState(false);
+
+  const fetchInterventions = async (id) => {
+    setLoadingInterventions(true);
+    try {
+      const data = await apiService.getInterventions(id);
+      setInterventions(data || []);
+    } catch (err) {
+      console.error('Failed to load retention interventions', err);
+    } finally {
+      setLoadingInterventions(false);
+    }
+  };
+
+  const handleCreateIntervention = async (e) => {
+    e.preventDefault();
+    if (!newOfferType.trim()) return;
+    setLoggingIntervention(true);
+    try {
+      await apiService.createIntervention({
+        customer_id: customerId,
+        offer_type: newOfferType.trim(),
+        status: newStatus,
+        notes: newNotes.trim() || null,
+        prediction_id: prediction?.prediction_id || null,
+      });
+      setNewOfferType('');
+      setNewNotes('');
+      setNewStatus('planned');
+      fetchInterventions(customerId);
+      if (onNotify) {
+        onNotify({
+          type: 'success',
+          title: 'Action logged',
+          message: 'Retention intervention logged successfully.'
+        });
+      }
+    } catch (err) {
+      if (onNotify) {
+        onNotify({
+          type: 'error',
+          title: 'Logging failed',
+          message: err.message || 'Failed to log intervention.'
+        });
+      }
+    } finally {
+      setLoggingIntervention(false);
+    }
+  };
+
+  const handleUpdateInterventionStatus = async (interventionId, statusVal) => {
+    try {
+      await apiService.updateIntervention(interventionId, {
+        status: statusVal
+      });
+      fetchInterventions(customerId);
+      if (onNotify) {
+        onNotify({
+          type: 'success',
+          title: 'Status updated',
+          message: `Intervention status updated to ${statusVal}.`
+        });
+      }
+    } catch (err) {
+      if (onNotify) {
+        onNotify({
+          type: 'error',
+          title: 'Update failed',
+          message: err.message || 'Failed to update status.'
+        });
+      }
+    }
+  };
+
   const fetchCustomerDetails = async (id) => {
     if (!id) return;
     setLoading(true);
@@ -139,6 +219,7 @@ export default function CustomerProfile({ onViewChange, onLogout, onNotify, sele
         });
       }
       fetchPredictionHistory(id);
+      fetchInterventions(id);
     } catch (err) {
       if (err.status === 401)      { onLogout({ silent: true }); }
       else if (err.status === 404) { setNotFound(true); setCustomer(null); }
@@ -437,6 +518,114 @@ export default function CustomerProfile({ onViewChange, onLogout, onNotify, sele
                     );
                   })}
                 </div>
+              </div>
+
+              {/* Retention Interventions Tracker */}
+              <div className="cp-card" style={S.card}>
+                <h3 style={S.cardTitle}>
+                  <span style={{ ...S.titleDot, background: '#10b981' }} />
+                  Retention Interventions Tracker
+                </h3>
+                <p style={S.helperText}>
+                  Log and track retention actions (discounts, downgrades, etc.) and customer responses
+                </p>
+
+                {/* Log New Action Form */}
+                <form onSubmit={handleCreateIntervention} style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '16px' }}>
+                  <h4 style={{ margin: 0, fontSize: '0.85rem', color: '#e2e8f0', fontWeight: 600 }}>Log New Retention Action</h4>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      type="text"
+                      placeholder="Action/Offer Type (e.g. 20% Renewal Discount)"
+                      value={newOfferType}
+                      onChange={(e) => setNewOfferType(e.target.value)}
+                      style={{ flex: 1, background: 'rgba(15,23,42,.9)', border: '1px solid rgba(255,255,255,.1)', borderRadius: '8px', padding: '8px 10px', color: '#fff', fontSize: '0.8rem', outline: 'none' }}
+                      required
+                    />
+                    <select
+                      value={newStatus}
+                      onChange={(e) => setNewStatus(e.target.value)}
+                      style={{ background: 'rgba(15,23,42,.9)', border: '1px solid rgba(255,255,255,.1)', borderRadius: '8px', padding: '8px 10px', color: '#fff', fontSize: '0.8rem', outline: 'none' }}
+                    >
+                      <option value="planned">Planned</option>
+                      <option value="sent">Sent</option>
+                      <option value="accepted">Accepted</option>
+                      <option value="ignored">Ignored</option>
+                      <option value="retained">Retained</option>
+                      <option value="churned">Churned</option>
+                    </select>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Action Notes (optional)"
+                    value={newNotes}
+                    onChange={(e) => setNewNotes(e.target.value)}
+                    style={{ background: 'rgba(15,23,42,.9)', border: '1px solid rgba(255,255,255,.1)', borderRadius: '8px', padding: '8px 10px', color: '#fff', fontSize: '0.8rem', outline: 'none' }}
+                  />
+                  <button
+                    type="submit"
+                    disabled={loggingIntervention}
+                    style={{ background: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', padding: '10px', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', transition: 'background 0.2s' }}
+                  >
+                    {loggingIntervention ? 'Saving...' : 'Log Action'}
+                  </button>
+                </form>
+
+                {/* Intervention History */}
+                {loadingInterventions ? (
+                  <p style={{ color: '#64748b', fontStyle: 'italic', fontSize: '0.82rem', margin: 0 }}>Loading actions...</p>
+                ) : interventions.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {interventions.map((item) => {
+                      const statusColors = {
+                        planned: { bg: 'rgba(255,255,255,0.06)', text: '#cbd5e1', border: 'rgba(255,255,255,0.1)' },
+                        sent: { bg: 'rgba(56,189,248,0.12)', text: '#38bdf8', border: 'rgba(56,189,248,0.2)' },
+                        accepted: { bg: 'rgba(52,211,153,0.12)', text: '#34d399', border: 'rgba(52,211,153,0.2)' },
+                        ignored: { bg: 'rgba(251,191,36,0.12)', text: '#fde047', border: 'rgba(251,191,36,0.2)' },
+                        retained: { bg: 'rgba(16,185,129,0.15)', text: '#10b981', border: 'rgba(16,185,129,0.3)' },
+                        churned: { bg: 'rgba(239,68,68,0.15)', text: '#ef4444', border: 'rgba(239,68,68,0.3)' },
+                      };
+                      const colors = statusColors[item.status] || { bg: 'rgba(255,255,255,0.06)', text: '#cbd5e1', border: 'rgba(255,255,255,0.1)' };
+                      return (
+                        <div key={item.intervention_id} style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            <strong style={{ fontSize: '0.85rem', color: '#e2e8f0' }}>{item.offer_type}</strong>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 700, background: colors.bg, color: colors.text, border: `1px solid ${colors.border}` }}>
+                                {item.status.toUpperCase()}
+                              </span>
+                              <select
+                                value={item.status}
+                                onChange={(e) => handleUpdateInterventionStatus(item.intervention_id, e.target.value)}
+                                style={{ background: 'rgba(15,23,42,0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '2px 4px', color: '#cbd5e1', fontSize: '0.7rem', outline: 'none' }}
+                              >
+                                <option value="planned">Planned</option>
+                                <option value="sent">Sent</option>
+                                <option value="accepted">Accepted</option>
+                                <option value="ignored">Ignored</option>
+                                <option value="retained">Retained</option>
+                                <option value="churned">Churned</option>
+                              </select>
+                            </div>
+                          </div>
+                          {item.notes && (
+                            <p style={{ margin: 0, fontSize: '0.8rem', color: '#cbd5e1', lineHeight: 1.4 }}>
+                              {item.notes}
+                            </p>
+                          )}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748b' }}>
+                            <span>By {item.created_by || 'system'}</span>
+                            <span>{new Date(item.created_at).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p style={{ color: '#64748b', fontStyle: 'italic', textAlign: 'center', fontSize: '0.8rem', margin: '10px 0' }}>
+                    No retention interventions logged for this customer.
+                  </p>
+                )}
               </div>
             </div>
 

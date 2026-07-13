@@ -38,6 +38,7 @@ class ChurnPrediction(Base):
     recommendation_type = Column(String(50), nullable=False)
     recommendation_desc = Column(Text, nullable=False)
     predicted_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    model_version = Column(String(20), nullable=True)
 
     # Relationships
     customer = relationship("Customer", back_populates="predictions")

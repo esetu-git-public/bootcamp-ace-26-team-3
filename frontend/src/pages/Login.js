@@ -34,37 +34,37 @@ export default function Login({ onLoginSuccess, onNavigateToSignup }) {
       {/* Left Showcase Panel */}
       <div className="login-left-panel">
         <div className="login-brand">
-          <span className="login-brand-icon">CE</span>
-          <span>Customer Engagement Tracker</span>
+          <span className="login-brand-icon">⚡</span>
+          <span>Subscription Churn Predictor</span>
         </div>
 
         <div className="login-showcase-content">
           <div className="login-showcase-tag">
-            Customer Engagement Intelligence
+            🎯 AI-Powered Retention Engine
           </div>
           <h1 className="login-showcase-title">
-            Track Signals. <br />
-            Prioritize Outreach. <br />
-            <span>Grow Customer Value.</span>
+            Predict Churn. <br />
+            Retain Customers. <br />
+            <span>Grow Lifetime Value.</span>
           </h1>
           <p className="login-showcase-subtitle">
-            Sign in to monitor engagement health, spot at-risk accounts, and focus every retention action where it can make the biggest difference.
+            Unleash the power of real-time machine learning predictions, analytical insight dashboards, and customized retention playbook generators for subscription managers.
           </p>
 
           <div className="login-kpis-grid">
             <div className="login-kpi-card">
               <div className="login-kpi-value kpi-value-green">14.2%</div>
-              <div className="login-kpi-label">Average Churn Reduction</div>
+              <div className="login-kpi-label">Average Churn Rate Reductions</div>
             </div>
             <div className="login-kpi-card">
               <div className="login-kpi-value kpi-value-purple">96.5%</div>
-              <div className="login-kpi-label">Prediction Accuracy</div>
+              <div className="login-kpi-label">Prediction Accuracy Rate</div>
             </div>
           </div>
         </div>
 
         <div className="login-showcase-footer">
-          (c) {new Date().getFullYear()} Customer Engagement Tracker. All rights reserved.
+          © {new Date().getFullYear()} Churn Predictor Inc. All rights reserved.
         </div>
       </div>
 
@@ -75,7 +75,7 @@ export default function Login({ onLoginSuccess, onNavigateToSignup }) {
           <div className="login-glass-card">
             <div className="login-card-header">
               <h2 className="login-card-title">Welcome Back</h2>
-              <p className="login-card-subtitle">Sign in to access your engagement dashboard</p>
+              <p className="login-card-subtitle">Sign in to access your manager dashboard</p>
             </div>
 
             {error && (
@@ -112,7 +112,7 @@ export default function Login({ onLoginSuccess, onNavigateToSignup }) {
                   <input
                     id="password"
                     type={showPassword ? "text" : "password"}
-                    placeholder="Password"
+                    placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className={`login-form-input ${error && !password ? 'input-has-error' : ''}`}

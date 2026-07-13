@@ -6,6 +6,14 @@
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1';
 const BACKEND_ORIGIN = API_BASE_URL.replace('/api/v1', '');
 
+function notifyApiError(error) {
+  if (typeof window === 'undefined') return;
+
+  window.dispatchEvent(new CustomEvent('app:api-error', {
+    detail: error,
+  }));
+}
+
 /**
  * Decode a JWT and check if it's expired (client-side only, no signature verify).
  * Returns true if the token is missing, malformed, or past its exp claim.
@@ -52,7 +60,9 @@ async function request(endpoint, options = {}) {
   // Proactively check token expiry — avoids wasting a round-trip on a 401
   if (token && isTokenExpired(token)) {
     localStorage.removeItem('access_token');
-    throw { status: 401, message: 'Session expired. Please log in again.', endpoint };
+    const error = { status: 401, message: 'Session expired. Please log in again.', endpoint };
+    notifyApiError(error);
+    throw error;
   }
 
   const url = `${API_BASE_URL}${endpoint}`;
@@ -68,11 +78,13 @@ async function request(endpoint, options = {}) {
 
   if (!response.ok) {
     const errorMessage = await parseErrorResponse(response);
-    throw {
+    const error = {
       status: response.status,
       message: errorMessage,
       endpoint,
     };
+    notifyApiError(error);
+    throw error;
   }
 
   // Handle 204 No Content
@@ -215,11 +227,13 @@ export async function uploadBulkPredictions(file) {
 
   if (!response.ok) {
     const errorMessage = await parseErrorResponse(response);
-    throw {
+    const error = {
       status: response.status,
       message: errorMessage,
       endpoint: '/predictions/bulk',
     };
+    notifyApiError(error);
+    throw error;
   }
 
   return response.json();
@@ -256,11 +270,13 @@ export async function exportReport(format = 'csv', filters = {}) {
 
   if (!response.ok) {
     const errorMessage = await parseErrorResponse(response);
-    throw {
+    const error = {
       status: response.status,
       message: errorMessage,
       endpoint,
     };
+    notifyApiError(error);
+    throw error;
   }
 
   const disposition = response.headers?.get?.('Content-Disposition') || '';

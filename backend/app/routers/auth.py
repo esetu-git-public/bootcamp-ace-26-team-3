@@ -80,6 +80,11 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Inactive user account"
         )
+    
+    # Update login frequency and last login timestamp
+    user.login_frequency = (user.login_frequency or 0) + 1
+    user.last_login_at = datetime.utcnow()
+    db.commit()
         
     access_token, expires_in = create_access_token(
         data={"sub": user.username, "role": "Administrator"}

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as apiService from '../services/api';
 import { clampPercent, formatPercent } from '../utils/percent';
 
@@ -24,7 +24,13 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
   const [bulkPreview, setBulkPreview] = useState([]);
   const [reportDownloading, setReportDownloading] = useState(false);
 
+  // Keep a stable ref to onLogout so we can call it inside the effect
+  // without adding it as a dependency (avoids infinite refetch loop on re-render).
+  const onLogoutRef = useRef(onLogout);
+  useEffect(() => { onLogoutRef.current = onLogout; }, [onLogout]);
+
   useEffect(() => {
+    let cancelled = false;
     Promise.all([
       apiService.getDashboardKPIs(),
       apiService.getChurnRiskDistribution(),
@@ -49,6 +55,7 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
         segmentDataResult,
         customersData,
       ]) => {
+        if (cancelled) return;
         setKpis(kpisData);
         setRiskDistribution(asArray(riskData));
         setIncomeData(asArray(incomeDataResult));
@@ -61,14 +68,17 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
         setCustomerRows(asArray(customersData.results));
       })
       .catch((err) => {
+        if (cancelled) return;
         if (err.status === 401) {
-          if (onLogout) onLogout();
+          if (onLogoutRef.current) onLogoutRef.current();
         } else {
           setError(err.message || 'Unable to load analytics data.');
         }
       })
-      .finally(() => setLoading(false));
-  }, [onLogout]);
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line
+  }, []); // Run once on mount — onLogout accessed via ref
 
   useEffect(() => {
     if (!bulkJob?.job_id || ['COMPLETED', 'FAILED'].includes(bulkJob.status)) {
@@ -297,7 +307,7 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
           <div style={styles.metricGrid}>
             <MetricCard label="Predicted churn" value={kpis?.predicted_churn_customers || 0} tone="warn" />
             <MetricCard label="High risk" value={kpis?.high_risk_customers || 0} tone="danger" />
-            <MetricCard label="Avg churn risk" value={formatPercent(kpis?.average_churn_risk ?? 0)} tone="accent" />
+            <MetricCard label="Avg churn risk" value={formatPercent(kpis?.average_churn_risk ?? 0, 0)} tone="accent" />
             <MetricCard label="Revenue at risk" value={`$${(kpis?.monthly_revenue_at_risk || 0).toLocaleString()}`} tone="success" />
           </div>
         </div>
@@ -307,11 +317,11 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
           {topSegment ? (
             <div style={styles.segmentPanel}>
               <span style={styles.segmentName}>{topSegment.segment}</span>
-              <p style={styles.segmentDetail}>{topSegment.customer_count.toLocaleString()} customers - {formatPercent(topSegment.percentage)} of base</p>
+              <p style={styles.segmentDetail}>{topSegment.customer_count.toLocaleString()} customers - {formatPercent(topSegment.percentage, 0)} of base</p>
               <div style={styles.segmentBarTrack}>
                 <div style={{ ...styles.segmentBarFill, width: `${clampPercent(topSegment.percentage)}%` }} />
               </div>
-              <div style={styles.segmentMeta}>Average churn risk: {formatPercent(topSegment.average_churn_risk)}</div>
+              <div style={styles.segmentMeta}>Average churn risk: {formatPercent(topSegment.average_churn_risk, 0)}</div>
             </div>
           ) : (
             <p style={styles.helperText}>Segmentation data is unavailable.</p>
@@ -345,7 +355,7 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
                   <strong>{segment.segment}</strong>
                   <div style={styles.smallText}>{segment.customer_count.toLocaleString()} customers</div>
                 </div>
-                <div style={styles.segmentValue}>{formatPercent(segment.percentage)}</div>
+                <div style={styles.segmentValue}>{formatPercent(segment.percentage, 0)}</div>
               </div>
             ))}
           </div>
@@ -359,7 +369,7 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
             <div key={item.income_level} style={styles.barRow}>
               <div style={styles.barHeader}>
                 <span>{item.income_level}</span>
-                <strong>{formatPercent(item.churn_rate)}</strong>
+                <strong>{formatPercent(item.churn_rate, 0)}</strong>
               </div>
               <div style={styles.barTrack}>
                 <div style={{ ...styles.barFill, width: `${clampPercent(item.churn_rate)}%` }} />
@@ -374,7 +384,7 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
             <div key={item.device_type} style={styles.barRow}>
               <div style={styles.barHeader}>
                 <span>{item.device_type}</span>
-                <strong>{formatPercent(item.churn_rate)}</strong>
+                <strong>{formatPercent(item.churn_rate, 0)}</strong>
               </div>
               <div style={styles.barTrack}>
                 <div style={{ ...styles.barFill, width: `${clampPercent(item.churn_rate)}%` }} />
@@ -391,7 +401,7 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
             <div key={item.payment_mode} style={styles.barRow}>
               <div style={styles.barHeader}>
                 <span>{item.payment_mode}</span>
-                <strong>{formatPercent(item.churn_rate)}</strong>
+                <strong>{formatPercent(item.churn_rate, 0)}</strong>
               </div>
               <div style={styles.barTrack}>
                 <div style={{ ...styles.barFill, width: `${clampPercent(item.churn_rate)}%` }} />
@@ -406,7 +416,7 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
             <div key={item.spend_bucket} style={styles.barRow}>
               <div style={styles.barHeader}>
                 <span>{item.spend_bucket}</span>
-                <strong>{formatPercent(item.churn_rate)}</strong>
+                <strong>{formatPercent(item.churn_rate, 0)}</strong>
               </div>
               <div style={styles.barTrack}>
                 <div style={{ ...styles.barFill, width: `${clampPercent(item.churn_rate)}%` }} />
@@ -423,7 +433,7 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
             <div key={item.tenure_bucket} style={styles.barRow}>
               <div style={styles.barHeader}>
                 <span>{item.tenure_bucket}</span>
-                <strong>{formatPercent(item.churn_rate)}</strong>
+                <strong>{formatPercent(item.churn_rate, 0)}</strong>
               </div>
               <div style={styles.barTrack}>
                 <div style={{ ...styles.barFill, width: `${clampPercent(item.churn_rate)}%` }} />
@@ -438,7 +448,7 @@ function AnalyticsDashboard({ onViewChange, onLogout }) {
             <div key={item.satisfaction_score} style={styles.barRow}>
               <div style={styles.barHeader}>
                 <span>Score {item.satisfaction_score}</span>
-                <strong>{formatPercent(item.churn_rate)}</strong>
+                <strong>{formatPercent(item.churn_rate, 0)}</strong>
               </div>
               <div style={styles.barTrack}>
                 <div style={{ ...styles.barFill, width: `${clampPercent(item.churn_rate)}%` }} />

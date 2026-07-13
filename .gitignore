@@ -37,3 +37,6 @@ Thumbs.db
 catboost_info/
 **/catboost_info/
 
+# Pyrefly
+pyrefly.toml
+**/pyrefly.toml

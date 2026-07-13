@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+// Trigger compile 3
+import React, { useState, useEffect, useCallback } from 'react';
 import Login from './pages/Login';
 import SignUp from './pages/SignUp';
 import AnalyticsDashboard from './pages/AnalyticsDashboard';
@@ -6,52 +7,111 @@ import CustomerProfile from './pages/CustomerProfile';
 import CustomerDirectory from './pages/CustomerDirectory';
 import ModelPerformance from './pages/ModelPerformance';
 import ScrumBoard from './pages/ScrumBoard';
-
-const AUTH_TOKEN_KEY = 'access_token';
-
-function getStoredToken() {
-  return localStorage.getItem(AUTH_TOKEN_KEY) || sessionStorage.getItem(AUTH_TOKEN_KEY);
-}
+import AlertNotifications from './components/AlertNotifications';
 
 function App() {
   const [view, setView] = useState('login');
-  const [token, setToken] = useState(getStoredToken());
-  const [selectedCustomerId, setSelectedCustomerId] = useState('C10239');
+  const [token, setToken] = useState(localStorage.getItem('access_token') || sessionStorage.getItem('access_token'));
+  const [selectedCustomerId, setSelectedCustomerId] = useState('');
+  const [notifications, setNotifications] = useState([]);
+  const [predictionRefreshToken, setPredictionRefreshToken] = useState(0);
+
+  const addNotification = useCallback((notification) => {
+    const id = notification.id || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setNotifications((current) => [
+      { id, type: 'info', ...notification },
+      ...current
+    ].slice(0, 4));
+  }, []);
+
+  const dismissNotification = useCallback((id) => {
+    setNotifications((current) => current.filter((notification) => notification.id !== id));
+  }, []);
+
+  const getUsernameFromToken = useCallback(() => {
+    if (!token) return null;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.sub;
+    } catch {
+      return null;
+    }
+  }, [token]);
+
+  const currentUsername = getUsernameFromToken();
+  const isAdmin = currentUsername === 'admin';
 
   useEffect(() => {
     if (token) {
       if (view === 'login' || view === 'signup') {
         setView('dashboard');
       }
-    } else if (view !== 'signup') {
+    } else {
       setView('login');
     }
   }, [token, view]);
 
-  const handleLoginSuccess = (newToken, rememberMe = false) => {
-    const storage = rememberMe ? localStorage : sessionStorage;
-    localStorage.removeItem(AUTH_TOKEN_KEY);
-    sessionStorage.removeItem(AUTH_TOKEN_KEY);
-    storage.setItem(AUTH_TOKEN_KEY, newToken);
-    setToken(newToken);
-  };
+  useEffect(() => {
+    const handleApiError = (event) => {
+      const error = event.detail || {};
 
-  const handleLogout = () => {
-    localStorage.removeItem(AUTH_TOKEN_KEY);
-    sessionStorage.removeItem(AUTH_TOKEN_KEY);
+      if (error.status === 401) {
+        setToken(null);
+        setView('login');
+      }
+
+      addNotification({
+        type: error.status === 401 ? 'warning' : 'error',
+        title: error.status === 401 ? 'Session expired' : 'Request failed',
+        message: error.message || 'Something went wrong. Please try again.'
+      });
+    };
+
+    window.addEventListener('app:api-error', handleApiError);
+    return () => window.removeEventListener('app:api-error', handleApiError);
+  }, [addNotification]);
+
+  const handleLoginSuccess = useCallback((newToken, rememberMe = false) => {
+    const storage = rememberMe ? localStorage : sessionStorage;
+    localStorage.removeItem('access_token');
+    sessionStorage.removeItem('access_token');
+    storage.setItem('access_token', newToken);
+    setToken(newToken);
+    addNotification({
+      type: 'success',
+      title: 'Signed in',
+      message: 'Welcome back. Your dashboard is ready.'
+    });
+  }, [addNotification]);
+
+  const handleLogout = useCallback((options = {}) => {
+    localStorage.removeItem('access_token');
+    sessionStorage.removeItem('access_token');
     setToken(null);
     setView('login');
-  };
+    if (!options.silent) {
+      addNotification({
+        type: 'info',
+        title: 'Signed out',
+        message: 'You have been signed out successfully.'
+      });
+    }
+  }, [addNotification]);
 
-  const isAuth = token && ['dashboard', 'directory', 'profile', 'model', 'board'].includes(view);
+  const isAuth = token && ['dashboard', 'directory', 'profile', 'model', 'board', 'users'].includes(view);
 
   return (
     <div className="App" style={styles.appContainer}>
+      <AlertNotifications
+        notifications={notifications}
+        onDismiss={dismissNotification}
+      />
+
       {isAuth && (
         <nav style={styles.navbar}>
           <div style={styles.brand}>
-            <span style={styles.brandText}>Engagement Tracker</span>
-            <span style={styles.brandDot}>|</span>
+            <span style={styles.brandText}>Churn Predictor</span>
+            <span style={styles.brandDot}>•</span>
             <span style={styles.brandSub}>Console</span>
           </div>
           <div style={styles.navLinks}>
@@ -85,6 +145,14 @@ function App() {
             >
               Scrum Board
             </button>
+            {isAdmin && (
+              <button
+                onClick={() => setView('users')}
+                style={view === 'users' ? styles.activeNavLink : styles.navLink}
+              >
+                Manage Users
+              </button>
+            )}
           </div>
           <button onClick={handleLogout} style={styles.signOutBtn}>
             Sign Out
@@ -97,40 +165,53 @@ function App() {
           <Login
             onLoginSuccess={handleLoginSuccess}
             onNavigateToSignup={() => setView('signup')}
+            onNotify={addNotification}
           />
         )}
         {view === 'signup' && (
           <SignUp
             onNavigateToLogin={() => setView('login')}
+            onNotify={addNotification}
           />
         )}
         {view === 'dashboard' && (
-          <AnalyticsDashboard onViewChange={setView} onLogout={handleLogout} />
+          <AnalyticsDashboard onViewChange={setView} onSelectCustomer={setSelectedCustomerId} onLogout={handleLogout} onNotify={addNotification} predictionRefreshToken={predictionRefreshToken} />
         )}
         {view === 'directory' && (
           <CustomerDirectory
             onViewChange={setView}
             onSelectCustomer={setSelectedCustomerId}
             onLogout={handleLogout}
+            onNotify={addNotification}
+            predictionRefreshToken={predictionRefreshToken}
           />
         )}
         {view === 'profile' && (
           <CustomerProfile
             onViewChange={setView}
             onLogout={handleLogout}
+            onNotify={addNotification}
             selectedCustomerId={selectedCustomerId}
             setSelectedCustomerId={setSelectedCustomerId}
+            onPredictionRecalculated={() => setPredictionRefreshToken(prev => prev + 1)}
           />
         )}
         {view === 'model' && (
           <ModelPerformance
             onViewChange={setView}
             onLogout={handleLogout}
+            onNotify={addNotification}
           />
         )}
         {view === 'board' && (
           <ScrumBoard
             onViewChange={setView}
+          />
+        )}
+        {view === 'users' && (
+          <SignUp
+            isAdminPanel={true}
+            onNavigateToLogin={() => setView('login')}
           />
         )}
       </main>

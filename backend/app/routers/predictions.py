@@ -236,32 +236,70 @@ async def predict_single(
             satisfaction = customer.satisfaction_score
             usage = float(customer.avg_usage_hours_per_week)
             monthly_spend = float(customer.monthly_total_spend)
+            
+            input_data = {
+                "income_level": customer.income_level,
+                "satisfaction_score": customer.satisfaction_score,
+                "discount_used": customer.discount_used,
+                "age": customer.age,
+                "number_of_subscriptions": customer.number_of_subscriptions,
+                "tenure_months": customer.tenure_months,
+                "monthly_total_spend": float(customer.monthly_total_spend),
+                "avg_usage_hours_per_week": float(customer.avg_usage_hours_per_week),
+                "app_switch_frequency": customer.app_switch_frequency,
+                "customer_support_interactions": customer.customer_support_interactions,
+                "device_type": customer.device_type,
+                "payment_mode": customer.payment_mode,
+            }
         else:
-            # Fake values
-            support_interactions = 3
-            satisfaction = 2
+            # Check if valid mock ID
+            mock_rows = [
+                {"customer_id": "1", "age": 34, "income_level": "Medium", "tenure_months": 8, "monthly_total_spend": 79.50, "satisfaction_score": 2, "device_type": "Android", "payment_mode": "UPI", "churn_probability": 89.00, "risk_category": "High", "will_cancel": 1, "recommendation_type": "Offer Discount"},
+                {"customer_id": "2", "age": 45, "income_level": "Low", "tenure_months": 2, "monthly_total_spend": 35.00, "satisfaction_score": 1, "device_type": "Web", "payment_mode": "Wallet", "churn_probability": 84.50, "risk_category": "High", "will_cancel": 1, "recommendation_type": "Provide Free Trial"},
+                {"customer_id": "3", "age": 22, "income_level": "High", "tenure_months": 15, "monthly_total_spend": 120.00, "satisfaction_score": 4, "device_type": "iOS", "payment_mode": "Credit Card", "churn_probability": 15.30, "risk_category": "Low", "will_cancel": 0, "recommendation_type": "No Action Required"},
+                {"customer_id": "4", "age": 58, "income_level": "Medium", "tenure_months": 24, "monthly_total_spend": 55.00, "satisfaction_score": 5, "device_type": "Android", "payment_mode": "Debit Card", "churn_probability": 4.10, "risk_category": "Low", "will_cancel": 0, "recommendation_type": "No Action Required"},
+                {"customer_id": "5", "age": 29, "income_level": "Low", "tenure_months": 5, "monthly_total_spend": 45.00, "satisfaction_score": 3, "device_type": "iOS", "payment_mode": "Wallet", "churn_probability": 52.40, "risk_category": "Medium", "will_cancel": 1, "recommendation_type": "Subscription Upgrade"}
+            ]
+            row = next((r for r in mock_rows if str(r["customer_id"]) == str(customer_id)), None)
+            if not row:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Customer with ID {customer_id} not found."
+                )
+            
+            support_interactions = 3 if row["risk_category"] == "High" else 1
+            satisfaction = row["satisfaction_score"]
             usage = 14.5
-            monthly_spend = 79.50
+            monthly_spend = row["monthly_total_spend"]
+            
+            input_data = {
+                "income_level": row["income_level"],
+                "satisfaction_score": row["satisfaction_score"],
+                "discount_used": False,
+                "age": row["age"],
+                "number_of_subscriptions": 2,
+                "tenure_months": row["tenure_months"],
+                "monthly_total_spend": float(row["monthly_total_spend"]),
+                "avg_usage_hours_per_week": 14.5,
+                "app_switch_frequency": 15,
+                "customer_support_interactions": support_interactions,
+                "device_type": row["device_type"],
+                "payment_mode": row["payment_mode"],
+            }
 
-        input_data = {
-            "income_level": customer.income_level if customer else "Medium",
-            "satisfaction_score": customer.satisfaction_score if customer else 2,
-            "discount_used": customer.discount_used if customer else False,
-            "age": customer.age if customer else 35,
-            "number_of_subscriptions": customer.number_of_subscriptions if customer else 1,
-            "tenure_months": customer.tenure_months if customer else 12,
-            "monthly_total_spend": float(customer.monthly_total_spend) if customer else 79.50,
-            "avg_usage_hours_per_week": float(customer.avg_usage_hours_per_week) if customer else 14.5,
-            "app_switch_frequency": customer.app_switch_frequency if customer else 5,
-            "customer_support_interactions": customer.customer_support_interactions if customer else 3,
-            "device_type": customer.device_type if customer else "Mobile",
-            "payment_mode": customer.payment_mode if customer else "UPI",
-        }
+        # A/B Testing Logic
+        model_version_to_use = model_service.get_model_version_for_request(customer_id)
+
+        if not model_version_to_use:
+             raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="No model is currently available to serve predictions."
+            )
 
         if model_service.is_ready:
             try:
                 df_input = _build_prediction_input(input_data)
-                output = model_service.predict_and_explain(df_input)
+                output = model_service.predict_and_explain(df_input, model_version=model_version_to_use)
                 score = round(output["probability"] * 100.0, 2)
                 score_lower = round(output["probability_confidence_lower"] * 100.0, 2)
                 score_upper = round(output["probability_confidence_upper"] * 100.0, 2)
@@ -304,8 +342,8 @@ async def predict_single(
             now_time = datetime.utcnow()
             insert_query = text("""
                 INSERT INTO churn_predictions 
-                (customer_id, churn_probability, risk_category, will_cancel, explainability_json, recommendation_type, recommendation_desc, predicted_at)
-                VALUES (:cust_id, :prob, :risk, :cancel, :explain, :rec_type, :rec_desc, :predicted_at)
+                (customer_id, churn_probability, risk_category, will_cancel, explainability_json, recommendation_type, recommendation_desc, predicted_at, model_version)
+                VALUES (:cust_id, :prob, :risk, :cancel, :explain, :rec_type, :rec_desc, :predicted_at, :model_version)
             """)
             db.execute(insert_query, {
                 "cust_id": customer_id,
@@ -315,7 +353,8 @@ async def predict_single(
                 "explain": json.dumps(explainability) if isinstance(explainability, dict) else explainability,
                 "rec_type": rec_type,
                 "rec_desc": rec_desc,
-                "predicted_at": now_time
+                "predicted_at": now_time,
+                "model_version": model_version_to_use
             })
             
             history_query = text("""

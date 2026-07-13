@@ -24,6 +24,17 @@ export async function getSinglePrediction(customerId) {
 }
 
 /**
+ * Run What-If risk simulation with behavior overrides
+ * @param {string} customerId - Customer ID to simulate
+ * @param {object} overrides - Custom feature values
+ * @returns {Promise<object>} Simulated prediction details
+ */
+export async function simulatePrediction(customerId, overrides) {
+  return apiService.simulatePrediction(customerId, overrides);
+}
+
+
+/**
  * Get customer prediction history (audit log of model runs)
  * @param {string} customerId - Customer ID
  * @returns {Promise<array>} Array of historical predictions with timestamps

@@ -221,6 +221,18 @@ export async function runSinglePrediction(customerId) {
 }
 
 /**
+ * Run What-If risk simulation with behavior overrides
+ */
+export async function simulatePrediction(customerId, overrides) {
+  return request(`/predictions/simulate/${customerId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(overrides),
+  });
+}
+
+
+/**
  * Upload bulk predictions CSV file
  */
 export async function uploadBulkPredictions(file) {

@@ -5,8 +5,8 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class LoginRequest(BaseModel):
-    username: str = Field(..., example="admin")
-    password: str = Field(..., example="SecurePassword123")
+    username: str = Field(..., json_schema_extra={"example": "admin"})
+    password: str = Field(..., json_schema_extra={"example": "SecurePassword123"})
 
 
 class TokenResponse(BaseModel):
@@ -210,8 +210,8 @@ class BulkPredictionStatusResponse(BaseModel):
 
 
 class RetrainRequest(BaseModel):
-    data_url: str = Field(..., description="URL or path to the new training data CSV.", example="https://example.com/new_churn_data.csv")
-    model_version: str = Field(..., description="The new version for the model being trained.", example="v1.4.0")
+    data_url: str = Field(..., description="URL or path to the new training data CSV.", json_schema_extra={"example": "https://example.com/new_churn_data.csv"})
+    model_version: str = Field(..., description="The new version for the model being trained.", json_schema_extra={"example": "v1.4.0"})
 
 
 class RetrainResponse(BaseModel):
@@ -221,8 +221,8 @@ class RetrainResponse(BaseModel):
 
 
 class ABTestConfig(BaseModel):
-    challenger_version: str = Field(..., description="The version of the challenger model.", example="v1.5.0-beta")
-    traffic_split_percent: int = Field(..., ge=0, le=100, description="Percentage of traffic (0-100) to route to the challenger model.", example=20)
+    challenger_version: str = Field(..., description="The version of the challenger model.", json_schema_extra={"example": "v1.5.0-beta"})
+    traffic_split_percent: int = Field(..., ge=0, le=100, description="Percentage of traffic (0-100) to route to the challenger model.", json_schema_extra={"example": 20})
 
 
 class ABTestStatusResponse(BaseModel):
@@ -238,7 +238,7 @@ class ABTestResultMetrics(BaseModel):
     average_churn_probability: float
     predicted_churn_count: int
     predicted_churn_rate: float
-    risk_distribution: Dict[str, int] = Field(..., example={"high": 10, "medium": 50, "low": 440})
+    risk_distribution: Dict[str, int] = Field(..., json_schema_extra={"example": {"high": 10, "medium": 50, "low": 440}})
 
 
 class ABTestResultsResponse(BaseModel):
@@ -330,3 +330,11 @@ class RetentionInterventionResponse(BaseModel):
     outcome_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class SimulationRequest(BaseModel):
+    satisfaction_score: Optional[int] = Field(None, ge=1, le=10, json_schema_extra={"example": 8})
+    customer_support_interactions: Optional[int] = Field(None, ge=0, le=15, json_schema_extra={"example": 1})
+    monthly_total_spend: Optional[float] = Field(None, ge=0.0, json_schema_extra={"example": 75.0})
+    discount_used: Optional[bool] = Field(None, json_schema_extra={"example": True})
+

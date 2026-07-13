@@ -1,0 +1,736 @@
+Customer ID,Age,Tenure (Months),Monthly Spend ($),Weekly Usage (Hrs),Support Tickets,Satisfaction (1-5),Churn Probability,Confidence Lower,Confidence Upper,Will Cancel,Risk Category,Recommended Offer,Action Description
+1,56,45,713.0,8.1,1,7,0.54%,0.0%,1.98%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (7/10), and a healthy tenure (45 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+2,46,35,1162.31,11.3,2,4,1.82%,0.0%,4.44%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (4/10), and a healthy tenure (35 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+3,32,45,545.97,6.2,1,5,9.14%,3.49%,14.78%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (5/10), and a healthy tenure (45 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+4,60,26,609.55,4.6,4,6,14.43%,7.54%,21.32%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (6/10), and a healthy tenure (26 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+5,25,36,541.72,5.8,3,8,14.63%,7.71%,21.56%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (8/10), and a healthy tenure (36 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+6,38,3,884.09,1.7,6,3,99.77%,98.84%,100.0%,1,High,Plan Optimization,"Why this customer is at risk: Low usage (1.7 hrs/week) and high spend ($884.09) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: High (Urgent)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+7,56,26,487.59,13.4,6,6,19.73%,11.93%,27.53%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (6/10), and a healthy tenure (26 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+8,36,7,415.96,5.5,6,6,17.35%,9.93%,24.77%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (6/10), and a healthy tenure (7 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+9,40,23,105.23,11.8,4,2,6.27%,1.52%,11.03%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (2/10), and a healthy tenure (23 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+10,28,41,442.49,4.3,9,10,10.96%,4.83%,17.08%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (10/10), and a healthy tenure (41 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+11,28,19,662.25,6.1,3,2,88.78%,82.59%,94.96%,1,High,Plan Optimization,"Why this customer is at risk: Low usage (6.1 hrs/week) and high spend ($662.25) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: High (Urgent)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+12,41,13,275.3,8.2,7,1,35.1%,25.74%,44.45%,1,Medium,Plan Optimization,"Why this customer is at risk: Low usage (8.2 hrs/week) and high spend ($275.30) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: Medium (Proactive)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+13,53,23,668.94,9.9,3,3,92.52%,87.36%,97.67%,1,High,Plan Optimization,"Why this customer is at risk: Low usage (9.9 hrs/week) and high spend ($668.94) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: High (Urgent)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+14,57,1,789.4,7.8,4,5,24.66%,16.21%,33.11%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (5/10), and a healthy tenure (1 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+15,41,6,494.41,3.4,7,5,78.64%,70.61%,86.67%,1,High,Plan Optimization,"Why this customer is at risk: Low usage (3.4 hrs/week) and high spend ($494.41) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: High (Urgent)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+16,20,8,391.26,7.8,2,2,39.52%,29.94%,49.1%,1,Medium,Plan Optimization,"Why this customer is at risk: Low usage (7.8 hrs/week) and high spend ($391.26) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: Medium (Proactive)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+17,39,38,783.05,11.8,6,1,96.17%,92.41%,99.93%,1,High,High Touch Intervention,"Why this customer is at risk: Customer is experiencing severe friction with 6 support interactions and a low satisfaction score of 1/10.
+Recommended action: Schedule a direct follow-up call from a senior customer success lead to address open tickets.
+Priority: High (Urgent)
+Expected impact: Resolves underlying support issues and restores trust.
+Next step: Personal support outreach"
+18,19,28,803.87,9.0,0,10,0.08%,0.0%,0.61%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (10/10), and a healthy tenure (28 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+19,41,28,363.24,14.6,1,2,2.09%,0.0%,4.89%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (2/10), and a healthy tenure (28 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+20,61,16,819.81,8.5,1,8,25.09%,16.59%,33.58%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (8/10), and a healthy tenure (16 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+21,47,32,1173.54,11.0,4,4,80.51%,72.74%,88.27%,1,High,Contract Win-back Offer,"Why this customer is at risk: High churn risk score driven by elevated usage switch behavior (12 app switches) and declining interaction patterns.
+Recommended action: Offer a 20% discount on renewal or a complimentary month to secure contract extension.
+Priority: High (Urgent)
+Expected impact: Lowers immediate exit probability.
+Next step: Send discount offer"
+22,55,23,584.73,9.6,1,6,0.44%,0.0%,1.73%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (6/10), and a healthy tenure (23 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+23,19,6,482.33,6.1,3,6,64.35%,54.97%,73.74%,1,Medium,Plan Optimization,"Why this customer is at risk: Low usage (6.1 hrs/week) and high spend ($482.33) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: Medium (Proactive)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+24,38,7,421.1,7.8,0,10,0.03%,0.0%,0.39%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (10/10), and a healthy tenure (7 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+25,50,7,495.52,11.3,5,6,25.66%,17.1%,34.22%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (6/10), and a healthy tenure (7 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+26,29,9,602.53,7.0,9,9,17.74%,10.26%,25.23%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (9/10), and a healthy tenure (9 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+27,39,26,524.42,9.2,0,3,48.37%,38.57%,58.16%,1,Medium,Plan Optimization,"Why this customer is at risk: Low usage (9.2 hrs/week) and high spend ($524.42) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: Medium (Proactive)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+28,61,47,480.89,6.1,1,9,0.36%,0.0%,1.54%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (9/10), and a healthy tenure (47 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+29,42,19,311.88,10.8,3,10,0.4%,0.0%,1.64%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (10/10), and a healthy tenure (19 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+30,44,27,1194.27,8.2,3,6,82.91%,75.53%,90.29%,1,High,Plan Optimization,"Why this customer is at risk: Low usage (8.2 hrs/week) and high spend ($1194.27) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: High (Urgent)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+31,59,41,601.06,10.6,8,2,88.5%,82.25%,94.75%,1,High,High Touch Intervention,"Why this customer is at risk: Customer is experiencing severe friction with 8 support interactions and a low satisfaction score of 2/10.
+Recommended action: Schedule a direct follow-up call from a senior customer success lead to address open tickets.
+Priority: High (Urgent)
+Expected impact: Resolves underlying support issues and restores trust.
+Next step: Personal support outreach"
+32,45,13,1251.41,11.7,4,9,0.3%,0.0%,1.36%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (9/10), and a healthy tenure (13 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+33,33,21,369.03,10.0,9,2,87.69%,81.25%,94.13%,1,High,High Touch Intervention,"Why this customer is at risk: Customer is experiencing severe friction with 9 support interactions and a low satisfaction score of 2/10.
+Recommended action: Schedule a direct follow-up call from a senior customer success lead to address open tickets.
+Priority: High (Urgent)
+Expected impact: Resolves underlying support issues and restores trust.
+Next step: Personal support outreach"
+34,32,42,330.68,7.5,3,3,2.69%,0.0%,5.86%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (3/10), and a healthy tenure (42 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+35,64,28,542.52,7.5,4,9,27.64%,18.87%,36.4%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (9/10), and a healthy tenure (28 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+36,61,4,915.4,1.7,6,6,98.74%,96.56%,100.0%,1,High,Plan Optimization,"Why this customer is at risk: Low usage (1.7 hrs/week) and high spend ($915.40) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: High (Urgent)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+37,20,8,1081.07,9.3,8,10,8.95%,3.35%,14.54%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (10/10), and a healthy tenure (8 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+38,54,33,370.29,11.1,8,7,62.26%,52.76%,71.76%,1,Medium,Premium Account Review,"Why this customer is at risk: Premium high-spending customer ($370.29) showing moderate engagement decline.
+Recommended action: Offer a proactive account check-in to optimize subscription tier benefits.
+Priority: Medium (Proactive)
+Expected impact: Protects high-value contract revenue.
+Next step: Monitor and review account"
+39,24,15,460.6,4.3,0,10,1.37%,0.0%,3.64%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (10/10), and a healthy tenure (15 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+40,38,7,463.73,7.5,3,3,15.72%,8.59%,22.86%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (3/10), and a healthy tenure (7 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+41,26,6,356.49,7.5,3,3,0.53%,0.0%,1.95%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (3/10), and a healthy tenure (6 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+42,56,16,374.18,9.4,6,6,13.43%,6.75%,20.11%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (6/10), and a healthy tenure (16 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+43,35,2,450.23,8.4,5,4,4.47%,0.42%,8.52%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (4/10), and a healthy tenure (2 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+44,21,25,242.16,5.3,7,5,65.56%,56.24%,74.87%,1,Medium,Plan Optimization,"Why this customer is at risk: Low usage (5.3 hrs/week) and high spend ($242.16) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: Medium (Proactive)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+45,42,19,325.68,12.8,3,3,12.63%,6.12%,19.14%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (3/10), and a healthy tenure (19 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+46,31,37,548.33,3.0,7,6,80.27%,72.46%,88.07%,1,High,Plan Optimization,"Why this customer is at risk: Low usage (3.0 hrs/week) and high spend ($548.33) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: High (Urgent)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+47,26,5,983.82,6.2,5,7,97.23%,94.02%,100.0%,1,High,Plan Optimization,"Why this customer is at risk: Low usage (6.2 hrs/week) and high spend ($983.82) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: High (Urgent)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+48,43,20,1268.23,4.0,1,5,16.4%,9.15%,23.66%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (5/10), and a healthy tenure (20 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+49,19,23,508.06,9.1,0,3,49.25%,39.45%,59.05%,1,Medium,Plan Optimization,"Why this customer is at risk: Low usage (9.1 hrs/week) and high spend ($508.06) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: Medium (Proactive)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+50,37,15,431.27,9.4,9,6,88.73%,82.54%,94.93%,1,High,Plan Optimization,"Why this customer is at risk: Low usage (9.4 hrs/week) and high spend ($431.27) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: High (Urgent)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+51,45,9,423.76,7.6,8,10,44.53%,34.79%,54.27%,1,Medium,Plan Optimization,"Why this customer is at risk: Low usage (7.6 hrs/week) and high spend ($423.76) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: Medium (Proactive)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+52,64,7,519.95,4.4,7,1,84.9%,77.89%,91.92%,1,High,Plan Optimization,"Why this customer is at risk: Low usage (4.4 hrs/week) and high spend ($519.95) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: High (Urgent)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+53,24,37,315.62,5.2,0,8,0.1%,0.0%,0.71%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (8/10), and a healthy tenure (37 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+54,61,3,818.68,10.7,3,6,29.39%,20.46%,38.32%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (6/10), and a healthy tenure (3 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+55,25,24,241.3,7.8,1,3,0.78%,0.0%,2.5%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (3/10), and a healthy tenure (24 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+56,64,21,750.35,6.6,1,10,2.06%,0.0%,4.85%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (10/10), and a healthy tenure (21 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+57,52,30,314.55,5.9,6,6,41.43%,31.78%,51.09%,1,Medium,Plan Optimization,"Why this customer is at risk: Low usage (5.9 hrs/week) and high spend ($314.55) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: Medium (Proactive)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+58,31,18,551.83,7.6,9,10,67.41%,58.23%,76.6%,1,Medium,Plan Optimization,"Why this customer is at risk: Low usage (7.6 hrs/week) and high spend ($551.83) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: Medium (Proactive)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+59,34,16,419.78,9.7,4,7,0.2%,0.0%,1.09%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (7/10), and a healthy tenure (16 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+60,53,45,568.36,7.3,1,2,18.55%,10.93%,26.16%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (2/10), and a healthy tenure (45 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+61,57,17,999.5,9.3,0,6,19.18%,11.46%,26.89%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (6/10), and a healthy tenure (17 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+62,21,27,1308.94,3.3,0,6,2.4%,0.0%,5.4%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (6/10), and a healthy tenure (27 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+63,19,44,384.69,11.4,3,5,22.56%,14.37%,30.75%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (5/10), and a healthy tenure (44 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+64,23,10,516.59,7.9,3,7,10.56%,4.54%,16.59%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (7/10), and a healthy tenure (10 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+65,59,20,1284.85,5.1,1,2,83.82%,76.61%,91.04%,1,High,Plan Optimization,"Why this customer is at risk: Low usage (5.1 hrs/week) and high spend ($1284.85) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: High (Urgent)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+66,21,47,19.58,9.3,1,6,0.1%,0.0%,0.7%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (6/10), and a healthy tenure (47 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+67,46,21,270.8,8.5,3,8,0.27%,0.0%,1.29%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (8/10), and a healthy tenure (21 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+68,35,15,453.23,4.6,7,6,91.94%,86.61%,97.28%,1,High,Plan Optimization,"Why this customer is at risk: Low usage (4.6 hrs/week) and high spend ($453.23) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: High (Urgent)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+69,43,11,261.93,7.6,5,4,23.75%,15.41%,32.09%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (4/10), and a healthy tenure (11 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+70,61,10,888.91,6.4,0,6,1.07%,0.0%,3.09%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (6/10), and a healthy tenure (10 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+71,51,14,1391.59,4.2,7,5,82.94%,75.56%,90.31%,1,High,Plan Optimization,"Why this customer is at risk: Low usage (4.2 hrs/week) and high spend ($1391.59) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: High (Urgent)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+72,27,45,892.11,6.7,4,2,89.45%,83.43%,95.47%,1,High,Plan Optimization,"Why this customer is at risk: Low usage (6.7 hrs/week) and high spend ($892.11) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: High (Urgent)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+73,53,9,594.83,4.9,9,1,99.87%,99.15%,100.0%,1,High,Plan Optimization,"Why this customer is at risk: Low usage (4.9 hrs/week) and high spend ($594.83) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: High (Urgent)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+74,31,45,370.65,4.3,5,9,23.31%,15.03%,31.6%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (9/10), and a healthy tenure (45 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+75,48,46,183.47,9.5,6,2,70.4%,61.45%,79.35%,1,High,Plan Optimization,"Why this customer is at risk: Low usage (9.5 hrs/week) and high spend ($183.47) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: High (Urgent)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+76,65,30,621.17,8.9,9,8,18.79%,11.14%,26.45%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (8/10), and a healthy tenure (30 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+77,32,15,657.58,7.2,5,3,80.99%,73.3%,88.68%,1,High,Plan Optimization,"Why this customer is at risk: Low usage (7.2 hrs/week) and high spend ($657.58) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: High (Urgent)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+78,25,17,669.49,1.3,2,4,71.62%,62.78%,80.45%,1,High,Plan Optimization,"Why this customer is at risk: Low usage (1.3 hrs/week) and high spend ($669.49) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: High (Urgent)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+79,31,32,813.31,7.8,9,4,98.59%,96.28%,100.0%,1,High,Plan Optimization,"Why this customer is at risk: Low usage (7.8 hrs/week) and high spend ($813.31) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: High (Urgent)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+80,40,33,349.91,10.3,1,6,5.78%,1.21%,10.36%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (6/10), and a healthy tenure (33 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+81,57,16,353.71,11.6,1,1,3.41%,0.0%,6.96%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (1/10), and a healthy tenure (16 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+82,38,19,383.79,11.1,2,5,3.83%,0.07%,7.59%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (5/10), and a healthy tenure (19 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+83,33,2,689.91,4.4,5,5,96.57%,93.0%,100.0%,1,High,Plan Optimization,"Why this customer is at risk: Low usage (4.4 hrs/week) and high spend ($689.91) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: High (Urgent)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+84,62,4,445.9,5.7,0,1,28.37%,19.54%,37.21%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (1/10), and a healthy tenure (4 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+85,35,5,636.68,7.5,2,3,40.63%,31.0%,50.25%,1,Medium,Plan Optimization,"Why this customer is at risk: Low usage (7.5 hrs/week) and high spend ($636.68) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: Medium (Proactive)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+86,64,38,354.93,7.8,1,2,50.85%,41.05%,60.65%,1,Medium,Plan Optimization,"Why this customer is at risk: Low usage (7.8 hrs/week) and high spend ($354.93) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: Medium (Proactive)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+87,41,8,740.44,8.1,3,10,0.67%,0.0%,2.27%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (10/10), and a healthy tenure (8 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+88,43,40,282.15,11.4,0,8,0.24%,0.0%,1.21%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (8/10), and a healthy tenure (40 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+89,42,24,1033.24,8.6,2,3,24.4%,15.98%,32.81%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (3/10), and a healthy tenure (24 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+90,62,31,32.4,11.6,3,9,0.03%,0.0%,0.39%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (9/10), and a healthy tenure (31 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+91,58,21,293.88,5.7,4,5,29.93%,20.95%,38.9%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (5/10), and a healthy tenure (21 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+92,46,14,352.9,6.8,3,10,6.2%,1.47%,10.93%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (10/10), and a healthy tenure (14 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+93,32,7,418.82,6.7,4,1,14.69%,7.75%,21.63%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (1/10), and a healthy tenure (7 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+94,62,3,698.27,7.8,0,1,31.64%,22.52%,40.75%,1,Medium,Plan Optimization,"Why this customer is at risk: Low usage (7.8 hrs/week) and high spend ($698.27) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: Medium (Proactive)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+95,18,26,386.46,3.9,7,8,53.68%,43.91%,63.45%,1,Medium,Plan Optimization,"Why this customer is at risk: Low usage (3.9 hrs/week) and high spend ($386.46) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: Medium (Proactive)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+96,42,28,243.84,13.8,1,10,0.0%,0.0%,0.07%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (10/10), and a healthy tenure (28 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+97,24,44,123.41,8.3,5,8,0.03%,0.0%,0.36%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (8/10), and a healthy tenure (44 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+98,26,19,417.28,4.6,1,9,22.82%,14.59%,31.04%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (9/10), and a healthy tenure (19 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+99,41,13,511.0,4.7,1,5,62.35%,52.85%,71.84%,1,Medium,Plan Optimization,"Why this customer is at risk: Low usage (4.7 hrs/week) and high spend ($511.00) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: Medium (Proactive)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+100,18,1,402.31,8.2,7,9,1.67%,0.0%,4.17%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (9/10), and a healthy tenure (1 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+101,61,39,652.04,9.8,2,10,0.18%,0.0%,1.01%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (10/10), and a healthy tenure (39 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+102,25,38,480.92,10.8,7,7,0.99%,0.0%,2.92%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (7/10), and a healthy tenure (38 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+103,41,9,954.62,8.1,1,10,0.15%,0.0%,0.91%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (10/10), and a healthy tenure (9 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+104,28,21,543.41,9.8,0,5,0.02%,0.0%,0.31%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (5/10), and a healthy tenure (21 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+105,34,1,531.25,9.0,0,4,4.94%,0.69%,9.19%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (4/10), and a healthy tenure (1 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+106,25,8,433.32,7.7,6,5,44.83%,35.09%,54.58%,1,Medium,Plan Optimization,"Why this customer is at risk: Low usage (7.7 hrs/week) and high spend ($433.32) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: Medium (Proactive)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+107,52,22,408.16,7.0,7,6,32.79%,23.59%,41.99%,1,Medium,Plan Optimization,"Why this customer is at risk: Low usage (7.0 hrs/week) and high spend ($408.16) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: Medium (Proactive)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+108,52,26,677.85,8.1,0,3,42.42%,32.73%,52.11%,1,Medium,Plan Optimization,"Why this customer is at risk: Low usage (8.1 hrs/week) and high spend ($677.85) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: Medium (Proactive)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+109,50,28,292.19,7.7,2,5,9.7%,3.9%,15.5%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (5/10), and a healthy tenure (28 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+110,22,17,1048.31,8.0,3,5,29.88%,20.91%,38.85%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (5/10), and a healthy tenure (17 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+111,59,21,444.97,9.3,7,7,22.71%,14.5%,30.92%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (7/10), and a healthy tenure (21 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+112,56,28,1360.51,12.9,6,3,99.17%,97.39%,100.0%,1,High,High Touch Intervention,"Why this customer is at risk: Customer is experiencing severe friction with 6 support interactions and a low satisfaction score of 3/10.
+Recommended action: Schedule a direct follow-up call from a senior customer success lead to address open tickets.
+Priority: High (Urgent)
+Expected impact: Resolves underlying support issues and restores trust.
+Next step: Personal support outreach"
+113,58,18,850.16,5.0,4,4,98.23%,95.64%,100.0%,1,High,Plan Optimization,"Why this customer is at risk: Low usage (5.0 hrs/week) and high spend ($850.16) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: High (Urgent)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+114,45,33,416.97,8.3,6,8,0.54%,0.0%,1.97%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (8/10), and a healthy tenure (33 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+115,24,29,231.57,9.1,1,7,0.9%,0.0%,2.76%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (7/10), and a healthy tenure (29 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+116,26,31,311.51,6.9,6,10,1.02%,0.0%,3.0%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (10/10), and a healthy tenure (31 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+117,25,12,319.18,11.2,0,10,0.01%,0.0%,0.16%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (10/10), and a healthy tenure (12 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+118,29,46,682.91,6.5,5,2,99.0%,97.05%,100.0%,1,High,Plan Optimization,"Why this customer is at risk: Low usage (6.5 hrs/week) and high spend ($682.91) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: High (Urgent)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+119,51,19,1154.28,10.0,7,3,99.41%,97.91%,100.0%,1,High,High Touch Intervention,"Why this customer is at risk: Customer is experiencing severe friction with 7 support interactions and a low satisfaction score of 3/10.
+Recommended action: Schedule a direct follow-up call from a senior customer success lead to address open tickets.
+Priority: High (Urgent)
+Expected impact: Resolves underlying support issues and restores trust.
+Next step: Personal support outreach"
+120,50,33,399.14,11.8,6,6,10.61%,4.57%,16.64%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (6/10), and a healthy tenure (33 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+121,65,30,624.56,9.2,4,5,13.76%,7.01%,20.52%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (5/10), and a healthy tenure (30 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+122,40,6,705.59,7.5,2,5,1.13%,0.0%,3.2%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (5/10), and a healthy tenure (6 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+123,41,20,352.54,9.4,6,9,3.64%,0.0%,7.32%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (9/10), and a healthy tenure (20 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+124,54,33,450.26,6.8,8,8,22.89%,14.65%,31.12%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (8/10), and a healthy tenure (33 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+125,52,29,515.3,5.9,9,10,23.43%,15.13%,31.73%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (10/10), and a healthy tenure (29 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+126,61,35,867.92,9.1,6,4,71.67%,62.84%,80.51%,1,High,Plan Optimization,"Why this customer is at risk: Low usage (9.1 hrs/week) and high spend ($867.92) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: High (Urgent)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+127,57,26,594.09,10.2,0,6,0.07%,0.0%,0.59%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (6/10), and a healthy tenure (26 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+128,39,23,359.93,8.3,9,6,13.04%,6.44%,19.64%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (6/10), and a healthy tenure (23 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+129,44,37,257.37,9.7,6,10,0.06%,0.0%,0.55%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (10/10), and a healthy tenure (37 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+130,52,27,497.51,14.9,9,2,43.1%,33.39%,52.81%,1,Medium,Feedback Loop & Nudge,"Why this customer is at risk: Moderate churn risk with a low satisfaction score of 2/10.
+Recommended action: Send a feedback survey to identify primary complaints, accompanied by a plan comparison check.
+Priority: Medium (Proactive)
+Expected impact: Flags areas of dissatisfaction before they escalate.
+Next step: Send feedback survey"
+131,18,23,250.13,11.7,1,1,17.95%,10.43%,25.47%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (1/10), and a healthy tenure (23 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+132,52,38,831.07,6.3,6,1,96.93%,93.54%,100.0%,1,High,Plan Optimization,"Why this customer is at risk: Low usage (6.3 hrs/week) and high spend ($831.07) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: High (Urgent)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+133,54,30,848.74,8.6,4,5,14.95%,7.96%,21.93%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (5/10), and a healthy tenure (30 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+134,64,43,533.61,8.9,5,4,2.99%,0.0%,6.32%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (4/10), and a healthy tenure (43 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+135,31,42,593.33,5.5,5,1,79.61%,71.71%,87.51%,1,High,Plan Optimization,"Why this customer is at risk: Low usage (5.5 hrs/week) and high spend ($593.33) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: High (Urgent)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+136,20,18,668.04,9.8,9,3,96.67%,93.15%,100.0%,1,High,Plan Optimization,"Why this customer is at risk: Low usage (9.8 hrs/week) and high spend ($668.04) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: High (Urgent)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+137,18,30,222.8,5.7,2,10,1.31%,0.0%,3.55%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (10/10), and a healthy tenure (30 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+138,22,19,721.07,10.0,8,8,35.44%,26.06%,44.81%,1,Medium,Premium Account Review,"Why this customer is at risk: Premium high-spending customer ($721.07) showing moderate engagement decline.
+Recommended action: Offer a proactive account check-in to optimize subscription tier benefits.
+Priority: Medium (Proactive)
+Expected impact: Protects high-value contract revenue.
+Next step: Monitor and review account"
+139,43,45,245.57,13.8,2,4,0.06%,0.0%,0.53%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (4/10), and a healthy tenure (45 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+140,31,42,257.83,7.6,1,5,6.72%,1.81%,11.63%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (5/10), and a healthy tenure (42 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+141,56,43,492.47,9.3,1,5,0.96%,0.0%,2.87%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (5/10), and a healthy tenure (43 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+142,44,1,269.98,8.9,6,2,36.08%,26.67%,45.49%,1,Medium,Plan Optimization,"Why this customer is at risk: Low usage (8.9 hrs/week) and high spend ($269.98) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: Medium (Proactive)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+143,26,45,919.76,5.2,6,3,99.43%,97.95%,100.0%,1,High,Plan Optimization,"Why this customer is at risk: Low usage (5.2 hrs/week) and high spend ($919.76) detected, indicating poor value-to-cost alignment.
+Recommended action: Offer a discount or plan downgrade to align costs with actual usage.
+Priority: High (Urgent)
+Expected impact: Lowers price-to-value friction and builds long-term retention.
+Next step: Offer plan optimization or discount"
+144,32,4,362.39,5.8,1,2,4.99%,0.72%,9.26%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (2/10), and a healthy tenure (4 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+145,32,17,772.78,9.1,3,1,20.48%,12.57%,28.39%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (1/10), and a healthy tenure (17 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+146,43,37,643.02,8.4,4,8,28.66%,19.8%,37.52%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (8/10), and a healthy tenure (37 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"
+147,59,6,507.74,7.6,1,6,4.98%,0.71%,9.24%,0,Low,Loyalty Reinforcement,"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction (6/10), and a healthy tenure (6 months).
+Recommended action: Continue monitoring behavioral metrics; keep enrolled in standard newsletters without aggressive discounts.
+Priority: Low
+Expected impact: Maintained stable retention and baseline satisfaction.
+Next step: Monitor metrics"

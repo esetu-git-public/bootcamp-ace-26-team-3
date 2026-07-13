@@ -2,7 +2,7 @@ import os
 import pickle
 import sys
 import threading
-from typing import Dict, Optional, List
+from typing import Any, Dict, List, Optional, TypedDict, Union, cast
 
 import numpy as np
 import pandas as pd
@@ -49,17 +49,39 @@ BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "
 ARTIFACT_DIR = os.path.join(os.path.dirname(__file__), "model_artifacts")
 
 def _install_pickle_module_aliases() -> None:
-    """Allow older artifacts pickled as app.core.* to load as backend.app.core.*."""
+    """Allow older artifacts pickled as app.core.* to load as backend.app.core.*, and alias numpy._core to numpy.core for numpy 1.x vs 2.x compatibility."""
+    # Install app namespace aliases
     try:
         import backend.app as backend_app
         import backend.app.core as backend_core
         from backend.app.core import preprocessing
+        sys.modules.setdefault("app", backend_app)
+        sys.modules.setdefault("app.core", backend_core)
+        sys.modules.setdefault("app.core.preprocessing", preprocessing)
     except Exception:
-        return
+        pass
 
-    sys.modules.setdefault("app", backend_app)
-    sys.modules.setdefault("app.core", backend_core)
-    sys.modules.setdefault("app.core.preprocessing", preprocessing)
+    # Alias numpy._core to numpy.core for compatibility with model pickles from different numpy versions
+    try:
+        import numpy
+        import numpy.core
+        sys.modules.setdefault("numpy._core", numpy.core)
+        
+        if hasattr(numpy.core, "numeric"):
+            sys.modules.setdefault("numpy._core.numeric", numpy.core.numeric)
+        if hasattr(numpy.core, "multiarray"):
+            sys.modules.setdefault("numpy._core.multiarray", numpy.core.multiarray)
+        if hasattr(numpy.core, "umath"):
+            sys.modules.setdefault("numpy._core.umath", numpy.core.umath)
+    except Exception as e:
+        print(f"Warning: Could not install numpy._core aliases: {e}")
+
+
+
+class ABTestConfigDict(TypedDict):
+    is_active: bool
+    challenger_version: Optional[str]
+    traffic_split_percent: int
 
 
 class ModelService:
@@ -69,7 +91,7 @@ class ModelService:
         self.models: Dict[str, Dict] = {}  # Stores artifacts for each loaded version
 
         # A/B Test configuration
-        self.ab_test_config = {
+        self.ab_test_config: ABTestConfigDict = {
             "is_active": False,
             "challenger_version": None,
             "traffic_split_percent": 0,  # Percentage of traffic to challenger
@@ -86,14 +108,19 @@ class ModelService:
     def load_latest_model(self):
         """Loads the latest model from the database-backed model registry."""
         # This will become the default "champion" model
-        from app.database import SessionLocal
-        from app.models import ModelMetric
+        from ..database import SessionLocal
+        from ..models import ModelMetric
         db = SessionLocal()
         try:
             latest_metric = db.query(ModelMetric).order_by(ModelMetric.evaluated_at.desc()).first()
-            if latest_metric and latest_metric.model_version:
-                print(f"Found latest model version '{latest_metric.model_version}' in registry. Attempting to load.")
-                self.load_artifacts(latest_metric.model_version, as_champion=True)
+            if latest_metric is not None:
+                model_version = cast(str, latest_metric.model_version)
+                if model_version:
+                    print(f"Found latest model version '{model_version}' in registry. Attempting to load.")
+                    self.load_artifacts(model_version, as_champion=True)
+                else:
+                    print("No models found in the registry. Loading fallback champion model version 'v1.2.0-catboost'.")
+                    self.load_artifacts("v1.2.0-catboost", as_champion=True)
             else:
                 print("No models found in the registry. Loading fallback champion model version 'v1.2.0-catboost'.")
                 self.load_artifacts("v1.2.0-catboost", as_champion=True)
@@ -108,15 +135,33 @@ class ModelService:
 
     def load_artifacts(self, version: str, as_champion: bool = False):
         """Loads model artifacts for a specific version."""
-        model_path = os.path.join(ARTIFACT_DIR, f"catboost_model_{version}.cbm")
+        sklearn_model_path = os.path.join(ARTIFACT_DIR, f"sklearn_model_{version}.pkl")
+        catboost_model_path = os.path.join(ARTIFACT_DIR, f"catboost_model_{version}.cbm")
         preprocessor_path = os.path.join(ARTIFACT_DIR, f"preprocessor_{version}.pkl")
 
-        if not os.path.exists(preprocessor_path) or not os.path.exists(model_path):
+        is_sklearn = False
+        model_path = None
+
+        if os.path.exists(sklearn_model_path):
+            model_path = sklearn_model_path
+            is_sklearn = True
+        elif os.path.exists(catboost_model_path):
+            model_path = catboost_model_path
+            is_sklearn = False
+        else:
             print(f"Artifacts for version '{version}' not found. Falling back to default unversioned artifacts.")
-            model_path = os.path.join(ARTIFACT_DIR, "catboost_model.cbm")
+            unversioned_sklearn = os.path.join(ARTIFACT_DIR, "sklearn_model.pkl")
+            unversioned_catboost = os.path.join(ARTIFACT_DIR, "catboost_model.cbm")
             preprocessor_path = os.path.join(ARTIFACT_DIR, "preprocessor.pkl")
 
-        if not os.path.exists(preprocessor_path) or not os.path.exists(model_path):
+            if os.path.exists(unversioned_sklearn):
+                model_path = unversioned_sklearn
+                is_sklearn = True
+            elif os.path.exists(unversioned_catboost):
+                model_path = unversioned_catboost
+                is_sklearn = False
+
+        if not model_path or not os.path.exists(preprocessor_path):
             print(f"Artifacts not found. Searched for version '{version}' and default paths.")
             return
 
@@ -124,19 +169,22 @@ class ModelService:
             _install_pickle_module_aliases()
             with open(preprocessor_path, "rb") as f:
                 preprocessor = pickle.load(f)
-        except (ModuleNotFoundError, AttributeError, pickle.UnpicklingError) as e:
-            print(f"Warning: Could not load preprocessor pickle: {e}. Continuing without it.")
-            return # Cannot proceed without a preprocessor
-
-        if not CATBOOST_AVAILABLE or CatBoostClassifier is None:
-            print("Warning: CatBoost not available, ML model service disabled.")
+        except Exception as e:
+            print(f"Warning: Could not load preprocessor pickle: {e}")
             return
 
         try:
-            model = CatBoostClassifier()
-            model.load_model(model_path)
+            if is_sklearn:
+                with open(model_path, "rb") as f:
+                    model = pickle.load(f)
+            else:
+                if not CATBOOST_AVAILABLE or CatBoostClassifier is None:
+                    print("Warning: CatBoost not available, cannot load CatBoost model.")
+                    return
+                model = CatBoostClassifier()
+                model.load_model(model_path)
         except Exception as e:
-            print(f"Warning: Could not load CatBoost model: {e}")
+            print(f"Warning: Could not load model: {e}")
             return
 
         feature_names = []
@@ -144,9 +192,18 @@ class ModelService:
             feature_names = list(preprocessor.feature_names_)
 
         # Only initialize SHAP if available and model loaded
+        explainer = None
+        shap_explainer = None
         if SHAP_AVAILABLE and shap is not None:
             try:
-                explainer = shap.TreeExplainer(model)
+                try:
+                    explainer = shap.TreeExplainer(model)
+                except Exception:
+                    try:
+                        explainer = shap.Explainer(model)
+                    except Exception:
+                        explainer = None
+                
                 # Initialize enhanced SHAP explainer
                 if feature_names and SHAPExplainer is not None:
                     shap_explainer = SHAPExplainer(model, preprocessor, feature_names)
@@ -156,9 +213,6 @@ class ModelService:
                 explainer = None
                 shap_explainer = None
                 print(f"Warning: Could not initialize SHAP explainer: {str(e)}")
-        else:
-            explainer = None
-            shap_explainer = None
 
         # Store loaded artifacts
         self.models[version] = {
@@ -172,7 +226,6 @@ class ModelService:
         if as_champion:
             self.champion_version = version
             print(f"Successfully loaded champion model version '{version}'.")
-            # Setup aliases for backwards compatibility and easy access
             self.model = model
             self.preprocessor = preprocessor
             self.explainer = explainer
@@ -191,7 +244,7 @@ class ModelService:
             "loaded_models": list(self.models.keys())
         }
 
-    def get_model_version_for_request(self, customer_id: int) -> Optional[str]:
+    def get_model_version_for_request(self, customer_id: Union[int, str]) -> Optional[str]:
         """Determine which model version to use for a given customer based on A/B test config."""
         with self._lock:
             if not self.is_ready:
@@ -214,14 +267,27 @@ class ModelService:
             return self.champion_version
 
     def _shap_values(self, processed_features: pd.DataFrame) -> np.ndarray:
-        raw_values = self.explainer.shap_values(processed_features)
+        if self.explainer is None:
+            # Return an array of zeros if explainer is not available
+            num_features = len(self.feature_names) if self.feature_names else processed_features.shape[1]
+            return np.zeros((processed_features.shape[0], num_features))
+
+        if hasattr(self.explainer, "shap_values"):
+            raw_values = self.explainer.shap_values(processed_features)
+        elif callable(self.explainer):
+            explanation = self.explainer(processed_features)
+            raw_values = explanation.values if hasattr(explanation, "values") else explanation
+        else:
+            num_features = len(self.feature_names) if self.feature_names else processed_features.shape[1]
+            return np.zeros((processed_features.shape[0], num_features))
+
         if isinstance(raw_values, list):
             shap_values = raw_values[1] if len(raw_values) > 1 else raw_values[0]
         else:
             shap_values = raw_values
         return np.array(shap_values)
 
-    def predict_and_explain(self, raw_features: pd.DataFrame, model_version: Optional[str] = None) -> Dict[str, object]:
+    def predict_and_explain(self, raw_features: pd.DataFrame, model_version: Optional[str] = None) -> Dict[str, Any]:
         """Legacy method for backward compatibility."""
         with self._lock:
             version = model_version or self.champion_version
@@ -239,16 +305,26 @@ class ModelService:
             probability = float(probabilities[0])
 
             if explainer is not None:
-                raw_values = explainer.shap_values(processed)
-                if isinstance(raw_values, list):
-                    shap_values = raw_values[1] if len(raw_values) > 1 else raw_values[0]
+                if hasattr(explainer, "shap_values"):
+                    raw_values = explainer.shap_values(processed)
+                elif callable(explainer):
+                    explanation = explainer(processed)
+                    raw_values = explanation.values if hasattr(explanation, "values") else explanation
                 else:
-                    shap_values = raw_values
-                shap_row = np.array(shap_values)[0]
-                explainability = {
-                    feature: float(value)
-                    for feature, value in zip(feature_names, shap_row.tolist())
-                }
+                    raw_values = None
+
+                if raw_values is not None:
+                    if isinstance(raw_values, list):
+                        shap_values = raw_values[1] if len(raw_values) > 1 else raw_values[0]
+                    else:
+                        shap_values = raw_values
+                    shap_row = np.array(shap_values)[0]
+                    explainability = {
+                        feature: float(value)
+                        for feature, value in zip(feature_names, shap_row.tolist())
+                    }
+                else:
+                    explainability = {}
             else:
                 explainability = {}
             
@@ -266,7 +342,7 @@ class ModelService:
                 "explainability": explainability,
             }
 
-    def predict_with_advanced_explanation(self, raw_features: pd.DataFrame, model_version: Optional[str] = None) -> Dict[str, object]:
+    def predict_with_advanced_explanation(self, raw_features: pd.DataFrame, model_version: Optional[str] = None) -> Dict[str, Any]:
         """Enhanced prediction with detailed SHAP explanations."""
         with self._lock:
             version = model_version or self.champion_version

@@ -7,7 +7,7 @@ const INCOME_OPTIONS = ['Low', 'Medium', 'High'];
 const DEVICE_OPTIONS = ['Android', 'iOS', 'Web'];
 const PAYMENT_OPTIONS = ['Credit Card', 'Debit Card', 'UPI', 'Wallet'];
 
-export default function CustomerDirectory({ onViewChange, onSelectCustomer, onLogout }) {
+export default function CustomerDirectory({ onViewChange, onSelectCustomer, onLogout, onNotify, predictionRefreshToken }) {
   const [customers, setCustomers] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -41,7 +41,7 @@ export default function CustomerDirectory({ onViewChange, onSelectCustomer, onLo
     } catch (err) {
       if (err.status === 401) {
         if (onLogout) {
-          onLogout();
+          onLogout({ silent: true });
         } else {
           localStorage.removeItem('access_token');
           sessionStorage.removeItem('access_token');
@@ -65,7 +65,7 @@ export default function CustomerDirectory({ onViewChange, onSelectCustomer, onLo
 
   useEffect(() => {
     fetchCustomers();
-  }, [page, debouncedSearchId, selectedRisk, selectedIncome, selectedDevice, selectedPayment, willCancel]);
+  }, [page, debouncedSearchId, selectedRisk, selectedIncome, selectedDevice, selectedPayment, willCancel, predictionRefreshToken]);
 
   const activeFilterCount = useMemo(() => {
     return [
@@ -354,9 +354,10 @@ const styles = {
   riskBadge: (category) => {
     const isHigh = category === 'High' || category === 'CRITICAL';
     const isMedium = category === 'Medium';
-    const bg = isHigh ? 'rgba(239,68,68,0.1)' : isMedium ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)';
-    const text = isHigh ? '#fca5a5' : isMedium ? '#fde047' : '#a7f3d0';
-    const border = isHigh ? 'rgba(239,68,68,0.2)' : isMedium ? 'rgba(245,158,11,0.2)' : 'rgba(16,185,129,0.2)';
+    const isPending = category === 'Pending';
+    const bg = isHigh ? 'rgba(239,68,68,0.1)' : isMedium ? 'rgba(245,158,11,0.1)' : isPending ? 'rgba(148,163,184,0.1)' : 'rgba(16,185,129,0.1)';
+    const text = isHigh ? '#fca5a5' : isMedium ? '#fde047' : isPending ? '#94a3b8' : '#a7f3d0';
+    const border = isHigh ? 'rgba(239,68,68,0.2)' : isMedium ? 'rgba(245,158,11,0.2)' : isPending ? 'rgba(148,163,184,0.2)' : 'rgba(16,185,129,0.2)';
     return {
       padding: '4px 8px',
       borderRadius: '6px',

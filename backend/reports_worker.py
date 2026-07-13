@@ -4,7 +4,7 @@
 import os
 import time
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 # Mock import of Celery app context
 # from .celery_app import celery_app
@@ -58,7 +58,7 @@ def generate_report_task(task_id: str, report_type: str, file_format: str, filte
             f.write("%PDF-1.4\n%[Mock PDF Binary Content/Metadata]\n")
             f.write(f"Title: Subscription Churn Analytical Report\n")
             f.write(f"Type: {report_type}\n")
-            f.write(f"Generated at: {datetime.utcnow()}\n")
+            f.write(f"Generated at: {datetime.now(timezone.utc)}\n")
             f.write(f"Applied Filters: {filters}\n")
             
     logger.info(f"Task {task_id} completed successfully. Saved to {file_path}")

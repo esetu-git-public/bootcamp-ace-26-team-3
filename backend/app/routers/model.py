@@ -1,3 +1,9 @@
+"""
+Model Performance Diagnostics and A/B Testing API Router.
+
+Author/Maintainer: Manthena Sri Harshitha
+"""
+
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -5,7 +11,7 @@ from typing import List
 from ..database import get_db
 from ..schemas import ModelMetricsResponse, ABTestConfig, ABTestStatusResponse, ABTestResultsResponse
 from .auth import get_current_user
-from datetime import datetime
+from datetime import datetime, timezone
 from ..core.model_service import model_service
 
 router = APIRouter(prefix="/model", tags=["Model Performance"])
@@ -58,7 +64,7 @@ async def get_model_metrics(
             try:
                 with open(metrics_file, "r") as f:
                     metrics = json.load(f)
-                metrics["evaluated_at"] = datetime.utcnow()
+                metrics["evaluated_at"] = datetime.now(timezone.utc)
                 return metrics
             except Exception:
                 pass
@@ -85,7 +91,7 @@ async def get_model_metrics(
                 "Monthly_Total_Spend": 6.8,
                 "Age": 3.6
             },
-            "evaluated_at": datetime.utcnow()
+            "evaluated_at": datetime.now(timezone.utc)
         }
 
 @router.post("/deploy/{model_version}", status_code=status.HTTP_202_ACCEPTED)

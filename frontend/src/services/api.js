@@ -159,6 +159,14 @@ export async function getCustomerSegmentation() {
 }
 
 /**
+ * Historical churn trends
+ */
+export async function getChurnTrends() {
+  return request('/analytics/churn-trends');
+}
+
+
+/**
  * List customers with pagination and filtering
  */
 export async function getCustomers(page = 1, limit = 20, filters = {}) {
@@ -186,6 +194,7 @@ export async function getCustomers(page = 1, limit = 20, filters = {}) {
   appendFilter('device_types', filters.deviceType || filters.deviceTypes);
   appendFilter('payment_modes', filters.paymentMode || filters.paymentModes);
   appendFilter('risk_categories', filters.riskCategory || filters.riskCategories);
+  if (filters.sortBy) params.append('sort_by', filters.sortBy);
 
   return request(`/customers?${params.toString()}`);
 }
@@ -320,6 +329,20 @@ export async function signup(username, email, password, fullName = null) {
     }),
   });
 }
+
+export async function listUsers() {
+  return request('/auth/users');
+}
+
+/**
+ * Delete a manager account (Admin only)
+ */
+export async function deleteUser(username) {
+  return request(`/auth/users/${username}`, {
+    method: 'DELETE',
+  });
+}
+
 
 /**
  * Get backend origin for file downloads and other absolute URLs

@@ -98,26 +98,10 @@ export function ModelPredictionCard({ prediction, loading = false, error = null,
         </div>
       )}
 
-      {/* Recommendation */}
-      {prediction.recommendation_type && (
-        <div style={styles.recommendationBox(isChurn)}>
-          <h4 style={styles.recommendationTitle}>
-            Recommended Action
-          </h4>
-          <p style={styles.recommendationAction}>
-            <strong>{prediction.recommendation_type}</strong>
-          </p>
-          <p style={styles.recommendationDesc}>
-            {prediction.recommendation_desc}
-          </p>
-        </div>
-      )}
 
-      {onRegenerate && (
-        <button onClick={onRegenerate} style={styles.regenerateBtn}>
-          Recalculate Prediction
-        </button>
-      )}
+
+
+
     </div>
   );
 }

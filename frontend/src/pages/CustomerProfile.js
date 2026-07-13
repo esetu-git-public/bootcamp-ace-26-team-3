@@ -32,6 +32,21 @@ function getInitials(id = '') {
   return id.replace(/[^a-zA-Z0-9]/g, '').slice(0, 2).toUpperCase() || '??';
 }
 
+function parseRecommendationDesc(desc) {
+  if (!desc) return null;
+  const lines = desc.split('\n');
+  const result = {};
+  lines.forEach(line => {
+    const parts = line.split(':');
+    if (parts.length >= 2) {
+      const key = parts[0].trim().toLowerCase();
+      const val = parts.slice(1).join(':').trim();
+      result[key] = val;
+    }
+  });
+  return Object.keys(result).length > 0 ? result : null;
+}
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function SatisfactionDots({ score }) {
@@ -90,7 +105,7 @@ function StatPill({ label, value, color = '#38bdf8', icon }) {
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export default function CustomerProfile({ onViewChange, onLogout, selectedCustomerId, setSelectedCustomerId }) {
+export default function CustomerProfile({ onViewChange, onLogout, onNotify, selectedCustomerId, setSelectedCustomerId, onPredictionRecalculated }) {
   const [customerId, setCustomerId]   = useState(selectedCustomerId || '');
   const [searchId,   setSearchId]     = useState(selectedCustomerId || '');
   const [customer,   setCustomer]     = useState(null);
@@ -125,7 +140,7 @@ export default function CustomerProfile({ onViewChange, onLogout, selectedCustom
       }
       fetchPredictionHistory(id);
     } catch (err) {
-      if (err.status === 401)      { onLogout(); }
+      if (err.status === 401)      { onLogout({ silent: true }); }
       else if (err.status === 404) { setNotFound(true); setCustomer(null); }
       else                         { setError(err.message || 'Failed to load customer details'); setCustomer(null); }
     } finally {
@@ -133,19 +148,30 @@ export default function CustomerProfile({ onViewChange, onLogout, selectedCustom
     }
   };
 
-  const runChurnPrediction = async () => {
+  const handleCalculatePrediction = async () => {
     if (!customer) return;
     setPredicting(true);
     setError(null);
     try {
       const data = await mlModel.getSinglePrediction(customerId);
       setPrediction(data);
-      fetchPredictionHistory(customerId);
+      if (onPredictionRecalculated) {
+        onPredictionRecalculated();
+      }
+      await fetchCustomerDetails(customerId);
+      if (onNotify) {
+        onNotify({
+          type: 'success',
+          title: 'Prediction ready',
+          message: `Churn prediction updated for ${customerId}.`
+        });
+      }
     } catch (err) {
-      if (err.status === 401) { onLogout(); }
+      if (err.status === 401) { onLogout({ silent: true }); }
       else { setError(err.message || 'Failed to run churn prediction model.'); }
     } finally { setPredicting(false); }
   };
+
 
   const fetchPredictionHistory = async (id) => {
     try {
@@ -372,15 +398,16 @@ export default function CustomerProfile({ onViewChange, onLogout, selectedCustom
 
                 <button
                   className="cp-predict-btn"
-                  onClick={runChurnPrediction}
+                  onClick={handleCalculatePrediction}
                   disabled={predicting}
                   style={predicting ? S.predictBtnDisabled : S.predictBtn}
                 >
                   {predicting
-                    ? <><span style={S.btnSpinner} />Calculating Churn Model…</>
-                    : <>⚡ Generate Model Prediction</>
+                    ? <><span style={S.btnSpinner} />Calculating...</>
+                    : <>Calculate Prediction</>
                   }
                 </button>
+
               </div>
 
               {/* Segment Benchmarks */}
@@ -421,29 +448,76 @@ export default function CustomerProfile({ onViewChange, onLogout, selectedCustom
                 prediction={prediction}
                 loading={predicting}
                 error={null}
-                onRegenerate={runChurnPrediction}
+                onRegenerate={null}
               />
 
               {/* Prediction Timeline */}
               <PredictionTimeline predictions={history} />
 
               {/* Retention Recommendation */}
-              {prediction && (
-                <div style={S.recommendCard}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', marginBottom: '14px', flexWrap: 'wrap' }}>
-                    <div>
-                      <h4 style={{ margin: '0 0 4px', fontSize: '1.05rem', fontWeight: 700, color: '#e2e8f0' }}>
-                        {prediction.will_cancel === 1 ? '🚨' : '✅'} Retention Recommendation
-                      </h4>
-                      <p style={{ margin: 0, fontSize: '.78rem', color: '#64748b' }}>Based on ML model output and behavioral signals</p>
+              {/* Retention Recommendation */}
+              {prediction && (() => {
+                const parsedRec = parseRecommendationDesc(prediction.recommendation_desc);
+                const riskPriority = prediction.risk_category || 'Low';
+                const recColor = riskPriority === 'High' ? '#fca5a5' : riskPriority === 'Medium' ? '#fde047' : '#a7f3d0';
+                const recBg = riskPriority === 'High' ? 'rgba(239,68,68,0.1)' : riskPriority === 'Medium' ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)';
+                const recBorder = riskPriority === 'High' ? 'rgba(239,68,68,0.2)' : riskPriority === 'Medium' ? 'rgba(245,158,11,0.2)' : 'rgba(16,185,129,0.2)';
+                return (
+                  <div style={{ ...S.recommendCard, background: recBg, borderColor: recBorder, borderStyle: 'solid', borderWidth: '1px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', marginBottom: '14px', flexWrap: 'wrap' }}>
+                      <div>
+                        <h4 style={{ margin: '0 0 4px', fontSize: '1.05rem', fontWeight: 700, color: '#e2e8f0' }}>
+                          {prediction.will_cancel === 1 ? '🚨' : '✅'} Retention Recommendation: {prediction.recommendation_type}
+                        </h4>
+                        <p style={{ margin: 0, fontSize: '.78rem', color: '#94a3b8' }}>Based on latest model execution and active customer profile metrics</p>
+                      </div>
+                      <div style={{ padding: '6px 14px', borderRadius: '20px', fontWeight: 700, fontSize: '.82rem', background: `${recColor}22`, color: recColor, border: `1px solid ${recColor}44`, whiteSpace: 'nowrap' }}>
+                        Priority: {riskPriority}
+                      </div>
                     </div>
-                    <div style={{ padding: '6px 14px', borderRadius: '20px', fontWeight: 700, fontSize: '.82rem', background: `${riskColor}22`, color: riskColor, border: `1px solid ${riskColor}44`, whiteSpace: 'nowrap' }}>
-                      {prediction.recommendation_type}
-                    </div>
+
+                    {parsedRec ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', color: '#e2e8f0', fontSize: '.9rem' }}>
+                        {parsedRec['why this customer is at risk'] && (
+                          <div>
+                            <strong style={{ color: '#94a3b8', display: 'block', fontSize: '0.8rem', textTransform: 'uppercase', marginBottom: '3px' }}>Why this customer is at risk</strong>
+                            <span style={{ lineHeight: 1.5 }}>{parsedRec['why this customer is at risk']}</span>
+                          </div>
+                        )}
+                        {parsedRec['recommended action'] && (
+                          <div>
+                            <strong style={{ color: '#94a3b8', display: 'block', fontSize: '0.8rem', textTransform: 'uppercase', marginBottom: '3px' }}>Recommended action</strong>
+                            <span style={{ lineHeight: 1.5 }}>{parsedRec['recommended action']}</span>
+                          </div>
+                        )}
+                        {parsedRec['priority'] && (
+                          <div>
+                            <strong style={{ color: '#94a3b8', display: 'block', fontSize: '0.8rem', textTransform: 'uppercase', marginBottom: '3px' }}>Priority Level</strong>
+                            <span style={{ lineHeight: 1.5, color: recColor, fontWeight: 600 }}>{parsedRec['priority']}</span>
+                          </div>
+                        )}
+                        {parsedRec['expected impact'] && (
+                          <div>
+                            <strong style={{ color: '#94a3b8', display: 'block', fontSize: '0.8rem', textTransform: 'uppercase', marginBottom: '3px' }}>Expected impact</strong>
+                            <span style={{ lineHeight: 1.5 }}>{parsedRec['expected impact']}</span>
+                          </div>
+                        )}
+                        {parsedRec['next step'] && (
+                          <div style={{ marginTop: '4px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                            <strong style={{ color: '#94a3b8', display: 'block', fontSize: '0.8rem', textTransform: 'uppercase', marginBottom: '3px' }}>Next action step</strong>
+                            <span style={{ lineHeight: 1.5, background: 'rgba(255,255,255,0.04)', padding: '6px 10px', borderRadius: '6px', display: 'inline-block', fontWeight: 600, border: '1px solid rgba(255,255,255,0.06)' }}>
+                              👉 {parsedRec['next step']}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p style={{ margin: 0, color: '#cbd5e1', fontSize: '.9rem', lineHeight: 1.65 }}>{prediction.recommendation_desc}</p>
+                    )}
                   </div>
-                  <p style={{ margin: 0, color: '#cbd5e1', fontSize: '.9rem', lineHeight: 1.65 }}>{prediction.recommendation_desc}</p>
-                </div>
-              )}
+                );
+              })()}
+
 
               {/* SHAP Explainability */}
               {prediction?.explainability && (

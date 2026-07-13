@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import bindparam, text
 from typing import Any, Dict, List, Optional, cast
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from ..database import get_db
 from ..schemas import PaginatedCustomersResponse, CustomerProfileResponse, PredictionHistoryItem
 from .auth import get_current_user
@@ -87,7 +87,7 @@ def get_mock_customer_profile(customer_id: str):
         "discount_used": False,
         "device_type": row["device_type"],
         "payment_mode": row["payment_mode"],
-        "created_at": datetime.utcnow() - timedelta(days=row["tenure_months"] * 30),
+        "created_at": datetime.now(timezone.utc) - timedelta(days=row["tenure_months"] * 30),
         "churn_probability": row["churn_probability"],
         "probability_confidence_lower": max(0.0, row["churn_probability"] - 5.0),
         "probability_confidence_upper": min(100.0, row["churn_probability"] + 5.0),
@@ -103,7 +103,7 @@ def get_mock_customer_profile(customer_id: str):
         },
         "recommendation_type": row["recommendation_type"],
         "recommendation_desc": f"Mock recommendation for customer {customer_id}: {row['recommendation_type']}.",
-        "predicted_at": datetime.utcnow()
+        "predicted_at": datetime.now(timezone.utc)
     }
 
 
@@ -124,6 +124,7 @@ async def get_customers(
     payment_modes: Optional[List[str]] = Query(None),
     risk_categories: Optional[List[str]] = Query(None),
     will_cancel: Optional[int] = Query(None, ge=0, le=1),
+    sort_by: str = Query("customer_id_asc", pattern="^(customer_id_asc|risk_desc)$"),
     db: Session = Depends(get_db),
     current_user: str = Depends(get_current_user)
 ):
@@ -132,7 +133,7 @@ async def get_customers(
         # Build dynamic query on view
         query_str = """
             SELECT customer_id, age, income_level, tenure_months, monthly_total_spend, satisfaction_score,
-                   device_type, payment_mode, churn_probability, risk_category, will_cancel, recommendation_type
+                   device_type, payment_mode, prediction_id, churn_probability, risk_category, will_cancel, recommendation_type, predicted_at, model_version
             FROM v_customer_predictions
             WHERE 1=1
         """
@@ -165,10 +166,53 @@ async def get_customers(
         rows = []
         if total > 0:
             # Run paginated list query
-            query_str += " ORDER BY cast(customer_id as integer) ASC LIMIT :limit OFFSET :offset"
+            if sort_by == "risk_desc":
+                query_str += """
+                    ORDER BY
+                        CASE risk_category
+                            WHEN 'High' THEN 1
+                            WHEN 'Medium' THEN 2
+                            WHEN 'Low' THEN 3
+                            ELSE 4
+                        END ASC,
+                        churn_probability DESC,
+                        customer_id ASC
+                    LIMIT :limit OFFSET :offset
+                """
+            else:
+                query_str += " ORDER BY cast(customer_id as integer) ASC LIMIT :limit OFFSET :offset"
             results = db.execute(_expand_list_params(text(query_str), params), params).fetchall()
             
             for r in results:
+                if r.churn_probability is None:
+                    from ..core.prediction_service import ensure_customer_has_prediction
+                    try:
+                        new_pred = ensure_customer_has_prediction(db, r.customer_id)
+                        prob = float(new_pred.churn_probability)
+                        risk = new_pred.risk_category
+                        cancel = new_pred.will_cancel
+                        rec_type = new_pred.recommendation_type
+                        pred_id = new_pred.prediction_id
+                        pred_at = new_pred.predicted_at
+                        model_version = new_pred.model_version
+                    except Exception as exc:
+                        print(f"On-the-fly list prediction fallback failed for {r.customer_id}: {exc}")
+                        prob = None
+                        risk = "Pending"
+                        cancel = None
+                        rec_type = None
+                        pred_id = None
+                        pred_at = None
+                        model_version = None
+                else:
+                    prob = float(r.churn_probability)
+                    risk = r.risk_category
+                    cancel = r.will_cancel
+                    rec_type = r.recommendation_type
+                    pred_id = r.prediction_id
+                    pred_at = r.predicted_at
+                    model_version = r.model_version
+
                 rows.append({
                     "customer_id": r.customer_id,
                     "age": r.age,
@@ -178,12 +222,14 @@ async def get_customers(
                     "satisfaction_score": r.satisfaction_score,
                     "device_type": r.device_type,
                     "payment_mode": r.payment_mode,
-                    "churn_probability": float(r.churn_probability or 0.0),
-                    "risk_category": r.risk_category,
-                    "will_cancel": r.will_cancel,
-                    "recommendation_type": r.recommendation_type
+                    "churn_probability": prob,
+                    "risk_category": risk,
+                    "will_cancel": cancel,
+                    "recommendation_type": rec_type,
+                    "prediction_id": pred_id,
+                    "predicted_at": pred_at,
+                    "model_version": model_version,
                 })
-
         return {
             "total": total,
             "page": page,
@@ -228,6 +274,48 @@ async def get_customer_profile(
                 detail=f"Customer with ID {customer_id} not found."
             )
             
+        # If no prediction exists yet, auto-create one
+        if result.churn_probability is None:
+            from ..core.prediction_service import ensure_customer_has_prediction
+            try:
+                new_pred = ensure_customer_has_prediction(db, customer_id)
+                prob = float(new_pred.churn_probability)
+                prob_lower = max(0.0, prob - 5.0)
+                prob_upper = min(100.0, prob + 5.0)
+                risk = new_pred.risk_category
+                cancel = new_pred.will_cancel
+                explain = new_pred.explainability_json
+                rec_type = new_pred.recommendation_type
+                rec_desc = new_pred.recommendation_desc
+                pred_at = new_pred.predicted_at
+                pred_id = new_pred.prediction_id
+                model_version = new_pred.model_version
+            except Exception as exc:
+                print(f"On-the-fly profile prediction fallback failed: {exc}")
+                prob = None
+                prob_lower = None
+                prob_upper = None
+                risk = "Pending"
+                cancel = None
+                explain = None
+                rec_type = "Pending Prediction"
+                rec_desc = "Run prediction model to generate recommendations."
+                pred_at = None
+                pred_id = None
+                model_version = None
+        else:
+            prob = float(result.churn_probability)
+            prob_lower = max(0.0, prob - 5.0)
+            prob_upper = min(100.0, prob + 5.0)
+            risk = result.risk_category
+            cancel = result.will_cancel
+            explain = json.loads(result.explainability_json) if isinstance(result.explainability_json, str) else result.explainability_json
+            rec_type = result.recommendation_type
+            rec_desc = result.recommendation_desc
+            pred_at = result.predicted_at
+            pred_id = result.prediction_id
+            model_version = result.model_version
+
         return {
             "customer_id": result.customer_id,
             "age": result.age,
@@ -243,19 +331,17 @@ async def get_customer_profile(
             "device_type": getattr(result, "device_type", None) or (result[11] if hasattr(result, "__getitem__") else None),
             "payment_mode": result.payment_mode,
             "created_at": result.created_at,
-            "churn_probability": float(result.churn_probability or 0.0) if result.churn_probability else None,
-            "probability_confidence_lower": max(0.0, float(result.churn_probability or 0.0) - 5.0) if result.churn_probability else None,
-            "probability_confidence_upper": min(100.0, float(result.churn_probability or 0.0) + 5.0) if result.churn_probability else None,
-            "risk_category": result.risk_category,
-            "will_cancel": result.will_cancel,
-            "explainability": (
-                json.loads(result.explainability_json)
-                if isinstance(result.explainability_json, str)
-                else result.explainability_json
-            ),
-            "recommendation_type": result.recommendation_type,
-            "recommendation_desc": result.recommendation_desc,
-            "predicted_at": result.predicted_at
+            "churn_probability": prob,
+            "probability_confidence_lower": prob_lower,
+            "probability_confidence_upper": prob_upper,
+            "risk_category": risk,
+            "will_cancel": cancel,
+            "explainability": explain,
+            "recommendation_type": rec_type,
+            "recommendation_desc": rec_desc,
+            "predicted_at": pred_at,
+            "prediction_id": pred_id,
+            "model_version": model_version
         }
     except Exception as e:
         if isinstance(e, HTTPException):
@@ -286,9 +372,9 @@ async def get_customer_prediction_history(
         } for r in results]
     except Exception:
         # Fallback Mock history
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
         return [
-            {"history_id": 105, "risk_score": 89.00, "risk_category": "High", "prediction_result": 1, "evaluated_at": datetime.utcnow()},
-            {"history_id": 92, "risk_score": 65.20, "risk_category": "Medium", "prediction_result": 1, "evaluated_at": datetime.utcnow() - timedelta(days=30)},
-            {"history_id": 71, "risk_score": 45.00, "risk_category": "Medium", "prediction_result": 0, "evaluated_at": datetime.utcnow() - timedelta(days=60)}
+            {"history_id": 105, "risk_score": 89.00, "risk_category": "High", "prediction_result": 1, "evaluated_at": datetime.now(timezone.utc)},
+            {"history_id": 92, "risk_score": 65.20, "risk_category": "Medium", "prediction_result": 1, "evaluated_at": datetime.now(timezone.utc) - timedelta(days=30)},
+            {"history_id": 71, "risk_score": 45.00, "risk_category": "Medium", "prediction_result": 0, "evaluated_at": datetime.now(timezone.utc) - timedelta(days=60)}
         ]

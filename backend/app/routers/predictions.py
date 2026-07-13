@@ -3,19 +3,20 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 import uuid
 import json
-from datetime import datetime
-from typing import Optional
+from datetime import datetime, timezone
+from typing import Any, Optional, cast
 from io import StringIO
 import os
 import csv
 import re
 import pandas as pd
-from ..database import get_db
+from ..database import SessionLocal, get_db
 from ..schemas import (
     SinglePredictionResponse, BulkPredictionUploadResponse, 
     BulkPredictionStatusResponse
 )
 from ..core.risk_score import build_risk_profile
+from ..models import BulkPredictionJob
 from ..core.model_service import model_service
 from .auth import get_current_user
 
@@ -53,14 +54,18 @@ def _get_first(data: dict, *keys: str, default: Optional[object] = None) -> Opti
 
 def _to_int(value: Optional[object], default: int) -> int:
     try:
-        return int(float(value))
+        if value is None:
+            return default
+        return int(float(cast(Any, value)))
     except (TypeError, ValueError):
         return default
 
 
 def _to_float(value: Optional[object], default: float) -> float:
     try:
-        return float(value)
+        if value is None:
+            return default
+        return float(cast(Any, value))
     except (TypeError, ValueError):
         return default
 
@@ -105,8 +110,48 @@ def _risk_from_probability(prob: float) -> tuple[str, int, str, str]:
         "Customer behavior shows stable engagement.",
     )
 
-# Global dictionary to track bulk job status in-memory for prototype
+# Compatibility mirror for older tests/utilities. API state is persisted in bulk_prediction_jobs.
 BULK_JOBS_DB = {}
+
+
+def _job_to_dict(job: BulkPredictionJob) -> dict:
+    return {
+        "job_id": job.job_id,
+        "status": job.status,
+        "total_records": job.total_records,
+        "processed_records": job.processed_records,
+        "successful_records": job.successful_records,
+        "failed_records": job.failed_records,
+        "created_at": job.created_at,
+        "completed_at": job.completed_at,
+        "download_url": job.download_url,
+        "error_message": job.error_message,
+    }
+
+
+def _mirror_job(job_data: dict) -> None:
+    BULK_JOBS_DB[job_data["job_id"]] = dict(job_data)
+
+
+def _get_job(db: Session, job_id: str) -> Optional[BulkPredictionJob]:
+    return db.query(BulkPredictionJob).filter(BulkPredictionJob.job_id == job_id).first()
+
+
+def _set_job_fields(db: Session, job_id: str, **fields) -> Optional[BulkPredictionJob]:
+    job = _get_job(db, job_id)
+    if not job:
+        return None
+    for key, value in fields.items():
+        setattr(job, key, value)
+    db.commit()
+    db.refresh(job)
+    _mirror_job(_job_to_dict(job))
+    return job
+
+
+def _update_legacy_job(job_id: str, **fields) -> None:
+    if job_id in BULK_JOBS_DB:
+        BULK_JOBS_DB[job_id].update(fields)
 
 
 def _is_valid_job_id(job_id: str) -> bool:
@@ -123,22 +168,59 @@ def _score_prediction_row(row: dict) -> dict:
         score = round(output["probability"] * 100.0, 2)
         score_lower = round(output["probability_confidence_lower"] * 100.0, 2)
         score_upper = round(output["probability_confidence_upper"] * 100.0, 2)
-        risk, will_cancel, rec_type, rec_desc = _risk_from_probability(score / 100.0)
+        
+        from ..core.prediction_service import risk_from_probability, generate_recommendation_details
+        risk, will_cancel = risk_from_probability(score / 100.0)
+        
+        support_interactions = _to_int(_get_first(row, "customer_support_interactions", "Customer_Support_Interactions", "Support Tickets", default=3), 3)
+        satisfaction = _to_int(_get_first(row, "satisfaction_score", "Satisfaction_Score", "Satisfaction (1-5)", default=3), 3)
+        monthly_spend = _to_float(_get_first(row, "monthly_total_spend", "Monthly_Total_Spend", "Monthly Spend ($)", default=75.0), 75.0)
+        usage = _to_float(_get_first(row, "avg_usage_hours_per_week", "Avg_Usage_Hours_Per_Week", "Weekly Usage (Hrs)", default=15.0), 15.0)
+        tenure = _to_int(_get_first(row, "tenure_months", "Tenure_Months", "Tenure (Months)", default=12), 12)
+        app_switch = _to_int(_get_first(row, "app_switch_frequency", "App_Switch_Frequency", default=5), 5)
+        
+        rec_type, rec_desc = generate_recommendation_details(
+            prob=score,
+            risk_category=risk,
+            satisfaction_score=satisfaction,
+            monthly_total_spend=monthly_spend,
+            tenure_months=tenure,
+            customer_support_interactions=support_interactions,
+            avg_usage_hours_per_week=usage,
+            app_switch_frequency=app_switch
+        )
     except Exception as exc:
         print(f"Bulk model prediction failed, falling back to rule-based predictor: {exc}")
+        support_interactions = _to_int(_get_first(row, "customer_support_interactions", "Customer_Support_Interactions", "Support Tickets", default=3), 3)
+        satisfaction = _to_int(_get_first(row, "satisfaction_score", "Satisfaction_Score", "Satisfaction (1-5)", default=3), 3)
+        monthly_spend = _to_float(_get_first(row, "monthly_total_spend", "Monthly_Total_Spend", "Monthly Spend ($)", default=75.0), 75.0)
+        usage = _to_float(_get_first(row, "avg_usage_hours_per_week", "Avg_Usage_Hours_Per_Week", "Weekly Usage (Hrs)", default=15.0), 15.0)
+        tenure = _to_int(_get_first(row, "tenure_months", "Tenure_Months", "Tenure (Months)", default=12), 12)
+        app_switch = _to_int(_get_first(row, "app_switch_frequency", "App_Switch_Frequency", default=5), 5)
+        
         profile = build_risk_profile(
-            customer_support_interactions=_to_int(_get_first(row, "customer_support_interactions", "Customer_Support_Interactions", "Support Tickets", default=3), 3),
-            satisfaction_score=_to_int(_get_first(row, "satisfaction_score", "Satisfaction_Score", "Satisfaction (1-5)", default=3), 3),
-            monthly_total_spend=_to_float(_get_first(row, "monthly_total_spend", "Monthly_Total_Spend", "Monthly Spend ($)", default=75.0), 75.0),
-            avg_usage_hours_per_week=_to_float(_get_first(row, "avg_usage_hours_per_week", "Avg_Usage_Hours_Per_Week", "Weekly Usage (Hrs)", default=15.0), 15.0),
+            customer_support_interactions=support_interactions,
+            satisfaction_score=satisfaction,
+            monthly_total_spend=monthly_spend,
+            avg_usage_hours_per_week=usage,
         )
         score = round(float(profile["risk_score"]), 2)
         score_lower = round(max(0, score - 5.0), 2)
         score_upper = round(min(100, score + 5.0), 2)
         risk = profile["risk_category"]
         will_cancel = profile["will_cancel"]
-        rec_type = profile["recommendation_type"]
-        rec_desc = profile["recommendation_desc"]
+        
+        from ..core.prediction_service import generate_recommendation_details
+        rec_type, rec_desc = generate_recommendation_details(
+            prob=score,
+            risk_category=risk,
+            satisfaction_score=satisfaction,
+            monthly_total_spend=monthly_spend,
+            tenure_months=tenure,
+            customer_support_interactions=support_interactions,
+            avg_usage_hours_per_week=usage,
+            app_switch_frequency=app_switch
+        )
 
     return {
         "customer_id": str(_get_first(row, "customer_id", "Customer ID", "Customer_ID", default="")).strip() or "UNKNOWN",
@@ -159,13 +241,29 @@ def _score_prediction_row(row: dict) -> dict:
 
 
 def process_bulk_predictions_task(job_id: str, file_content: bytes):
-    if job_id not in BULK_JOBS_DB or not _is_valid_job_id(job_id):
+    if not _is_valid_job_id(job_id):
         return
 
-    BULK_JOBS_DB[job_id]["status"] = "PROCESSING"
-    output_path = os.path.join(RESULTS_DIR, f"{job_id}.csv")
-
+    db = SessionLocal()
+    use_db = True
     try:
+        try:
+            job = _get_job(db, job_id)
+        except Exception as lookup_exc:
+            print(f"Bulk job database lookup failed, using legacy tracker: {lookup_exc}")
+            job = None
+            use_db = False
+
+        if not job:
+            use_db = False
+            if job_id not in BULK_JOBS_DB:
+                return
+
+        if use_db:
+            _set_job_fields(db, job_id, status="PROCESSING")
+        _update_legacy_job(job_id, status="PROCESSING")
+
+        output_path = os.path.join(RESULTS_DIR, f"{job_id}.csv")
         decoded = file_content.decode("utf-8-sig", errors="ignore")
         reader = csv.DictReader(StringIO(decoded))
         if not reader.fieldnames:
@@ -177,6 +275,10 @@ def process_bulk_predictions_task(job_id: str, file_content: bytes):
             "Churn Probability", "Confidence Lower", "Confidence Upper",
             "Will Cancel", "Risk Category", "Recommended Offer", "Action Description"
         ]
+
+        processed_records = 0
+        successful_records = 0
+        failed_records = 0
 
         with open(output_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -204,21 +306,63 @@ def process_bulk_predictions_task(job_id: str, file_content: bytes):
                         "Recommended Offer": result["recommendation_type"],
                         "Action Description": result["recommendation_desc"],
                     })
-                    BULK_JOBS_DB[job_id]["successful_records"] += 1
+                    successful_records += 1
                 except Exception as row_exc:
                     print(f"Failed to process bulk row for job {job_id}: {row_exc}")
-                    BULK_JOBS_DB[job_id]["failed_records"] += 1
+                    failed_records += 1
                 finally:
-                    BULK_JOBS_DB[job_id]["processed_records"] += 1
+                    processed_records += 1
+                    if use_db:
+                        _set_job_fields(
+                            db,
+                            job_id,
+                            processed_records=processed_records,
+                            successful_records=successful_records,
+                            failed_records=failed_records,
+                        )
+                    _update_legacy_job(
+                        job_id,
+                        processed_records=processed_records,
+                        successful_records=successful_records,
+                        failed_records=failed_records,
+                    )
 
-        BULK_JOBS_DB[job_id]["status"] = "COMPLETED"
-        BULK_JOBS_DB[job_id]["completed_at"] = datetime.utcnow()
-        BULK_JOBS_DB[job_id]["download_url"] = f"/api/v1/reports/export?format=csv&job_id={job_id}"
+        completed_at = datetime.now(timezone.utc)
+        download_url = f"/api/v1/reports/export?format=csv&job_id={job_id}"
+        if use_db:
+            _set_job_fields(
+                db,
+                job_id,
+                status="COMPLETED",
+                completed_at=completed_at,
+                download_url=download_url,
+                error_message=None,
+            )
+        _update_legacy_job(
+            job_id,
+            status="COMPLETED",
+            completed_at=completed_at,
+            download_url=download_url,
+            error_message=None,
+        )
     except Exception as exc:
-        BULK_JOBS_DB[job_id]["status"] = "FAILED"
-        BULK_JOBS_DB[job_id]["error_message"] = str(exc)
-        BULK_JOBS_DB[job_id]["completed_at"] = datetime.utcnow()
-
+        completed_at = datetime.now(timezone.utc)
+        if use_db:
+            _set_job_fields(
+                db,
+                job_id,
+                status="FAILED",
+                error_message=str(exc),
+                completed_at=completed_at,
+            )
+        _update_legacy_job(
+            job_id,
+            status="FAILED",
+            error_message=str(exc),
+            completed_at=completed_at,
+        )
+    finally:
+        db.close()
 @router.post("/single/{customer_id}", response_model=SinglePredictionResponse)
 async def predict_single(
     customer_id: str,
@@ -226,30 +370,29 @@ async def predict_single(
     current_user: str = Depends(get_current_user)
 ):
     try:
-        # Check if customer exists in database
-        query = text("SELECT * FROM customers WHERE customer_id = :customer_id")
-        customer = db.execute(query, {"customer_id": customer_id}).fetchone()
+        from ..models import Customer
+        from ..core.prediction_service import calculate_prediction_for_customer, save_customer_prediction
         
-        # Determine features (either from db or fallback values)
+        # Check if customer exists in database
+        customer = db.query(Customer).filter(Customer.customer_id == customer_id).first()
+        
         if customer:
-            support_interactions = customer.customer_support_interactions
-            satisfaction = customer.satisfaction_score
-            usage = float(customer.avg_usage_hours_per_week)
-            monthly_spend = float(customer.monthly_total_spend)
+            pred_data = calculate_prediction_for_customer(db, customer)
+            db_prediction = save_customer_prediction(db, customer_id, pred_data)
             
-            input_data = {
-                "income_level": customer.income_level,
-                "satisfaction_score": customer.satisfaction_score,
-                "discount_used": customer.discount_used,
-                "age": customer.age,
-                "number_of_subscriptions": customer.number_of_subscriptions,
-                "tenure_months": customer.tenure_months,
-                "monthly_total_spend": float(customer.monthly_total_spend),
-                "avg_usage_hours_per_week": float(customer.avg_usage_hours_per_week),
-                "app_switch_frequency": customer.app_switch_frequency,
-                "customer_support_interactions": customer.customer_support_interactions,
-                "device_type": customer.device_type,
-                "payment_mode": customer.payment_mode,
+            return {
+                "customer_id": customer_id,
+                "churn_probability": round(pred_data["churn_probability"], 2),
+                "probability_confidence_lower": pred_data["probability_confidence_lower"],
+                "probability_confidence_upper": pred_data["probability_confidence_upper"],
+                "risk_category": pred_data["risk_category"],
+                "will_cancel": pred_data["will_cancel"],
+                "explainability": pred_data["explainability"],
+                "recommendation_type": pred_data["recommendation_type"],
+                "recommendation_desc": pred_data["recommendation_desc"],
+                "prediction_id": db_prediction.prediction_id,
+                "predicted_at": db_prediction.predicted_at,
+                "model_version": db_prediction.model_version
             }
         else:
             # Check if valid mock ID
@@ -267,131 +410,88 @@ async def predict_single(
                     detail=f"Customer with ID {customer_id} not found."
                 )
             
-            support_interactions = 3 if row["risk_category"] == "High" else 1
-            satisfaction = row["satisfaction_score"]
-            usage = 14.5
-            monthly_spend = row["monthly_total_spend"]
+            row["customer_id"] = customer_id
+            pred_data = calculate_prediction_for_customer(db, row)
             
-            input_data = {
-                "income_level": row["income_level"],
-                "satisfaction_score": row["satisfaction_score"],
-                "discount_used": False,
-                "age": row["age"],
-                "number_of_subscriptions": 2,
-                "tenure_months": row["tenure_months"],
-                "monthly_total_spend": float(row["monthly_total_spend"]),
-                "avg_usage_hours_per_week": 14.5,
-                "app_switch_frequency": 15,
-                "customer_support_interactions": support_interactions,
-                "device_type": row["device_type"],
-                "payment_mode": row["payment_mode"],
+            return {
+                "customer_id": customer_id,
+                "churn_probability": round(pred_data["churn_probability"], 2),
+                "probability_confidence_lower": pred_data["probability_confidence_lower"],
+                "probability_confidence_upper": pred_data["probability_confidence_upper"],
+                "risk_category": pred_data["risk_category"],
+                "will_cancel": pred_data["will_cancel"],
+                "explainability": pred_data["explainability"],
+                "recommendation_type": pred_data["recommendation_type"],
+                "recommendation_desc": pred_data["recommendation_desc"],
+                "prediction_id": None,
+                "predicted_at": datetime.now(timezone.utc),
+                "model_version": pred_data["model_version"]
             }
-
-        # A/B Testing Logic
-        model_version_to_use = model_service.get_model_version_for_request(customer_id)
-
-        if not model_version_to_use:
-             raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="No model is currently available to serve predictions."
-            )
-
-        if model_service.is_ready:
-            try:
-                df_input = _build_prediction_input(input_data)
-                output = model_service.predict_and_explain(df_input, model_version=model_version_to_use)
-                score = round(output["probability"] * 100.0, 2)
-                score_lower = round(output["probability_confidence_lower"] * 100.0, 2)
-                score_upper = round(output["probability_confidence_upper"] * 100.0, 2)
-                risk, will_cancel, rec_type, rec_desc = _risk_from_probability(score / 100.0)
-                explainability = output["explainability"]
-            except Exception as exc:
-                print(f"Model prediction failed, falling back to rule-based predictor: {exc}")
-                profile = build_risk_profile(
-                    customer_support_interactions=support_interactions,
-                    satisfaction_score=satisfaction,
-                    monthly_total_spend=monthly_spend,
-                    avg_usage_hours_per_week=usage,
-                )
-                score = profile["risk_score"]
-                score_lower = max(0, score - 5.0)  # ±5% confidence bounds for rule-based
-                score_upper = min(100, score + 5.0)
-                risk = profile["risk_category"]
-                will_cancel = profile["will_cancel"]
-                rec_type = profile["recommendation_type"]
-                rec_desc = profile["recommendation_desc"]
-                explainability = profile.get("explainability_json", {})
-        else:
-            profile = build_risk_profile(
-                customer_support_interactions=support_interactions,
-                satisfaction_score=satisfaction,
-                monthly_total_spend=monthly_spend,
-                avg_usage_hours_per_week=usage,
-            )
-            score = profile["risk_score"]
-            score_lower = max(0, score - 5.0)  # ±5% confidence bounds for rule-based
-            score_upper = min(100, score + 5.0)
-            risk = profile["risk_category"]
-            will_cancel = profile["will_cancel"]
-            rec_type = profile["recommendation_type"]
-            rec_desc = profile["recommendation_desc"]
-            explainability = profile.get("explainability_json", {})
-
-        # Save to database if customer is database-backed
-        if customer:
-            now_time = datetime.utcnow()
-            insert_query = text("""
-                INSERT INTO churn_predictions 
-                (customer_id, churn_probability, risk_category, will_cancel, explainability_json, recommendation_type, recommendation_desc, predicted_at, model_version)
-                VALUES (:cust_id, :prob, :risk, :cancel, :explain, :rec_type, :rec_desc, :predicted_at, :model_version)
-            """)
-            db.execute(insert_query, {
-                "cust_id": customer_id,
-                "prob": score,
-                "risk": risk,
-                "cancel": will_cancel,
-                "explain": json.dumps(explainability) if isinstance(explainability, dict) else explainability,
-                "rec_type": rec_type,
-                "rec_desc": rec_desc,
-                "predicted_at": now_time,
-                "model_version": model_version_to_use
-            })
-            
-            history_query = text("""
-                INSERT INTO prediction_history 
-                (customer_id, risk_score, risk_category, prediction_result, evaluated_at)
-                VALUES (:cust_id, :risk_score, :risk_cat, :pred_res, :evaluated_at)
-            """)
-            db.execute(history_query, {
-                "cust_id": customer_id,
-                "risk_score": score,
-                "risk_cat": risk,
-                "pred_res": will_cancel,
-                "evaluated_at": now_time
-            })
-            db.commit()
-
-        return {
-            "customer_id": customer_id,
-            "churn_probability": round(score, 2),
-            "probability_confidence_lower": score_lower,
-            "probability_confidence_upper": score_upper,
-            "risk_category": risk,
-            "will_cancel": will_cancel,
-            "explainability": explainability,
-            "recommendation_type": rec_type,
-            "recommendation_desc": rec_desc
-        }
     except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Inference pipeline execution failed: {str(e)}"
         )
 
+@router.post("/backfill-missing", status_code=status.HTTP_200_OK)
+async def backfill_missing_predictions(
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
+    try:
+        from ..core.prediction_service import ensure_all_customers_have_predictions
+        res = ensure_all_customers_have_predictions(db)
+        return res
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Backfill execution failed: {str(e)}"
+        )
+
+@router.post("/recalculate-all", status_code=status.HTTP_200_OK)
+async def recalculate_all_predictions(
+    customer_id: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
+    try:
+        from ..models import Customer
+        from ..core.prediction_service import calculate_prediction_for_customer, save_customer_prediction
+
+        query = db.query(Customer)
+        if customer_id:
+            query = query.filter(Customer.customer_id == customer_id)
+        customers = query.all()
+
+        created_count = 0
+        failed_ids = []
+
+        for customer in customers:
+            try:
+                pred_data = calculate_prediction_for_customer(db, customer)
+                save_customer_prediction(db, customer.customer_id, pred_data)
+                created_count += 1
+            except Exception:
+                failed_ids.append(customer.customer_id)
+
+        return {
+            "total_checked": len(customers),
+            "predictions_created": created_count,
+            "failed_customers": failed_ids,
+            "status": "success" if not failed_ids else "partial_success"
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Recalculation failed: {str(e)}"
+        )
 @router.post("/bulk", response_model=BulkPredictionUploadResponse, status_code=status.HTTP_202_ACCEPTED)
 async def predict_bulk(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
+    db: Session = Depends(get_db),
     current_user: str = Depends(get_current_user)
 ):
     if not file.filename or not file.filename.lower().endswith(".csv"):
@@ -420,44 +520,53 @@ async def predict_bulk(
         )
     
     job_id = str(uuid.uuid4())
-    
-    # Initialize job tracking database
-    job_info = {
-        "job_id": job_id,
-        "status": "QUEUED",
-        "total_records": total_records,
-        "processed_records": 0,
-        "successful_records": 0,
-        "failed_records": 0,
-        "created_at": datetime.utcnow(),
-        "completed_at": None,
-        "download_url": None,
-        "error_message": None,
-    }
-    BULK_JOBS_DB[job_id] = job_info
+    job = BulkPredictionJob(
+        job_id=job_id,
+        status="QUEUED",
+        total_records=total_records,
+        processed_records=0,
+        successful_records=0,
+        failed_records=0,
+    )
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+    _mirror_job(_job_to_dict(job))
     
     # Send processing task to background queue
     background_tasks.add_task(process_bulk_predictions_task, job_id, file_content)
     
     return {
-        "job_id": job_id,
-        "status": "QUEUED",
-        "total_records": total_records,
-        "created_at": job_info["created_at"]
+        "job_id": job.job_id,
+        "status": job.status,
+        "total_records": job.total_records,
+        "created_at": job.created_at
     }
-
 @router.get("/bulk/status/{job_id}", response_model=BulkPredictionStatusResponse)
 async def get_bulk_status(
     job_id: str,
+    db: Session = Depends(get_db),
     current_user: str = Depends(get_current_user)
 ):
-    if not _is_valid_job_id(job_id) or job_id not in BULK_JOBS_DB:
+    if not _is_valid_job_id(job_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Bulk prediction job not found."
         )
-    return BULK_JOBS_DB[job_id]
 
+    job = _get_job(db, job_id) if isinstance(db, Session) else None
+    if job:
+        job_data = _job_to_dict(job)
+        _mirror_job(job_data)
+        return job_data
+
+    if job_id in BULK_JOBS_DB:
+        return BULK_JOBS_DB[job_id]
+
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Bulk prediction job not found."
+    )
 @router.get("/bulk/preview/{job_id}")
 async def get_bulk_preview(
     job_id: str,

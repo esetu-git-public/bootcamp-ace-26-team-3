@@ -87,6 +87,15 @@ class SegmentStats(BaseModel):
     average_churn_risk: float
 
 
+class ChurnTrendItem(BaseModel):
+    period: str
+    churn_rate: float
+    churn_count: int
+    total_customers: int
+    average_risk: float
+
+
+
 class CustomerBase(BaseModel):
     customer_id: str
     age: int
@@ -126,6 +135,9 @@ class CustomerListRow(BaseModel):
     risk_category: Optional[str] = None
     will_cancel: Optional[int] = None
     recommendation_type: Optional[str] = None
+    prediction_id: Optional[int] = None
+    predicted_at: Optional[datetime] = None
+    model_version: Optional[str] = None
 
 
 class PaginatedCustomersResponse(BaseModel):
@@ -156,6 +168,8 @@ class CustomerProfileResponse(CustomerBase):
     recommendation_type: Optional[str] = None
     recommendation_desc: Optional[str] = None
     predicted_at: Optional[datetime] = None
+    prediction_id: Optional[int] = None
+    model_version: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -170,6 +184,9 @@ class SinglePredictionResponse(BaseModel):
     explainability: Optional[Dict[str, float]] = Field(None, description="SHAP feature importance scores")
     recommendation_type: str
     recommendation_desc: str
+    prediction_id: Optional[int] = None
+    predicted_at: Optional[datetime] = None
+    model_version: Optional[str] = None
 
 
 class BulkPredictionUploadResponse(BaseModel):
@@ -284,3 +301,32 @@ class CustomerValidationSchema(BaseModel):
         if v not in ["Credit Card", "UPI", "Debit Card", "Wallet"]:
             raise ValueError("Payment mode must be 'Credit Card', 'UPI', 'Debit Card', or 'Wallet'")
         return v
+
+class RetentionInterventionCreate(BaseModel):
+    customer_id: str = Field(..., min_length=1, max_length=50)
+    prediction_id: Optional[int] = None
+    offer_type: str = Field(..., min_length=1, max_length=50)
+    status: str = Field("planned", pattern="^(planned|sent|accepted|ignored|retained|churned|cancelled)$")
+    notes: Optional[str] = None
+
+
+class RetentionInterventionUpdate(BaseModel):
+    offer_type: Optional[str] = Field(None, min_length=1, max_length=50)
+    status: Optional[str] = Field(None, pattern="^(planned|sent|accepted|ignored|retained|churned|cancelled)$")
+    notes: Optional[str] = None
+    outcome_at: Optional[datetime] = None
+
+
+class RetentionInterventionResponse(BaseModel):
+    intervention_id: int
+    customer_id: str
+    prediction_id: Optional[int] = None
+    offer_type: str
+    status: str
+    notes: Optional[str] = None
+    created_by: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    outcome_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)

@@ -78,4 +78,15 @@ describe('CustomerDirectory', () => {
       });
     });
   });
+
+  it('reloads customers when predictionRefreshToken changes', async () => {
+    const { rerender } = render(<CustomerDirectory onViewChange={jest.fn()} onSelectCustomer={jest.fn()} predictionRefreshToken={0} />);
+    await screen.findByText('12345');
+    expect(apiService.getCustomers).toHaveBeenCalledTimes(1);
+
+    rerender(<CustomerDirectory onViewChange={jest.fn()} onSelectCustomer={jest.fn()} predictionRefreshToken={1} />);
+    await waitFor(() => {
+      expect(apiService.getCustomers).toHaveBeenCalledTimes(2);
+    });
+  });
 });

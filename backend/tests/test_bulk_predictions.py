@@ -1,7 +1,9 @@
 import csv
-from datetime import datetime
+from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
+
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi import BackgroundTasks, HTTPException, UploadFile
@@ -37,7 +39,7 @@ def test_build_prediction_input_accepts_dashboard_headers():
 def test_process_bulk_predictions_task_writes_real_results(tmp_path, monkeypatch):
     job_id = "job-test"
     monkeypatch.setattr(predictions, "RESULTS_DIR", str(tmp_path))
-    monkeypatch.setattr(predictions.model_service, "is_ready", False)
+    monkeypatch.setattr(predictions.model_service, "champion_version", None)
     predictions.BULK_JOBS_DB.clear()
     predictions.BULK_JOBS_DB[job_id] = {
         "job_id": job_id,
@@ -46,7 +48,7 @@ def test_process_bulk_predictions_task_writes_real_results(tmp_path, monkeypatch
         "processed_records": 0,
         "successful_records": 0,
         "failed_records": 0,
-        "created_at": datetime.utcnow(),
+        "created_at": datetime.now(timezone.utc),
         "completed_at": None,
         "download_url": None,
     }
@@ -113,7 +115,7 @@ async def test_export_bulk_report_returns_404_for_missing_job(tmp_path, monkeypa
         await reports.export_report(
             format="csv",
             job_id="missing-job",
-            db=None,
+            db=MagicMock(),
             current_user="admin",
         )
 

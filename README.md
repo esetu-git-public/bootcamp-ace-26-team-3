@@ -80,6 +80,12 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
+For local development and tests, install the dev requirements after activating the virtual environment:
+
+```powershell
+pip install -r requirements-dev.txt
+```
+
 > **Note:** The React frontend requires Node.js and npm. If `npm` is not recognized, install Node.js from https://nodejs.org, restart PowerShell, and verify with:
 >
 > ```powershell
@@ -133,7 +139,10 @@ UI available at:
 
 ### Authentication
 
-The app requires a login before accessing any dashboard. Use the **Sign Up** page to create a new account, then log in to receive a JWT token stored in `localStorage`.
+The app requires a login before accessing any dashboard. Public signup has been disabled for security (Option B: Admin-Only Signup).
+* A default administrator is seeded on database initialization: **Username:** `admin` (or Email `admin@company.com`), **Password:** `admin123`.
+* New Customer Manager accounts can only be provisioned by the logged-in administrator via the **Manage Users** tab inside the dashboard.
+* Logins support verification using either username or email address.
 
 ### Analytics Dashboard
 
@@ -185,12 +194,47 @@ tenure_months,monthly_total_spend,avg_usage_hours_per_week,app_switch_frequency,
 customer_support_interactions,satisfaction_score,discount_used
 ```
 
+## Model training and comparison
+
+To improve generalization and check for overfitting and data leakage, we support training and comparing multiple classifiers (Logistic Regression, Random Forest, XGBoost, CatBoost, Gradient Boosting).
+
+### 1. Model training notebook
+For interactive experimentation, run the Jupyter Notebook:
+- [notebooks/model_training_comparison.ipynb](file:///c:/Users/user/Downloads/Subscription%20Cancellation%20Prediction%20System%20%28OTTSaaS%29/bootcamp-ace-26-team-3/notebooks/model_training_comparison.ipynb)
+
+### 2. Run model comparison script
+To automate comparison and select/integrate the best leakage-free model:
+```powershell
+.\.venv\Scripts\python.exe backend/experiments/train_compare_models.py
+```
+This script will:
+- Drop leakage features and identifier columns.
+- Evaluate train-test gap and cross-validation scores.
+- Select the best model (under 5% accuracy gap) and save versioned artifacts.
+- Export comparison metrics, summary, and plots to `reports/`.
+
 ## Running tests
+
+### Backend unit tests
+
+From the `backend/` directory:
+
+```powershell
+$env:PYTHONPATH = "C:\Users\user\Downloads\Subscription Cancellation Prediction System (OTTSaaS)\bootcamp-ace-26-team-3"
+.\.venv\Scripts\python.exe -m pytest
+```
+
+Test files:
+- `tests/test_security_auth.py`
+- `tests/test_bulk_predictions.py`
+- `tests/test_probability_implementation.py`
+- `tests/test_shap_explainability.py`
 
 ### Frontend unit tests
 
+From the `frontend/` directory:
+
 ```powershell
-cd frontend
 npm test -- --watchAll=false
 ```
 
@@ -198,14 +242,22 @@ Test files:
 - `src/pages/AnalyticsDashboard.test.js`
 - `src/pages/ModelPerformance.test.js`
 
+### Backend unit tests
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest backend/tests
+```
+
+For full setup, architecture, and debugging details, see the [TDD & Unit Testing Documentation](file:///d:/Team-3/docs/TDD_TESTING_DOCUMENTATION.md) authored by **Manthena Sri Harshitha**.
+
 ## API reference
 
 All routes are under `/api/v1`:
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/auth/login` | Login and obtain JWT token |
-| `POST` | `/auth/signup` | Register a new user |
+| `POST` | `/auth/login` | Login and obtain JWT token (supports username or email lookup) |
+| `POST` | `/auth/signup` | Register a new manager account (requires Administrator token) |
 | `GET`  | `/dashboard/kpis` | KPI summary metrics |
 | `GET`  | `/customers` | Paginated customer list with filters |
 | `GET`  | `/customers/{id}` | Single customer profile |
@@ -229,6 +281,7 @@ All routes are under `/api/v1`:
 
 - **Frontend can't reach backend** — confirm the backend is running on port 8000 and CORS is enabled
 - **`npm start` fails** — run `npm install` first; ensure Node.js ≥ 16 is installed
-- **Login returns 401** — create a new account via Sign Up before logging in
+- **Login returns 401** — ensure you are using the default admin account `admin`/`admin123` or your manager profile has been created by the system administrator
 - **No model metrics shown** — place a `model_metrics.json` file under `backend/app/models/` or seed the `model_metrics` DB table
 - **Switch from SQLite to PostgreSQL** — set `DATABASE_URL` to your connection string before starting the backend
+

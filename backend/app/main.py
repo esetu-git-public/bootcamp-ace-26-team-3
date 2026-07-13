@@ -5,7 +5,7 @@ from .config import settings
 from .database import Base, SessionLocal, engine
 from . import models
 from .db_init import initialize_database
-from .routers import analytics, auth, customers, dashboard, model, predictions, reports
+from .routers import analytics, auth, customers, dashboard, model, predictions, reports, retention
 from .api.endpoints import explainability
 
 app = FastAPI(
@@ -40,6 +40,7 @@ app.include_router(analytics.router, prefix="/api/v1")
 app.include_router(customers.router, prefix="/api/v1")
 app.include_router(predictions.router, prefix="/api/v1")
 app.include_router(reports.router, prefix="/api/v1")
+app.include_router(retention.router, prefix="/api/v1")
 app.include_router(model.router, prefix="/api/v1")
 app.include_router(explainability.router, prefix="/api/v1")
 

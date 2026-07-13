@@ -31,7 +31,7 @@ def create_customer_predictions_view(engine: Engine, db: Session) -> None:
         WITH latest_predictions AS (
             SELECT
                 p.*,
-                ROW_NUMBER() OVER(PARTITION BY p.customer_id ORDER BY p.predicted_at DESC) as rn
+                ROW_NUMBER() OVER(PARTITION BY p.customer_id ORDER BY p.predicted_at DESC, p.prediction_id DESC) as rn
             FROM churn_predictions p
         )
         SELECT
@@ -56,7 +56,8 @@ def create_customer_predictions_view(engine: Engine, db: Session) -> None:
             lp.explainability_json,
             lp.recommendation_type,
             lp.recommendation_desc,
-            lp.predicted_at
+            lp.predicted_at,
+            lp.model_version
         FROM customers c
         LEFT JOIN latest_predictions lp ON c.customer_id = lp.customer_id AND lp.rn = 1
     """))
@@ -80,6 +81,18 @@ def create_indexes(db: Session) -> None:
         """
         CREATE INDEX IF NOT EXISTS idx_prediction_history_customer_at
         ON prediction_history(customer_id, evaluated_at DESC)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_bulk_prediction_jobs_status_created
+        ON bulk_prediction_jobs(status, created_at DESC)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_retention_interventions_customer_created
+        ON retention_interventions(customer_id, created_at DESC)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_retention_interventions_status
+        ON retention_interventions(status)
         """,
     ]
 
@@ -116,54 +129,84 @@ def seed_demo_customers(db: Session) -> None:
     if not os.path.exists(csv_path):
         return
 
-    print(f"Seeding customer database from {csv_path}...")
+    print(f"Seeding customer database from {csv_path} using ML model predictions...")
+    import pandas as pd
+    from .core.model_service import model_service
+    from .core.risk_score import build_explainability
+
+    df = pd.read_csv(csv_path)
+
+    # 1. Extract raw features for prediction
+    X_raw = df.drop(columns=["Customer_ID", "Will_Cancel_Next_3_Months"], errors="ignore")
+
+    # 2. Compute predictions in a fast single batch call
+    processed = model_service.preprocessor.transform(X_raw)
+    probabilities = model_service.model.predict_proba(processed)[:, 1]
+
     customers_to_insert: list[dict[str, Any]] = []
     predictions_to_insert: list[dict[str, Any]] = []
 
-    with open(csv_path, "r", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-
-            support = int(row["Customer_Support_Interactions"])
-            satisfaction = int(row["Satisfaction_Score"])
-            spend = float(row["Monthly_Total_Spend"])
-            usage = float(row["Avg_Usage_Hours_Per_Week"])
-            cust_id = row["Customer_ID"]
-
-            customers_to_insert.append({
-                "customer_id": cust_id,
-                "age": int(row["Age"]),
-                "income_level": row["Income_Level"],
-                "number_of_subscriptions": int(row["Number_of_Subscriptions"]),
-                "tenure_months": int(row["Tenure_Months"]),
-                "monthly_total_spend": spend,
-                "avg_usage_hours_per_week": usage,
-                "app_switch_frequency": int(row["App_Switch_Frequency"]),
-                "customer_support_interactions": support,
-                "satisfaction_score": satisfaction,
-                "discount_used": row["Discount_Used"] == "1",
-                "device_type": row["Device_Type"],
-                "payment_mode": row["Payment_Mode"],
-            })
-
-            profile = build_risk_profile(
-                customer_support_interactions=support,
-                satisfaction_score=satisfaction,
-                monthly_total_spend=spend,
-                avg_usage_hours_per_week=usage,
+    def get_risk_info(prob: float):
+        if prob >= 0.7:
+            return (
+                "High",
+                1,
+                "Offer Discount",
+                "Apply 20% discount on renewal to mitigate high interaction friction.",
             )
-            predictions_to_insert.append({
-                "customer_id": cust_id,
-                "churn_probability": profile["risk_score"],
-                "risk_category": profile["risk_category"],
-                "will_cancel": profile["will_cancel"],
-                "explainability_json": profile["explainability_json"],
-                "recommendation_type": profile["recommendation_type"],
-                "recommendation_desc": profile["recommendation_desc"],
-            })
+        if prob >= 0.3:
+            return (
+                "Medium",
+                1,
+                "Subscription Upgrade",
+                "Provide subscription upgrade incentive for premium benefits.",
+            )
+        return (
+            "Low",
+            0,
+            "No Action Required",
+            "Customer behavior shows stable engagement.",
+        )
+
+    for idx, row in df.iterrows():
+        cust_id = str(row["Customer_ID"])
+        support = int(row["Customer_Support_Interactions"])
+        satisfaction = int(row["Satisfaction_Score"])
+        spend = float(row["Monthly_Total_Spend"])
+        usage = float(row["Avg_Usage_Hours_Per_Week"])
+
+        customers_to_insert.append({
+            "customer_id": cust_id,
+            "age": int(row["Age"]),
+            "income_level": row["Income_Level"],
+            "number_of_subscriptions": int(row["Number_of_Subscriptions"]),
+            "tenure_months": int(row["Tenure_Months"]),
+            "monthly_total_spend": spend,
+            "avg_usage_hours_per_week": usage,
+            "app_switch_frequency": int(row["App_Switch_Frequency"]),
+            "customer_support_interactions": support,
+            "satisfaction_score": satisfaction,
+            "discount_used": row["Discount_Used"] == 1 or str(row["Discount_Used"]).strip() == "1",
+            "device_type": row["Device_Type"],
+            "payment_mode": row["Payment_Mode"],
+        })
+
+        prob = float(probabilities[idx])
+        risk_category, will_cancel, rec_type, rec_desc = get_risk_info(prob)
+        explainability = build_explainability(support, satisfaction, spend, usage)
+
+        predictions_to_insert.append({
+            "customer_id": cust_id,
+            "churn_probability": round(prob * 100.0, 2),
+            "risk_category": risk_category,
+            "will_cancel": will_cancel,
+            "explainability_json": explainability,
+            "recommendation_type": rec_type,
+            "recommendation_desc": rec_desc,
+        })
 
     db.bulk_insert_mappings(Customer, customers_to_insert)
     db.commit()
     db.bulk_insert_mappings(ChurnPrediction, predictions_to_insert)
     db.commit()
-    print(f"Successfully seeded {len(customers_to_insert)} customer records and prediction history.")
+    print(f"Successfully seeded {len(customers_to_insert)} customer records and prediction history using CatBoost predictions.")

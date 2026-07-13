@@ -84,10 +84,39 @@ class TestSHAPExplainer:
     
     def test_explainer_initialization(self, mock_model, mock_preprocessor, feature_names):
         """Test that SHAPExplainer initializes correctly."""
-        # This would test: explainer = SHAPExplainer(mock_model, mock_preprocessor, feature_names)
-        # For now, we test the concept
-        assert len(feature_names) == 12
-        assert "Satisfaction_Score" in feature_names
+        from backend.app.core.shap_explainer import SHAPExplainer
+        with patch('backend.app.core.shap_explainer.shap') as mock_shap:
+            mock_shap.TreeExplainer = Mock(return_value=Mock(spec=[]))
+            explainer = SHAPExplainer(mock_model, mock_preprocessor, feature_names)
+            assert len(explainer.feature_names) == 12
+            assert "Satisfaction_Score" in explainer.feature_names
+
+    def test_callable_explainer_fallback(self, mock_model, mock_preprocessor, feature_names):
+        """Test that SHAPExplainer works when the explainer has no shap_values method but is callable."""
+        from backend.app.core.shap_explainer import SHAPExplainer
+        
+        # Create a mock explanation object
+        mock_explanation = Mock()
+        mock_explanation.values = np.ones((1, len(feature_names)))
+        
+        # Create a callable mock explainer
+        mock_explainer_obj = Mock()
+        if hasattr(mock_explainer_obj, "shap_values"):
+            del mock_explainer_obj.shap_values
+        mock_explainer_obj.side_effect = lambda X: mock_explanation
+        
+        with patch('backend.app.core.shap_explainer.shap') as mock_shap:
+            mock_shap.TreeExplainer = Mock(side_effect=Exception("TreeExplainer failed"))
+            mock_shap.Explainer = Mock(return_value=mock_explainer_obj)
+            
+            explainer = SHAPExplainer(mock_model, mock_preprocessor, feature_names)
+            
+            # Now compute SHAP values
+            processed_data = np.zeros((1, len(feature_names)))
+            shap_values = explainer._compute_shap_values(processed_data)
+            
+            # Verify the fallback worked
+            assert np.array_equal(shap_values, mock_explanation.values)
     
     def test_feature_contributions_building(self, sample_shap_values, feature_names):
         """Test building feature contributions."""

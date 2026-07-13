@@ -343,6 +343,39 @@ export async function deleteUser(username) {
   });
 }
 
+/**
+ * Create a new retention intervention
+ */
+export async function createIntervention(data) {
+  return request('/retention/interventions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
+/**
+ * List retention interventions for a customer
+ */
+export async function getInterventions(customerId = null, status = null) {
+  const params = new URLSearchParams();
+  if (customerId) params.append('customer_id', customerId);
+  if (status) params.append('status', status);
+  
+  const queryStr = params.toString();
+  return request(`/retention/interventions${queryStr ? `?${queryStr}` : ''}`);
+}
+
+/**
+ * Update an existing retention intervention
+ */
+export async function updateIntervention(interventionId, data) {
+  return request(`/retention/interventions/${interventionId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
 
 /**
  * Get backend origin for file downloads and other absolute URLs

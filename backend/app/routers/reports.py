@@ -6,7 +6,6 @@ import io
 import csv
 import os
 import re
-import pandas as pd
 from datetime import datetime
 from typing import Optional
 from ..database import get_db
@@ -20,6 +19,58 @@ os.makedirs(RESULTS_DIR, exist_ok=True)
 
 def _is_valid_job_id(job_id: str) -> bool:
     return bool(re.fullmatch(r"[A-Za-z0-9_-]+", job_id))
+REPORT_HEADERS = [
+    "Customer ID", "Age", "Tenure (Months)", "Monthly Spend ($)",
+    "Weekly Usage (Hrs)", "Support Tickets", "Satisfaction (1-5)",
+    "Churn Probability", "Risk Category", "Recommended Offer", "Action Description"
+]
+
+
+def _csv_chunks_from_rows(rows):
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(REPORT_HEADERS)
+    yield buffer.getvalue()
+    buffer.seek(0)
+    buffer.truncate(0)
+
+    for row in rows:
+        writer.writerow([
+            row.customer_id,
+            row.age,
+            row.tenure_months,
+            float(row.monthly_total_spend or 0.0),
+            float(row.avg_usage_hours_per_week or 0.0),
+            row.customer_support_interactions,
+            row.satisfaction_score,
+            f"{float(row.churn_probability or 0.0)}%",
+            row.risk_category,
+            row.recommendation_type,
+            row.recommendation_desc,
+        ])
+        yield buffer.getvalue()
+        buffer.seek(0)
+        buffer.truncate(0)
+
+
+def _mock_csv_chunks(risk_category: Optional[str], recommendation_type: Optional[str]):
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(REPORT_HEADERS)
+    mock_records = [
+        ["1", 34, 8, 79.50, 14.5, 3, 2, "89.0%", "High", "Offer Discount", "Apply 20% discount offer for renewal."],
+        ["2", 45, 2, 35.00, 8.2, 5, 1, "84.5%", "High", "Provide Free Trial", "Offer a 14-day premium free trial extension."],
+        ["8", 28, 4, 95.00, 6.0, 4, 2, "78.2%", "High", "Offer Discount", "Recommend a 15% discount for a 6-month contract."],
+        ["12", 50, 1, 110.00, 5.5, 3, 1, "92.1%", "High", "Contact Customer Support", "Flag customer success agent for call follow-up."],
+        ["25", 39, 6, 65.00, 10.1, 2, 2, "74.6%", "High", "Subscription Upgrade", "Offer subscription tier upgrade at existing price."]
+    ]
+    if risk_category:
+        mock_records = [r for r in mock_records if r[8].lower() == risk_category.lower()]
+    if recommendation_type:
+        mock_records = [r for r in mock_records if r[9].lower() == recommendation_type.lower()]
+    for row in mock_records:
+        writer.writerow(row)
+    yield buffer.getvalue()
 
 @router.get("/export")
 async def export_report(
@@ -56,76 +107,33 @@ async def export_report(
         )
 
     try:
-        # Build report query
         query_str = """
-            WITH max_p AS (
-                SELECT customer_id, MAX(prediction_id) as max_id
-                FROM churn_predictions
-                GROUP BY customer_id
-            )
-            SELECT c.customer_id, c.age, c.tenure_months, c.monthly_total_spend, c.avg_usage_hours_per_week,
-                   c.customer_support_interactions, c.satisfaction_score, p.churn_probability, p.risk_category,
-                   p.recommendation_type, p.recommendation_desc
-            FROM customers c
-            LEFT JOIN max_p ON c.customer_id = max_p.customer_id
-            LEFT JOIN churn_predictions p ON max_p.max_id = p.prediction_id
-            WHERE 1=1
+            SELECT customer_id, age, tenure_months, monthly_total_spend, avg_usage_hours_per_week,
+                   customer_support_interactions, satisfaction_score, churn_probability, risk_category,
+                   recommendation_type, recommendation_desc
+            FROM v_customer_predictions
+            WHERE churn_probability IS NOT NULL
         """
         params = {}
         if risk_category:
-            query_str += " AND p.risk_category = :risk_category"
+            query_str += " AND risk_category = :risk_category"
             params["risk_category"] = risk_category
         if recommendation_type:
-            query_str += " AND p.recommendation_type = :recommendation_type"
+            query_str += " AND recommendation_type = :recommendation_type"
             params["recommendation_type"] = recommendation_type
-            
-        query_str += " ORDER BY p.churn_probability DESC"
-        
-        df = pd.read_sql_query(text(query_str), db.bind, params=params)
-        
-        if df.empty:
-            raise Exception("No data")
-            
-        df["churn_probability"] = df["churn_probability"].apply(lambda x: f"{float(x)}%" if x is not None else "0.0%")
-        df["monthly_total_spend"] = df["monthly_total_spend"].fillna(0.0).astype(float)
-        df["avg_usage_hours_per_week"] = df["avg_usage_hours_per_week"].fillna(0.0).astype(float)
 
-        df.columns = [
-            "Customer ID", "Age", "Tenure (Months)", "Monthly Spend ($)", 
-            "Weekly Usage (Hrs)", "Support Tickets", "Satisfaction (1-5)", 
-            "Churn Probability", "Risk Category", "Recommended Offer", "Action Description"
-        ]
-        csv_data = df.to_csv(index=False)
-        
+        query_str += " ORDER BY churn_probability DESC"
+        rows = db.execute(text(query_str), params)
+        csv_iterator = _csv_chunks_from_rows(rows)
+        filename = "high_risk_customers_report.csv" if risk_category else "customer_report.csv"
     except Exception:
-        # Stream realistic mock customer data for demo purposes
-        output = io.StringIO()
-        writer = csv.writer(output)
-        writer.writerow([
-            "Customer ID", "Age", "Tenure (Months)", "Monthly Spend ($)", 
-            "Weekly Usage (Hrs)", "Support Tickets", "Satisfaction (1-5)", 
-            "Churn Probability", "Risk Category", "Recommended Offer", "Action Description"
-        ])
-        mock_records = [
-            ["1", 34, 8, 79.50, 14.5, 3, 2, "89.0%", "High", "Offer Discount", "Apply 20% discount offer for renewal."],
-            ["2", 45, 2, 35.00, 8.2, 5, 1, "84.5%", "High", "Provide Free Trial", "Offer a 14-day premium free trial extension."],
-            ["8", 28, 4, 95.00, 6.0, 4, 2, "78.2%", "High", "Offer Discount", "Recommend a 15% discount for a 6-month contract."],
-            ["12", 50, 1, 110.00, 5.5, 3, 1, "92.1%", "High", "Contact Customer Support", "Flag customer success agent for call follow-up."],
-            ["25", 39, 6, 65.00, 10.1, 2, 2, "74.6%", "High", "Subscription Upgrade", "Offer subscription tier upgrade at existing price."]
-        ]
-        if risk_category:
-            mock_records = [r for r in mock_records if r[8].lower() == risk_category.lower()]
-        if recommendation_type:
-            mock_records = [r for r in mock_records if r[9].lower() == recommendation_type.lower()]
-            
-        for row in mock_records:
-            writer.writerow(row)
-        csv_data = output.getvalue()
-        
+        csv_iterator = _mock_csv_chunks(risk_category, recommendation_type)
+        filename = "high_risk_customers_report.csv" if risk_category else "customer_report.csv"
+
     return StreamingResponse(
-        io.StringIO(csv_data), 
+        csv_iterator,
         media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=high_risk_customers_report.csv"}
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
 

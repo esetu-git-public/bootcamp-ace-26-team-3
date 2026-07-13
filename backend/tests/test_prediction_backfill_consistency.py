@@ -224,9 +224,14 @@ def test_customers_list_risk_desc_sorting(test_context):
     db.commit()
 
 
-def test_recommendation_classification_rules(test_context):
+def test_recommendation_classification_rules(test_context, monkeypatch):
     client, db, cust_id, headers = test_context
     from backend.app.core.prediction_service import calculate_prediction_for_customer
+    from backend.app.core.model_service import model_service
+    
+    # Force rule-based prediction to verify recommendation engine mappings deterministically
+    monkeypatch.setattr(model_service, "champion_version", None)
+
     
     # 1. High risk customer case: low satisfaction, high support
     high_risk_cust = Customer(

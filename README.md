@@ -131,6 +131,19 @@ npm start
 UI available at:
 - http://localhost:3000
 
+### 6. Start the standalone Scrum Board
+
+Open a third terminal:
+
+```powershell
+cd scrum-board
+npm install
+npm run dev
+```
+
+UI available at:
+- http://localhost:5173
+
 ## Using the app
 
 ### Authentication

@@ -6,7 +6,6 @@ import AnalyticsDashboard from './pages/AnalyticsDashboard';
 import CustomerProfile from './pages/CustomerProfile';
 import CustomerDirectory from './pages/CustomerDirectory';
 import ModelPerformance from './pages/ModelPerformance';
-import ScrumBoard from './pages/ScrumBoard';
 import DatasetInsights from './pages/DatasetInsights';
 import AlertNotifications from './components/AlertNotifications';
 
@@ -100,7 +99,7 @@ function App() {
     }
   }, [addNotification]);
 
-  const isAuth = token && ['dashboard', 'directory', 'profile', 'model', 'board', 'users', 'bulk_insights'].includes(view);
+  const isAuth = token && ['dashboard', 'directory', 'profile', 'model', 'users', 'bulk_insights'].includes(view);
 
   return (
     <div className="App" style={styles.appContainer}>
@@ -140,12 +139,6 @@ function App() {
               style={view === 'model' ? styles.activeNavLink : styles.navLink}
             >
               Model Performance
-            </button>
-            <button
-              onClick={() => setView('board')}
-              style={view === 'board' ? styles.activeNavLink : styles.navLink}
-            >
-              Scrum Board
             </button>
             {isAdmin && (
               <button
@@ -205,11 +198,7 @@ function App() {
             onNotify={addNotification}
           />
         )}
-        {view === 'board' && (
-          <ScrumBoard
-            onViewChange={setView}
-          />
-        )}
+
         {view === 'users' && (
           <SignUp
             isAdminPanel={true}

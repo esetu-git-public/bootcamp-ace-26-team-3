@@ -1,12 +1,10 @@
 // Trigger compile 3
 import React, { useState, useEffect, useCallback } from 'react';
 import Login from './pages/Login';
-import SignUp from './pages/SignUp';
 import AnalyticsDashboard from './pages/AnalyticsDashboard';
 import CustomerProfile from './pages/CustomerProfile';
 import CustomerDirectory from './pages/CustomerDirectory';
 import ModelPerformance from './pages/ModelPerformance';
-import ScrumBoard from './pages/ScrumBoard';
 import DatasetInsights from './pages/DatasetInsights';
 import AlertNotifications from './components/AlertNotifications';
 
@@ -45,7 +43,7 @@ function App() {
 
   useEffect(() => {
     if (token) {
-      if (view === 'login' || view === 'signup') {
+      if (view === 'login') {
         setView('dashboard');
       }
     } else {
@@ -100,7 +98,7 @@ function App() {
     }
   }, [addNotification]);
 
-  const isAuth = token && ['dashboard', 'directory', 'profile', 'model', 'board', 'users', 'bulk_insights'].includes(view);
+  const isAuth = token && ['dashboard', 'directory', 'profile', 'model', 'users', 'bulk_insights'].includes(view);
 
   return (
     <div className="App" style={styles.appContainer}>
@@ -141,12 +139,6 @@ function App() {
             >
               Model Performance
             </button>
-            <button
-              onClick={() => setView('board')}
-              style={view === 'board' ? styles.activeNavLink : styles.navLink}
-            >
-              Scrum Board
-            </button>
             {isAdmin && (
               <button
                 onClick={() => setView('users')}
@@ -166,13 +158,6 @@ function App() {
         {view === 'login' && (
           <Login
             onLoginSuccess={handleLoginSuccess}
-            onNavigateToSignup={() => setView('signup')}
-            onNotify={addNotification}
-          />
-        )}
-        {view === 'signup' && (
-          <SignUp
-            onNavigateToLogin={() => setView('login')}
             onNotify={addNotification}
           />
         )}
@@ -205,11 +190,7 @@ function App() {
             onNotify={addNotification}
           />
         )}
-        {view === 'board' && (
-          <ScrumBoard
-            onViewChange={setView}
-          />
-        )}
+
         {view === 'users' && (
           <SignUp
             isAdminPanel={true}

@@ -22,7 +22,6 @@ const INITIAL_TASKS = [
   { id: 'BUG-004', title: 'ML Model Pickle Version Mismatch', type: 'bug', sp: 3, status: 'Backlog', sprint: 'Backlog', desc: 'SimpleImputer / StandardScaler pickled with newer sklearn version 1.8.0 throws unpickling warnings in 1.6.1.', priority: 'Medium' },
   { id: 'BUG-005', title: 'datetime.utcnow() Deprecations', type: 'bug', sp: 1, status: 'Backlog', sprint: 'Backlog', desc: 'Code relies on deprecated timezone-naive datetime.utcnow(), use timezone-aware datetime.now(datetime.UTC).', priority: 'Low' },
   { id: 'BUG-006', title: 'Webpack Dev Server Warnings', type: 'bug', sp: 2, status: 'Backlog', sprint: 'Backlog', desc: 'fs.F_OK and setupMiddlewares deprecation warnings on npm start, update react-scripts dependencies.', priority: 'Low' }
-
 ];
 
 const COLUMNS = [
@@ -41,7 +40,7 @@ const SPRINTS = [
   { id: 'Backlog', title: 'Unscheduled', desc: 'Future backlog features & bugs' }
 ];
 
-export default function ScrumBoard({ onViewChange }) {
+export default function App() {
   const [tasks, setTasks] = useState(() => {
     const saved = localStorage.getItem('scrum_tasks_sprints');
     return saved ? JSON.parse(saved) : INITIAL_TASKS;
@@ -179,9 +178,6 @@ export default function ScrumBoard({ onViewChange }) {
           </button>
           <button onClick={resetBoard} style={styles.resetBtn}>
             Reset Board
-          </button>
-          <button onClick={() => onViewChange('dashboard')} style={styles.backBtn}>
-            Dashboard
           </button>
         </div>
       </header>
@@ -568,7 +564,7 @@ export default function ScrumBoard({ onViewChange }) {
 }
 
 const styles = {
-  page: { minHeight: 'calc(100vh - 70px)', background: '#07111f', color: '#f7f8fc', padding: '24px', fontFamily: 'Inter, Arial, sans-serif', display: 'flex', flexDirection: 'column', gap: '20px' },
+  page: { minHeight: '100vh', background: '#07111f', color: '#f7f8fc', padding: '24px', fontFamily: 'Inter, Arial, sans-serif', display: 'flex', flexDirection: 'column', gap: '20px' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' },
   eyebrow: { textTransform: 'uppercase', letterSpacing: '0.18em', color: '#7dd3fc', fontSize: '0.75rem', margin: 0 },
   title: { margin: '4px 0 8px', fontSize: '2rem', fontWeight: 700 },
@@ -576,7 +572,6 @@ const styles = {
   headerActions: { display: 'flex', gap: '10px' },
   addBtn: { background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', border: 'none', borderRadius: '12px', color: '#ffffff', padding: '10px 20px', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99, 102, 241, 0.4)' },
   resetBtn: { background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '12px', color: '#cbd5e1', padding: '10px 20px', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer' },
-  backBtn: { background: 'rgba(99, 102, 241, 0.12)', border: '1px solid rgba(99, 102, 241, 0.3)', borderRadius: '12px', color: '#818cf8', padding: '10px 20px', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer' },
   
   // Sprint Section Tabs
   sprintsSection: { display: 'flex', overflowX: 'auto', paddingBottom: '4px', borderBottom: '1px solid rgba(255, 255, 255, 0.06)' },

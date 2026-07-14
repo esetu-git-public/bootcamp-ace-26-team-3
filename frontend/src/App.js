@@ -1,7 +1,6 @@
 // Trigger compile 3
 import React, { useState, useEffect, useCallback } from 'react';
 import Login from './pages/Login';
-import SignUp from './pages/SignUp';
 import AnalyticsDashboard from './pages/AnalyticsDashboard';
 import CustomerProfile from './pages/CustomerProfile';
 import CustomerDirectory from './pages/CustomerDirectory';
@@ -44,7 +43,7 @@ function App() {
 
   useEffect(() => {
     if (token) {
-      if (view === 'login' || view === 'signup') {
+      if (view === 'login') {
         setView('dashboard');
       }
     } else {
@@ -159,13 +158,6 @@ function App() {
         {view === 'login' && (
           <Login
             onLoginSuccess={handleLoginSuccess}
-            onNavigateToSignup={() => setView('signup')}
-            onNotify={addNotification}
-          />
-        )}
-        {view === 'signup' && (
-          <SignUp
-            onNavigateToLogin={() => setView('login')}
             onNotify={addNotification}
           />
         )}

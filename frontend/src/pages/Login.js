@@ -178,19 +178,7 @@ export default function Login({ onLoginSuccess, onNavigateToSignup, onNotify }) 
               </button>
             </form>
 
-            <div className="login-signup-prompt" style={{ marginTop: '20px', textAlign: 'center', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-              Don't have an account?{' '}
-              <a
-                href="#signup"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (onNavigateToSignup) onNavigateToSignup();
-                }}
-                style={{ color: 'var(--color-accent)', fontWeight: '600', textDecoration: 'none' }}
-              >
-                Sign Up
-              </a>
-            </div>
+
 
             <div className="login-card-footer">
               Credentials issue? Contact your administrator <br />

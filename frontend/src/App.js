@@ -45,7 +45,7 @@ function App() {
 
   useEffect(() => {
     if (token) {
-      if (view === 'login' || view === 'signup') {
+      if (view === 'login') {
         setView('dashboard');
       }
     } else {
@@ -166,13 +166,6 @@ function App() {
         {view === 'login' && (
           <Login
             onLoginSuccess={handleLoginSuccess}
-            onNavigateToSignup={() => setView('signup')}
-            onNotify={addNotification}
-          />
-        )}
-        {view === 'signup' && (
-          <SignUp
-            onNavigateToLogin={() => setView('login')}
             onNotify={addNotification}
           />
         )}

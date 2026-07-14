@@ -226,6 +226,21 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, setSelectedJobId, 
     return <div style={styles.center}>{error}</div>;
   }
 
+  const chartList = trendData.length > 1 ? trendData : [
+    {"period": "Feb 2026", "churn_rate": 15.42, "churn_count": 2458, "total_customers": 15946, "average_risk": 20.30},
+    {"period": "Mar 2026", "churn_rate": 14.85, "churn_count": 2368, "total_customers": 15946, "average_risk": 18.90},
+    {"period": "Apr 2026", "churn_rate": 13.91, "churn_count": 2218, "total_customers": 15946, "average_risk": 16.40},
+    {"period": "May 2026", "churn_rate": 13.10, "churn_count": 2089, "total_customers": 15946, "average_risk": 14.80},
+    {"period": "Jun 2026", "churn_rate": 12.82, "churn_count": 2045, "total_customers": 15946, "average_risk": 13.50},
+    {"period": "Jul 2026", "churn_rate": 12.40, "churn_count": 1977, "total_customers": 15946, "average_risk": 12.40},
+  ];
+
+  const activeValue = (item) => activeTrendTab === 'rate' ? item.churn_rate : item.churn_count;
+  const maxVal = Math.max(...chartList.map(activeValue), 1);
+  const chartMaxY = activeTrendTab === 'rate'
+    ? Math.ceil(maxVal / 5) * 5
+    : Math.ceil(maxVal / 1000) * 1000;
+
   return (
     <div style={styles.page}>
       <header style={styles.header}>
@@ -467,8 +482,8 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, setSelectedJobId, 
               {[0.25, 0.5, 0.75, 1.0].map((ratio, gridIdx) => {
                 const yVal = 180 - ratio * 155;
                 const label = activeTrendTab === 'rate' 
-                  ? `${(ratio * 20).toFixed(0)}%` 
-                  : `${(ratio * 3000).toLocaleString()}`;
+                  ? `${(ratio * chartMaxY).toFixed(0)}%` 
+                  : `${(ratio * chartMaxY).toLocaleString()}`;
                 return (
                   <g key={`grid-${gridIdx}`}>
                     <text x="35" y={yVal + 4} fill="#64748b" fontSize="9" textAnchor="end">
@@ -481,23 +496,12 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, setSelectedJobId, 
 
               {/* X Axis Labels */}
               {(() => {
-                const list = trendData.length ? trendData : [
-                  {"period": "Feb 2026", "churn_rate": 15.42, "churn_count": 2458, "total_customers": 15946, "average_risk": 20.30},
-                  {"period": "Mar 2026", "churn_rate": 14.85, "churn_count": 2368, "total_customers": 15946, "average_risk": 18.90},
-                  {"period": "Apr 2026", "churn_rate": 13.91, "churn_count": 2218, "total_customers": 15946, "average_risk": 16.40},
-                  {"period": "May 2026", "churn_rate": 13.10, "churn_count": 2089, "total_customers": 15946, "average_risk": 14.80},
-                  {"period": "Jun 2026", "churn_rate": 12.82, "churn_count": 2045, "total_customers": 15946, "average_risk": 13.50},
-                  {"period": "Jul 2026", "churn_rate": 12.40, "churn_count": 1977, "total_customers": 15946, "average_risk": 12.40},
-                ];
-
-                const activeValue = (item) => activeTrendTab === 'rate' ? item.churn_rate : item.churn_count;
-                const maxY = activeTrendTab === 'rate' ? 20 : 3000;
                 const minY = 0;
 
-                const points = list.map((item, idx) => {
-                  const x = 50 + (idx / (list.length - 1)) * 420;
+                const points = chartList.map((item, idx) => {
+                  const x = 50 + (idx / (chartList.length - 1)) * 420;
                   const val = activeValue(item);
-                  const y = 180 - ((val - minY) / (maxY - minY)) * 155;
+                  const y = 180 - ((val - minY) / (chartMaxY - minY)) * 155;
                   return { x, y, item, val, index: idx };
                 });
 
@@ -564,19 +568,11 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, setSelectedJobId, 
 
             {/* Floating Tooltip Card */}
             {hoveredTrendIdx !== null && (() => {
-              const list = trendData.length ? trendData : [
-                {"period": "Feb 2026", "churn_rate": 15.42, "churn_count": 2458, "total_customers": 15946, "average_risk": 20.30},
-                {"period": "Mar 2026", "churn_rate": 14.85, "churn_count": 2368, "total_customers": 15946, "average_risk": 18.90},
-                {"period": "Apr 2026", "churn_rate": 13.91, "churn_count": 2218, "total_customers": 15946, "average_risk": 16.40},
-                {"period": "May 2026", "churn_rate": 13.10, "churn_count": 2089, "total_customers": 15946, "average_risk": 14.80},
-                {"period": "Jun 2026", "churn_rate": 12.82, "churn_count": 2045, "total_customers": 15946, "average_risk": 13.50},
-                {"period": "Jul 2026", "churn_rate": 12.40, "churn_count": 1977, "total_customers": 15946, "average_risk": 12.40},
-              ];
-              const p = list[hoveredTrendIdx];
+              const p = chartList[hoveredTrendIdx];
               if (!p) return null;
 
               // Calculate horizontal position overlay
-              const pct = (hoveredTrendIdx / (list.length - 1)) * 80 + 10; // offset in percent
+              const pct = (hoveredTrendIdx / (chartList.length - 1)) * 80 + 10; // offset in percent
               return (
                 <div style={{
                   position: 'absolute',

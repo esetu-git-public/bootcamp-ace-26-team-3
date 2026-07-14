@@ -64,7 +64,7 @@ export default function Login({ onLoginSuccess, onNotify }) {
               <div className="login-kpi-label">Average Churn Rate Reductions</div>
             </div>
             <div className="login-kpi-card">
-              <div className="login-kpi-value kpi-value-purple">96.5%</div>
+              <div className="login-kpi-value kpi-value-purple">85.36%</div>
               <div className="login-kpi-label">Prediction Accuracy Rate</div>
             </div>
           </div>

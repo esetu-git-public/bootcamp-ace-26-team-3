@@ -38,11 +38,10 @@ def create_customer_predictions_view(engine: Engine, db: Session) -> None:
 
     db.execute(text("""
         CREATE VIEW v_customer_predictions AS
-        WITH latest_predictions AS (
-            SELECT
-                p.*,
-                ROW_NUMBER() OVER(PARTITION BY p.customer_id ORDER BY p.predicted_at DESC, p.prediction_id DESC) as rn
-            FROM churn_predictions p
+        WITH max_p AS (
+            SELECT customer_id, MAX(prediction_id) as max_id
+            FROM churn_predictions
+            GROUP BY customer_id
         )
         SELECT
             c.customer_id,
@@ -69,7 +68,8 @@ def create_customer_predictions_view(engine: Engine, db: Session) -> None:
             lp.predicted_at,
             lp.model_version
         FROM customers c
-        LEFT JOIN latest_predictions lp ON c.customer_id = lp.customer_id AND lp.rn = 1
+        LEFT JOIN max_p ON c.customer_id = max_p.customer_id
+        LEFT JOIN churn_predictions lp ON max_p.max_id = lp.prediction_id
     """))
     db.commit()
 

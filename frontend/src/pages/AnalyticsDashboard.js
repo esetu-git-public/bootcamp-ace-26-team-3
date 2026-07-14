@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import * as apiService from '../services/api';
 import { clampPercent, formatPercent } from '../utils/percent';
 

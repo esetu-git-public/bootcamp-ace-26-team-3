@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import * as apiService from '../services/api';
 
-export default function Login({ onLoginSuccess, onNavigateToSignup, onNotify }) {
+export default function Login({ onLoginSuccess, onNotify }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);

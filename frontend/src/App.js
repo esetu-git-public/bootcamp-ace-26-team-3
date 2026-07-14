@@ -7,6 +7,7 @@ import CustomerDirectory from './pages/CustomerDirectory';
 import ModelPerformance from './pages/ModelPerformance';
 import DatasetInsights from './pages/DatasetInsights';
 import AlertNotifications from './components/AlertNotifications';
+import SignUp from './pages/SignUp';
 
 function App() {
   const [view, setView] = useState('login');

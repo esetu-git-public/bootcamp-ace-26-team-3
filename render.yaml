@@ -1,0 +1,47 @@
+# render.yaml — Render Blueprint
+# Deploys both FastAPI backend and React frontend in ONE click
+# Place this file in the ROOT of your repository
+
+services:
+  # ── 1. FastAPI Backend ─────────────────────────────────────────────────────
+  - type: web
+    name: churn-backend
+    runtime: python
+    region: singapore
+    branch: main
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    plan: free
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true          # Render auto-generates a secure random value
+      - key: DATABASE_URL
+        value: sqlite:///./app.db
+      - key: DEBUG
+        value: "False"
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "120"
+      - key: PYTHON_VERSION
+        value: "3.11.0"
+
+  # ── 2. React Frontend ──────────────────────────────────────────────────────
+  - type: web
+    name: churn-frontend
+    runtime: static
+    region: singapore
+    branch: main
+    rootDir: frontend
+    buildCommand: npm install --legacy-peer-deps && npm run build
+    staticPublishPath: build
+    plan: free
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html   # Handles React Router client-side routing
+    envVars:
+      - key: REACT_APP_API_URL
+        fromService:
+          name: churn-backend
+          type: web
+          property: host           # Auto-fills with backend URL — no manual copy-paste!

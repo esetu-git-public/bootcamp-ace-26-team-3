@@ -74,6 +74,13 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
+On macOS / Linux (bash/zsh):
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
 ### 2. Install Python dependencies
 
 ```powershell
@@ -93,9 +100,18 @@ For local development and tests, the required dependencies (such as `pytest` and
 
 By default the backend uses SQLite. To override:
 
+On Windows PowerShell:
+
 ```powershell
 $env:DATABASE_URL = 'sqlite:///./app.db'       # default (SQLite)
 # $env:DATABASE_URL = 'postgresql://...'       # for PostgreSQL
+```
+
+On macOS / Linux (bash/zsh):
+
+```bash
+export DATABASE_URL='sqlite:///./app.db'       # default (SQLite)
+# export DATABASE_URL='postgresql://...'       # for PostgreSQL
 ```
 
 To point the frontend at a non-default backend URL, create `frontend/.env`:
@@ -104,14 +120,49 @@ To point the frontend at a non-default backend URL, create `frontend/.env`:
 REACT_APP_API_URL=http://localhost:8000/api/v1
 ```
 
+### Running with a Single Command (Fastest)
+
+You can run both the frontend and backend services concurrently using one of the following methods from the repository root:
+
+* **Option A: Using NPM (Cross-Platform - All services in one terminal)**
+  ```bash
+  npm start
+  ```
+  *(Launches both services concurrently using a Node.js process runner.)*
+
+* **Option B: Using PowerShell (Windows Only - Launches separate terminal windows)**
+  ```powershell
+  .\run.ps1
+  ```
+  *(Opens the backend and frontend in separate, persistent PowerShell windows.)*
+
+* **Option C: Using Docker Compose (Cross-Platform - Containerized)**
+  ```bash
+  docker compose up --build
+  ```
+  > [!IMPORTANT]
+  > Before running this, ensure **Docker Desktop** is open and fully started (the status bar/icon should show "Running" in green).
+
+If you do not want to use Docker, you can run the application directly on your local system using **Option A** (`npm start`) or **Option B** (`.\run.ps1` for Windows).
+
 ### 4. Start the backend
 
 From the repository root:
+
+On Windows PowerShell:
 
 ```powershell
 $env:PYTHONPATH = '.'
 $env:DATABASE_URL = 'sqlite:///./app.db'
 .\.venv\Scripts\python.exe -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
+```
+
+On macOS / Linux (bash/zsh):
+
+```bash
+export PYTHONPATH=.
+export DATABASE_URL='sqlite:///./app.db'
+./.venv/bin/python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
 ```
 
 API available at:
@@ -131,18 +182,6 @@ npm start
 UI available at:
 - http://localhost:3000
 
-### 6. Start the standalone Scrum Board
-
-Open a third terminal:
-
-```powershell
-cd scrum-board
-npm install
-npm run dev
-```
-
-UI available at:
-- http://localhost:5173
 
 ## Using the app
 

@@ -1,16 +1,32 @@
-# React + Vite
+# Scrum Board
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+This is the standalone Scrum Board application built with React + Vite.
 
-Currently, two official plugins are available:
+## Running the Scrum Board (Standalone)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+To run **only** the Scrum Board, execute the following commands from the repository root:
 
-## React Compiler
+```bash
+cd scrum-board
+npm install
+npm run dev
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Once started, the Scrum Board UI will be available at:
+* **Local:** http://localhost:5173
 
-## Expanding the Oxlint configuration
+---
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+### Alternative: Using Docker
+
+If you prefer to run it inside a Docker container:
+
+1. **Build the container:**
+   ```bash
+   docker build -t scrum-board ./scrum-board
+   ```
+2. **Run the container:**
+   ```bash
+   docker run -p 5173:80 scrum-board
+   ```
+   *(The Scrum Board will then be accessible at http://localhost:5173)*

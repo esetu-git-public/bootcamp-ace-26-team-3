@@ -1,0 +1,8 @@
+{
+  "name": "bootcamp-ace-26-team-3",
+  "version": "1.0.0",
+  "description": "Subscription Cancellation Prediction System (OTTSaaS) Workspace Root",
+  "scripts": {
+    "start": "node run.js"
+  }
+}

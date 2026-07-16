@@ -43,3 +43,8 @@ pyrefly.toml
 
 # System files
 *.lnk
+
+# Logs and temporary outputs
+*.log
+backend/app/bulk_results/
+

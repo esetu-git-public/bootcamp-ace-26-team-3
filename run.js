@@ -40,7 +40,7 @@ function startService(name, command, args, cwd, envExtra = {}, useShell = false)
 const backendProcess = startService(
   'Backend',
   pythonExec,
-  ['-m', 'uvicorn', 'backend.app.main:app', '--host', '0.0.0.0', '--port', '8000'],
+  ['-m', 'uvicorn', 'backend.app.main:app', '--host', '0.0.0.0', '--port', '8000', '--reload'],
   __dirname,
   {
     PYTHONPATH: '.',

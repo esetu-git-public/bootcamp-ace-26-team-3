@@ -165,6 +165,13 @@ export async function getChurnTrends() {
   return request('/analytics/churn-trends');
 }
 
+/**
+ * Churn risk velocity / acceleration
+ */
+export async function getRiskVelocity() {
+  return request('/analytics/risk-velocity');
+}
+
 
 /**
  * List customers with pagination and filtering

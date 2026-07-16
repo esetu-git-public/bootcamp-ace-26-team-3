@@ -338,3 +338,10 @@ class SimulationRequest(BaseModel):
     monthly_total_spend: Optional[float] = Field(None, ge=0.0, json_schema_extra={"example": 75.0})
     discount_used: Optional[bool] = Field(None, json_schema_extra={"example": True})
 
+
+class RiskVelocityBucket(BaseModel):
+    category: str
+    customer_count: int
+    total_spend: float
+    average_change: float
+

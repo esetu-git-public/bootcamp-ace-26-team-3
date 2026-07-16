@@ -27,6 +27,11 @@ def initialize_database(engine: Engine, db: Session) -> None:
     except Exception as e:
         print(f"Warning: Startup backfill failed: {e}")
 
+    try:
+        seed_prediction_history_if_empty(db)
+    except Exception as e:
+        print(f"Warning: Startup prediction history seeding failed: {e}")
+
 
 
 def create_customer_predictions_view(engine: Engine, db: Session) -> None:
@@ -219,4 +224,80 @@ def seed_demo_customers(db: Session) -> None:
     db.commit()
     db.bulk_insert_mappings(ChurnPrediction, predictions_to_insert)
     db.commit()
-    print(f"Successfully seeded {len(customers_to_insert)} customer records and prediction history using CatBoost predictions.")
+    print(f"Successfully seeded {len(customers_to_insert)} customer records using CatBoost predictions.")
+
+
+def seed_prediction_history_if_empty(db: Session) -> None:
+    from .models import PredictionHistory
+    if db.query(PredictionHistory).count() > 0:
+        return
+
+    print("Prediction history table is empty. Seeding simulated history...")
+    import datetime
+    import hashlib
+
+    current_preds = db.query(ChurnPrediction).all()
+    if not current_preds:
+        print("No churn predictions found to base history off. Skipping prediction history seeding.")
+        return
+
+    months_offsets = [
+        (5, datetime.datetime(2026, 2, 11, 12, 0, 0)),
+        (4, datetime.datetime(2026, 3, 11, 12, 0, 0)),
+        (3, datetime.datetime(2026, 4, 11, 12, 0, 0)),
+        (2, datetime.datetime(2026, 5, 11, 12, 0, 0)),
+        (1, datetime.datetime(2026, 6, 11, 12, 0, 0)),
+    ]
+
+    history_records = []
+    batch_size = 5000
+
+    for pred in current_preds:
+        current_prob = float(pred.churn_probability)
+        for month_ago, eval_time in months_offsets:
+            hash_val = int(hashlib.md5(pred.customer_id.encode()).hexdigest(), 16) % 100
+            noise = (hash_val - 50) / 10.0
+            drift = month_ago * 1.5
+            hist_prob = min(100.0, max(0.0, current_prob + drift + noise))
+            
+            if hist_prob >= 70.0:
+                cat = "High"
+                res = 1
+            elif hist_prob >= 30.0:
+                cat = "Medium"
+                res = 1
+            else:
+                cat = "Low"
+                res = 0
+
+            history_records.append({
+                "customer_id": pred.customer_id,
+                "risk_score": round(hist_prob, 2),
+                "risk_category": cat,
+                "prediction_result": res,
+                "evaluated_at": eval_time
+            })
+
+        if len(history_records) >= batch_size:
+            db.execute(
+                text("""
+                    INSERT INTO prediction_history (customer_id, risk_score, risk_category, prediction_result, evaluated_at)
+                    VALUES (:customer_id, :risk_score, :risk_category, :prediction_result, :evaluated_at)
+                """),
+                history_records
+            )
+            db.commit()
+            history_records = []
+
+    if history_records:
+        db.execute(
+            text("""
+                INSERT INTO prediction_history (customer_id, risk_score, risk_category, prediction_result, evaluated_at)
+                VALUES (:customer_id, :risk_score, :risk_category, :prediction_result, :evaluated_at)
+            """),
+            history_records
+        )
+        db.commit()
+
+    print(f"Successfully seeded prediction history with {db.query(PredictionHistory).count()} records.")
+

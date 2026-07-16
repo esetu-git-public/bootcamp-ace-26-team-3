@@ -288,7 +288,7 @@ async def get_churn_trends(db: Session = Depends(get_db), current_user: str = De
         return p_str
 
     try:
-        # Query historical data from prediction_history and current predictions from churn_predictions
+        # Query historical data from prediction_history (excluding current month July) and current predictions from churn_predictions
         query = text("""
             SELECT 
                 strftime('%Y-%m', evaluated_at) as period,
@@ -297,6 +297,7 @@ async def get_churn_trends(db: Session = Depends(get_db), current_user: str = De
                 ROUND(AVG(risk_score), 2) as average_risk,
                 ROUND((SUM(prediction_result) * 100.0) / COUNT(*), 2) as churn_rate
             FROM prediction_history
+            WHERE strftime('%Y-%m', evaluated_at) < '2026-07'
             GROUP BY period
             
             UNION ALL

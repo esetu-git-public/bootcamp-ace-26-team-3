@@ -1,6 +1,7 @@
 import os
 import sys
 import datetime
+import hashlib
 from sqlalchemy import text
 
 # Add the parent directory to Python path to import app modules
@@ -43,7 +44,7 @@ def seed_prediction_history():
             for idx, (month_ago, eval_time) in enumerate(months_offsets):
                 # Monthly drifts: older records have higher risk.
                 # Adding some slight noise per customer so it's not a uniform shift.
-                hash_val = hash(pred.customer_id) % 100
+                hash_val = int(hashlib.md5(pred.customer_id.encode()).hexdigest(), 16) % 100
                 noise = (hash_val - 50) / 10.0 # -5 to +5% noise
                 
                 # Drift: risk increases as we go backward in time

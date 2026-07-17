@@ -1,3 +1,11 @@
+# ==============================================================================
+# PREDICTION SERVICE MODULE
+# ==============================================================================
+# This module coordinates the end-to-end predictive pipeline for individual 
+# customers. It maps customer demographic and platform activity features into
+# numerical arrays, invokes model inference, calculates confidence bounds,
+# generates customized retention offers, and records audit logs to database.
+
 import json
 import pandas as pd
 from datetime import datetime, timezone
@@ -8,6 +16,12 @@ from backend.app.core.risk_score import build_risk_profile
 from backend.app.core.model_service import model_service
 
 def risk_from_probability(prob: float) -> tuple[str, int]:
+    """
+    Categorizes the raw model probability into standard risk bands:
+    - Probability >= 70%: High Churn Risk (will_cancel = 1)
+    - Probability >= 30%: Medium Churn Risk (will_cancel = 1)
+    - Probability < 30%: Low Churn Risk (will_cancel = 0)
+    """
     if prob >= 0.7:
         return "High", 1
     if prob >= 0.3:
@@ -24,7 +38,12 @@ def generate_recommendation_details(
     avg_usage_hours_per_week: float,
     app_switch_frequency: int
 ) -> tuple[str, str]:
-    # Specific personalization: Low usage and high spend check
+    """
+    Heuristics-based Business Recommendation Engine.
+    Maps risk category, usage, spend, and satisfaction into distinct discount, 
+    onboarding, or touch-point suggestions for Customer Success teams.
+    """
+    # Case A: Mismatched Value (Low usage but high monthly subscription cost)
     if risk_category in ("High", "Medium") and avg_usage_hours_per_week < 10 and monthly_total_spend > 100:
         rec_type = "Plan Optimization"
         priority_label = "High (Urgent)" if risk_category == "High" else "Medium (Proactive)"
@@ -38,7 +57,9 @@ def generate_recommendation_details(
         )
         return rec_type, rec_desc
 
+    # Case B: High Churn Risk Segment
     if risk_category == "High":
+        # Sub-case: High friction / technical blockers
         if customer_support_interactions >= 5 and satisfaction_score <= 3:
             rec_type = "High Touch Intervention"
             rec_desc = (
@@ -49,6 +70,7 @@ def generate_recommendation_details(
                 f"Expected impact: Resolves underlying support issues and restores trust.\n"
                 f"Next step: Personal support outreach"
             )
+        # Sub-case: New user struggling to onboard
         elif tenure_months <= 3:
             rec_type = "Early-Stage Retainer"
             rec_desc = (
@@ -59,6 +81,7 @@ def generate_recommendation_details(
                 f"Expected impact: Boosts early usage and customer confidence.\n"
                 f"Next step: Send onboarding guidance"
             )
+        # Sub-case: Standard winback campaign
         else:
             rec_type = "Contract Win-back Offer"
             rec_desc = (
@@ -69,7 +92,9 @@ def generate_recommendation_details(
                 f"Expected impact: Lowers immediate exit probability.\n"
                 f"Next step: Send discount offer"
             )
+    # Case C: Medium Churn Risk Segment
     elif risk_category == "Medium":
+        # Sub-case: Product feedback loop
         if satisfaction_score <= 5:
             rec_type = "Feedback Loop & Nudge"
             rec_desc = (
@@ -79,6 +104,7 @@ def generate_recommendation_details(
                 f"Expected impact: Flags areas of dissatisfaction before they escalate.\n"
                 f"Next step: Send feedback survey"
             )
+        # Sub-case: Premium account optimization review
         elif monthly_total_spend > 100:
             rec_type = "Premium Account Review"
             rec_desc = (
@@ -89,6 +115,7 @@ def generate_recommendation_details(
                 f"Expected impact: Protects high-value contract revenue.\n"
                 f"Next step: Monitor and review account"
             )
+        # Sub-case: Standard value email push
         else:
             rec_type = "Proactive Engagement Plan"
             rec_desc = (
@@ -99,7 +126,8 @@ def generate_recommendation_details(
                 f"Expected impact: Increases product adoption and weekly engagement.\n"
                 f"Next step: Trigger feature updates newsletter"
             )
-    else:  # Low risk
+    # Case D: Low Risk (Stable customer)
+    else:  
         rec_type = "Loyalty Reinforcement"
         rec_desc = (
             f"Why this customer is at risk: Customer exhibits stable engagement patterns, high satisfaction "
@@ -112,7 +140,12 @@ def generate_recommendation_details(
     return rec_type, rec_desc
 
 def build_customer_prediction_input(customer) -> pd.DataFrame:
+    """
+    Parses and casts a customer database entity or flat dictionary into a single-row
+    Pandas DataFrame formatted with the correct columns required by the preprocessor.
+    """
     if isinstance(customer, dict):
+        # Local lookup helper for dictionaries (handles case/name mismatch variations)
         def get_first(*keys, default=None):
             for key in keys:
                 if key in customer and customer[key] not in (None, ""):
@@ -130,7 +163,7 @@ def build_customer_prediction_input(customer) -> pd.DataFrame:
                 return float(val) if val is not None else default
             except:
                 return default
-
+                
         input_row = {
             "Income_Level": get_first("income_level", "Income_Level", "Income Level", default="Medium"),
             "Satisfaction_Score": to_int(get_first("satisfaction_score", "Satisfaction_Score", "Satisfaction (1-5)", default=3), 3),
@@ -146,7 +179,7 @@ def build_customer_prediction_input(customer) -> pd.DataFrame:
             "Payment_Mode": get_first("payment_mode", "Payment_Mode", "Payment Mode", default="UPI"),
         }
     else:
-        # Customer ORM object
+        # Customer ORM SQLAlchemy entity mapping
         input_row = {
             "Income_Level": customer.income_level or "Medium",
             "Satisfaction_Score": int(customer.satisfaction_score or 3),
@@ -164,9 +197,15 @@ def build_customer_prediction_input(customer) -> pd.DataFrame:
     return pd.DataFrame([input_row], dtype=object)
 
 def calculate_prediction_for_customer(db: Session, customer) -> dict:
+    """
+    Runs the predictive pipeline for a customer:
+    1. Determines which A/B testing model version to fetch.
+    2. Invokes model preprocessors and computes the probability.
+    3. Triggers the SHAP explainability calculations and the recommendation engine.
+    """
     customer_id = customer.customer_id if hasattr(customer, "customer_id") else customer.get("customer_id")
     
-    # A/B Testing Logic
+    # 1. Fetch active A/B testing model version
     model_version_to_use = model_service.get_model_version_for_request(customer_id)
     if not model_version_to_use:
         model_version_to_use = "v1.3.0-model-comparison"
@@ -178,6 +217,7 @@ def calculate_prediction_for_customer(db: Session, customer) -> dict:
     tenure = int(customer.tenure_months or 12) if hasattr(customer, "tenure_months") else int(customer.get("tenure_months", 12))
     app_switch = int(customer.app_switch_frequency or 5) if hasattr(customer, "app_switch_frequency") else int(customer.get("app_switch_frequency", 5))
 
+    # 2. Run inference via ModelService if preloaded
     if model_service.is_ready:
         try:
             df_input = build_customer_prediction_input(customer)
@@ -199,6 +239,7 @@ def calculate_prediction_for_customer(db: Session, customer) -> dict:
             )
             explainability = output["explainability"]
         except Exception as exc:
+            # Fallback to local heuristic risk profile calculation if ML inference fails
             print(f"Model prediction failed, falling back to rule-based predictor: {exc}")
             profile = build_risk_profile(
                 customer_support_interactions=support_interactions,
@@ -224,6 +265,7 @@ def calculate_prediction_for_customer(db: Session, customer) -> dict:
             )
             explainability = profile.get("explainability_json", {})
     else:
+        # Fallback to local heuristics if model artifacts are not initialized
         profile = build_risk_profile(
             customer_support_interactions=support_interactions,
             satisfaction_score=satisfaction,
@@ -261,6 +303,11 @@ def calculate_prediction_for_customer(db: Session, customer) -> dict:
     }
 
 def save_customer_prediction(db: Session, customer_id: str, prediction_data: dict) -> ChurnPrediction:
+    """
+    Saves a calculated customer prediction:
+    - Writes the active record to the 'churn_predictions' table.
+    - Writes an audit log record to the 'prediction_history' table.
+    """
     now_time = datetime.now(timezone.utc)
     db_prediction = ChurnPrediction(
         customer_id=customer_id,
@@ -288,6 +335,7 @@ def save_customer_prediction(db: Session, customer_id: str, prediction_data: dic
     return db_prediction
 
 def ensure_customer_has_prediction(db: Session, customer_id: str) -> ChurnPrediction:
+    """Gets the existing customer prediction, or generates and stores one if missing."""
     prediction = db.query(ChurnPrediction).filter(ChurnPrediction.customer_id == customer_id).first()
     if prediction:
         return prediction
@@ -300,6 +348,7 @@ def ensure_customer_has_prediction(db: Session, customer_id: str) -> ChurnPredic
     return save_customer_prediction(db, customer_id, pred_data)
 
 def ensure_all_customers_have_predictions(db: Session, limit: int = None) -> dict:
+    """Startup routine backfilling predictions for any customer records that lack one."""
     stmt = text("""
         SELECT customer_id FROM customers 
         WHERE customer_id NOT IN (SELECT DISTINCT customer_id FROM churn_predictions)
@@ -330,3 +379,4 @@ def ensure_all_customers_have_predictions(db: Session, limit: int = None) -> dic
         "failed_customers": failed_ids,
         "status": "success" if not failed_ids else "partial_success"
     }
+

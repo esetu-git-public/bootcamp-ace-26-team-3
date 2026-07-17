@@ -1,3 +1,10 @@
+# ==============================================================================
+# DATABASE INITIALIZATION MODULE
+# ==============================================================================
+# This module initializes the relational database schema, builds critical indices
+# for lookup performance, creates the aggregated CTE customer view, and seeds
+# initial admin accounts, raw customer records, and simulated prediction histories.
+
 import csv
 import os
 from typing import Any
@@ -11,8 +18,16 @@ from .core.risk_score import build_risk_profile
 from .models import ChurnPrediction, Customer
 from .models.user import User
 
-
 def initialize_database(engine: Engine, db: Session) -> None:
+    """
+    Orchestrates the entire database setup sequence during startup:
+    1. Creates or replaces v_customer_predictions.
+    2. Builds performance indexes.
+    3. Seeds the admin user account.
+    4. Inserts seed customers from the CSV.
+    5. Backfills any missing predictions.
+    6. Seeds history trend metrics for charts.
+    """
     create_customer_predictions_view(engine, db)
     create_indexes(db)
     seed_default_admin(db)
@@ -33,8 +48,13 @@ def initialize_database(engine: Engine, db: Session) -> None:
         print(f"Warning: Startup prediction history seeding failed: {e}")
 
 
-
 def create_customer_predictions_view(engine: Engine, db: Session) -> None:
+    """
+    Creates the 'v_customer_predictions' view.
+    Uses a Common Table Expression (CTE) to fetch the absolute latest prediction
+    for each customer (joining on max prediction_id), avoiding duplicate listings
+    and slow subqueries. Supports both SQLite and PostgreSQL.
+    """
     if engine.dialect.name == "postgresql":
         db.execute(text("DROP VIEW IF EXISTS v_customer_predictions CASCADE"))
     else:
@@ -80,6 +100,11 @@ def create_customer_predictions_view(engine: Engine, db: Session) -> None:
 
 
 def create_indexes(db: Session) -> None:
+    """
+    Applies performance optimization indices to SQLite/Postgres.
+    - idx_customers_lower_customer_id: Speeds up case-insensitive search.
+    - idx_predictions_customer_predicted_at: Speeds up dashboard queries and profile lookups.
+    """
     index_statements = [
         """
         CREATE INDEX IF NOT EXISTS idx_customers_lower_customer_id
@@ -117,6 +142,7 @@ def create_indexes(db: Session) -> None:
 
 
 def seed_default_admin(db: Session) -> None:
+    """Seeds the initial administrator credentials with pbkdf2_sha256 security hash."""
     admin_exists = db.query(User).filter(User.username == "admin").first()
     if admin_exists:
         return
@@ -134,6 +160,11 @@ def seed_default_admin(db: Session) -> None:
 
 
 def seed_demo_customers(db: Session) -> None:
+    """
+    Reads the base dataset CSV file, processes all records in a single fast batch,
+    uses the champion model to predict churn probabilities, and commits records
+    to SQL tables using bulk insert mappings for high speed.
+    """
     if db.query(Customer).count() > 0:
         return
 
@@ -220,6 +251,7 @@ def seed_demo_customers(db: Session) -> None:
             "recommendation_desc": rec_desc,
         })
 
+    # Bulk insert database mappings for fast seeding
     db.bulk_insert_mappings(Customer, customers_to_insert)
     db.commit()
     db.bulk_insert_mappings(ChurnPrediction, predictions_to_insert)
@@ -228,6 +260,11 @@ def seed_demo_customers(db: Session) -> None:
 
 
 def seed_prediction_history_if_empty(db: Session) -> None:
+    """
+    Generates simulated historical predictions across the last 5 months.
+    Applies MD5-based noise and drift calculation to model natural trend variation
+    in risk velocity charts without introducing artificial bias.
+    """
     from .models import PredictionHistory
     if db.query(PredictionHistory).count() > 0:
         return
@@ -255,6 +292,7 @@ def seed_prediction_history_if_empty(db: Session) -> None:
     for pred in current_preds:
         current_prob = float(pred.churn_probability)
         for month_ago, eval_time in months_offsets:
+            # Deterministic noise based on hashed ID
             hash_val = int(hashlib.md5(pred.customer_id.encode()).hexdigest(), 16) % 100
             noise = (hash_val - 50) / 10.0
             drift = month_ago * 1.5
@@ -300,4 +338,5 @@ def seed_prediction_history_if_empty(db: Session) -> None:
         db.commit()
 
     print(f"Successfully seeded prediction history with {db.query(PredictionHistory).count()} records.")
+
 

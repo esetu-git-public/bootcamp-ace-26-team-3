@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional, cast
 from catboost import CatBoostClassifier
 import pickle
 
-# Try to import SHAP, but make it optional
+# Try to import SHAP, but make it optional to prevent build failure on non-linux boxes
 try:
     import shap
     SHAP_AVAILABLE = True
@@ -26,12 +26,8 @@ except Exception as e:
 class SHAPExplainer:
     """
     Advanced SHAP explainer for CatBoost models.
-    
-    Provides:
-    - Local feature contributions for individual predictions
-    - Global feature importance across dataset
-    - SHAP value statistics
-    - Feature interaction analysis
+    Translates model weights and decision splits into additive feature contributions
+    matching game theoretic properties (Shapley Values).
     """
     
     def __init__(self, model: CatBoostClassifier, preprocessor, feature_names: List[str]):
@@ -51,22 +47,25 @@ class SHAPExplainer:
         self._initialize_explainer()
     
     def _initialize_explainer(self):
-        """Initialize SHAP explainer with fallbacks."""
+        """Initialize SHAP explainer, falling back to model agnostic Explainer if TreeExplainer fails."""
         if not SHAP_AVAILABLE or shap is None:
             raise RuntimeError("SHAP is not installed or could not be imported.")
 
         try:
+            # TreeExplainer is O(N) where N is tree size, much faster than generic kernel explainer
             self.explainer = shap.TreeExplainer(self.model)
         except Exception as e:
             try:
+                # Fallback to model agnostic partition explainer
                 self.explainer = shap.Explainer(self.model)
             except Exception as e2:
                 raise RuntimeError(f"Failed to initialize SHAP explainer: {str(e2)}")
 
     @staticmethod
     def _as_shap_array(raw_values) -> np.ndarray:
-        """Normalize SHAP output to a 2D array for the positive class."""
+        """Normalizes raw SHAP values array formats (handles binary list dimensions vs 2D arrays)."""
         if isinstance(raw_values, list):
+            # Extract positive class values (index 1) if binary probabilities returned
             raw_values = raw_values[1] if len(raw_values) > 1 else raw_values[0]
 
         values = np.asarray(raw_values)
@@ -75,7 +74,7 @@ class SHAPExplainer:
         return values
 
     def _compute_shap_values(self, processed_features) -> np.ndarray:
-        """Compute SHAP values safely, supporting both shap_values method and callable explainers."""
+        """Computes SHAP scores, abstraction layer handling callable vs object shape differences."""
         if self.explainer is None:
             raise RuntimeError("SHAP explainer is not initialized.")
 
@@ -91,7 +90,7 @@ class SHAPExplainer:
             raise AttributeError("The SHAP explainer object does not support computing SHAP values.")
 
     def _expected_value(self) -> float:
-        """Return the expected value for the positive class when available."""
+        """Extracts the base model expectation (mean log-odds or mean probability rate)."""
         if self.explainer is None:
             return 0.0
         
@@ -121,18 +120,18 @@ class SHAPExplainer:
         Returns:
             Dictionary with SHAP values, probability, and feature contributions
         """
-        # Preprocess features
+        # Run preprocessing transform before explaining features
         processed = self.preprocessor.transform(raw_features)
         
-        # Get prediction probability
+        # Calculate raw classification score
         probabilities = self.model.predict_proba(processed)
-        probability = float(probabilities[0, 1])  # Class 1 probability
+        probability = float(probabilities[0, 1])  
         
-        # Get SHAP values
+        # Run explainer to calculate contributions
         shap_values = self._as_shap_array(self._compute_shap_values(processed))
         shap_row = shap_values[0]
         
-        # Build feature contributions
+        # Map values back to feature names
         feature_contributions = self._build_feature_contributions(
             shap_row, 
             raw_features.iloc[0].to_dict()
@@ -155,14 +154,8 @@ class SHAPExplainer:
         original_values: Dict
     ) -> List[Dict]:
         """
-        Build detailed feature contribution objects.
-        
-        Args:
-            shap_values: SHAP values for the instance
-            original_values: Original feature values before preprocessing
-            
-        Returns:
-            List of feature contribution dictionaries, sorted by absolute SHAP value
+        Formats contributions into neat UI-consumable metrics.
+        Sorts absolute SHAP values descending to put main drivers first.
         """
         contributions = []
         
@@ -176,7 +169,7 @@ class SHAPExplainer:
             }
             contributions.append(contribution)
         
-        # Sort by absolute SHAP value (most important first)
+        # Sorting priority
         contributions.sort(key=lambda x: x["abs_shap_value"], reverse=True)
         
         return contributions
@@ -196,13 +189,11 @@ class SHAPExplainer:
         Returns:
             Dictionary with feature importance statistics
         """
-        # Calculate SHAP values for all samples
         shap_array = self._as_shap_array(self._compute_shap_values(processed_features))
         
-        # Calculate mean absolute SHAP values
+        # Average absolute impact of each feature across the validation batch
         mean_abs_shap = np.mean(np.abs(shap_array), axis=0)
         
-        # Create importance dataframe
         importance_df = pd.DataFrame({
             "feature": self.feature_names,
             "mean_abs_shap": mean_abs_shap
@@ -231,15 +222,8 @@ class SHAPExplainer:
         feature2: str
     ) -> Dict:
         """
-        Analyze interaction between two features using SHAP.
-        
-        Args:
-            raw_features: Raw input features
-            feature1: Name of first feature
-            feature2: Name of second feature
-            
-        Returns:
-            Dictionary with interaction analysis
+        Calculates correlation coefficient between the SHAP values of two features
+        to evaluate feature dependency levels.
         """
         if feature1 not in self.feature_names or feature2 not in self.feature_names:
             raise ValueError(f"Feature must be in {self.feature_names}")
@@ -250,7 +234,7 @@ class SHAPExplainer:
         processed = self.preprocessor.transform(raw_features)
         shap_array = self._as_shap_array(self._compute_shap_values(processed))
         
-        # Calculate correlation between SHAP values of two features
+        # Calculate Pearson correlation coefficient of columns
         shap_corr = np.corrcoef(shap_array[:, idx1], shap_array[:, idx2])[0, 1]
         
         return {
@@ -262,7 +246,7 @@ class SHAPExplainer:
     
     @staticmethod
     def _interpret_correlation(corr: float) -> str:
-        """Interpret correlation coefficient."""
+        """Interpret correlation coefficient bounds for interactive plotting."""
         if np.isnan(corr):
             return "Insufficient data"
         
@@ -292,10 +276,7 @@ class SHAPExplainer:
             Dictionary mapping feature names to SHAP values
         """
         explanation = self.explain_prediction(raw_features, return_base_value=False)
-        
-        # Get top N features by absolute value
         contributions = explanation["feature_contributions"][:top_n]
-        
         return {contrib["feature"]: contrib["shap_value"] for contrib in contributions}
     
     def summary_statistics(
@@ -303,13 +284,7 @@ class SHAPExplainer:
         processed_features: pd.DataFrame
     ) -> Dict:
         """
-        Generate summary statistics for SHAP values across dataset.
-        
-        Args:
-            processed_features: Preprocessed feature data
-            
-        Returns:
-            Dictionary with summary statistics
+        Generate statistical distributions for SHAP metrics.
         """
         shap_array = self._as_shap_array(self._compute_shap_values(processed_features))
         
@@ -328,16 +303,7 @@ class SHAPExplainer:
 
 
 def load_explainer_from_artifacts(preprocessor_path: str, model: CatBoostClassifier) -> Optional[SHAPExplainer]:
-    """
-    Load and initialize SHAPExplainer from saved artifacts.
-    
-    Args:
-        preprocessor_path: Path to saved preprocessor
-        model: Trained CatBoost model
-        
-    Returns:
-        Initialized SHAPExplainer or None if artifacts not found
-    """
+    """Loads and instantiates a SHAPExplainer wrapper from the serialized preprocessor and model."""
     if not os.path.exists(preprocessor_path):
         return None
     
@@ -354,3 +320,4 @@ def load_explainer_from_artifacts(preprocessor_path: str, model: CatBoostClassif
     except Exception as e:
         print(f"Error loading explainer: {str(e)}")
         return None
+

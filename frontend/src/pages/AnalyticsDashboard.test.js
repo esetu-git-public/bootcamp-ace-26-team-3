@@ -19,7 +19,6 @@ jest.mock('../services/api', () => ({
   getBulkPredictionStatus: jest.fn(),
   getBulkJobs: jest.fn(),
   getChurnTrends: jest.fn(),
-  getRiskVelocity: jest.fn(),
 }));
 
 // Import the mocked service after the mock setup
@@ -53,13 +52,6 @@ describe('AnalyticsDashboard', () => {
       {"period": "May 2026", "churn_rate": 13.10, "churn_count": 2089, "total_customers": 15946, "average_risk": 14.80},
       {"period": "Jun 2026", "churn_rate": 12.82, "churn_count": 2045, "total_customers": 15946, "average_risk": 13.50},
       {"period": "Jul 2026", "churn_rate": 12.40, "churn_count": 1977, "total_customers": 15946, "average_risk": 12.40},
-    ]);
-    apiService.getRiskVelocity.mockResolvedValue([
-      {"category": "Significant Deceleration", "customer_count": 890, "total_spend": 17800.0, "average_change": -11.5},
-      {"category": "Moderate Deceleration", "customer_count": 4890, "total_spend": 97800.0, "average_change": -4.2},
-      {"category": "Stable", "customer_count": 8200, "total_spend": 164000.0, "average_change": 0.1},
-      {"category": "Moderate Acceleration", "customer_count": 1420, "total_spend": 28400.0, "average_change": 3.8},
-      {"category": "Significant Acceleration", "customer_count": 549, "total_spend": 10980.0, "average_change": 12.1}
     ]);
   });
 
@@ -100,7 +92,7 @@ describe('AnalyticsDashboard', () => {
     // Customer Segments list
     expect(await screen.findByText('Loyal')).toBeInTheDocument();
     expect(screen.getByText('45 customers')).toBeInTheDocument();
-    expect(screen.getByText(/5% of/i)).toBeInTheDocument();
+    expect(screen.getByText('5%')).toBeInTheDocument();
   });
 
   it('renders the high-risk customer queue ordered by risk level', async () => {

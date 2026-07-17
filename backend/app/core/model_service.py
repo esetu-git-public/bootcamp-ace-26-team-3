@@ -1,3 +1,10 @@
+# ==============================================================================
+# MODEL SERVICE MODULE
+# ==============================================================================
+# This module acts as the unified controller for managing Machine Learning model
+# artifacts (serialization, version registration, A/B testing configurations,
+# and runtime inference). It supports both Scikit-Learn models and CatBoost models.
+
 import os
 import pickle
 import sys
@@ -9,6 +16,10 @@ import pandas as pd
 
 from . import preprocessing as preprocessing_module
 
+# ── PICKLE NAMESPACE RESOLUTIONS ─────────────────────────────────────────────
+# Set module namespaces before pickle unserialization so that older model pickles
+# originally serialized under the 'app' namespace can be resolved correctly under
+# the new 'backend.app' namespace structure.
 backend_app_module = sys.modules.get("backend.app")
 backend_core_module = sys.modules.get("backend.app.core")
 if backend_app_module is not None:
@@ -17,6 +28,9 @@ if backend_core_module is not None:
     sys.modules.setdefault("app.core", backend_core_module)
 sys.modules.setdefault("app.core.preprocessing", preprocessing_module)
 
+# ── OPTIONAL MODULE IMPORTS ──────────────────────────────────────────────────
+# Attempt imports of CatBoost and SHAP. If not installed or incompatible, 
+# flag availability as False and gracefully fall back to default models/predict.
 try:
     from catboost import CatBoostClassifier
     CATBOOST_AVAILABLE = True
@@ -25,7 +39,6 @@ except Exception as e:
     CatBoostClassifier = None
     CATBOOST_AVAILABLE = False
 
-# Try to import SHAP, but make it optional if there are compatibility issues
 try:
     import shap
     SHAP_AVAILABLE = True
@@ -34,7 +47,6 @@ except Exception as e:
     shap = None
     SHAP_AVAILABLE = False
 
-# Only import SHAPExplainer if SHAP is available
 if SHAP_AVAILABLE:
     try:
         from .shap_explainer import SHAPExplainer
@@ -44,13 +56,16 @@ if SHAP_AVAILABLE:
 else:
     SHAPExplainer = None
 
-
+# ── FILE PATH RESOLUTIONS ───────────────────────────────────────────────────
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 ARTIFACT_DIR = os.path.join(os.path.dirname(__file__), "model_artifacts")
 
 def _install_pickle_module_aliases() -> None:
-    """Allow older artifacts pickled as app.core.* to load as backend.app.core.*, and alias numpy._core to numpy.core for numpy 1.x vs 2.x compatibility."""
-    # Install app namespace aliases
+    """
+    Ensures that older model artifacts serialized under 'app.core.*' can be unpickled
+    seamlessly. Also handles compatibilities between numpy versions 1.x and 2.x
+    by mapping numpy._core internal module references back to numpy.core.
+    """
     try:
         import backend.app as backend_app
         import backend.app.core as backend_core
@@ -61,7 +76,6 @@ def _install_pickle_module_aliases() -> None:
     except Exception:
         pass
 
-    # Alias numpy._core to numpy.core for compatibility with model pickles from different numpy versions
     try:
         import numpy
         import numpy.core
@@ -77,41 +91,50 @@ def _install_pickle_module_aliases() -> None:
         print(f"Warning: Could not install numpy._core aliases: {e}")
 
 
-
+# ── A/B TESTING STRUCT TYPE ──────────────────────────────────────────────────
 class ABTestConfigDict(TypedDict):
     is_active: bool
     challenger_version: Optional[str]
     traffic_split_percent: int
 
 
+# ── MODEL SERVICE CONTROLLER ────────────────────────────────────────────────
 class ModelService:
+    """
+    Thread-safe model service managing model loading, preprocessor execution,
+    A/B test bucket splitting, local prediction scoring, and SHAP explainability.
+    """
     def __init__(self):
-        # Main model artifacts
+        # Version indicators and artifact dictionary
         self.champion_version: Optional[str] = None
-        self.models: Dict[str, Dict] = {}  # Stores artifacts for each loaded version
+        self.models: Dict[str, Dict] = {}  # Format: { "version_str": { "model": obj, "preprocessor": obj, ... } }
 
-        # A/B Test configuration
+        # Active A/B Test Configuration details
         self.ab_test_config: ABTestConfigDict = {
             "is_active": False,
             "challenger_version": None,
-            "traffic_split_percent": 0,  # Percentage of traffic to challenger
+            "traffic_split_percent": 0,
         }
 
+        # Lock to ensure thread-safety during runtime model swaps/reloads
         self._lock = threading.Lock()
         self.load_latest_model()
 
     @property
     def is_ready(self) -> bool:
-        """Check if the champion model is loaded and ready."""
+        """Helper checking if at least one champion model has been successfully initialized."""
         return self.champion_version is not None and self.champion_version in self.models
 
     def load_latest_model(self):
-        """Loads the latest model from the database-backed model registry."""
-        # This will become the default "champion" model
+        """
+        Loads the latest registered model version from the database registry table.
+        Falls back to 'v1.2.0-catboost' if no database connection or entries exist.
+        """
         from ..database import SessionLocal
         from ..models import ModelMetric
         db = SessionLocal()
         try:
+            # Query the database for the newest model metric registry record
             latest_metric = db.query(ModelMetric).order_by(ModelMetric.evaluated_at.desc()).first()
             if latest_metric is not None:
                 model_version = cast(str, latest_metric.model_version)
@@ -134,7 +157,10 @@ class ModelService:
             db.close()
 
     def load_artifacts(self, version: str, as_champion: bool = False):
-        """Loads model artifacts for a specific version."""
+        """
+        Loads model pickles (classifier and column transformers) for a specific version string.
+        Optionally registers it as the active 'champion' model version.
+        """
         sklearn_model_path = os.path.join(ARTIFACT_DIR, f"sklearn_model_{version}.pkl")
         catboost_model_path = os.path.join(ARTIFACT_DIR, f"catboost_model_{version}.cbm")
         preprocessor_path = os.path.join(ARTIFACT_DIR, f"preprocessor_{version}.pkl")
@@ -142,6 +168,7 @@ class ModelService:
         is_sklearn = False
         model_path = None
 
+        # Determine if version maps to Scikit-learn (.pkl) or CatBoost (.cbm) format
         if os.path.exists(sklearn_model_path):
             model_path = sklearn_model_path
             is_sklearn = True
@@ -165,6 +192,7 @@ class ModelService:
             print(f"Artifacts not found. Searched for version '{version}' and default paths.")
             return
 
+        # Load preprocessor artifacts
         try:
             _install_pickle_module_aliases()
             with open(preprocessor_path, "rb") as f:
@@ -173,6 +201,7 @@ class ModelService:
             print(f"Warning: Could not load preprocessor pickle: {e}")
             return
 
+        # Load model classifier based on format type
         try:
             if is_sklearn:
                 with open(model_path, "rb") as f:
@@ -191,7 +220,7 @@ class ModelService:
         if hasattr(preprocessor, "feature_names_"):
             feature_names = list(preprocessor.feature_names_)
 
-        # Only initialize SHAP if available and model loaded
+        # Load SHAP Visualizers and Maskers if available
         explainer = None
         shap_explainer = None
         if SHAP_AVAILABLE and shap is not None:
@@ -204,7 +233,6 @@ class ModelService:
                     except Exception:
                         explainer = None
                 
-                # Initialize enhanced SHAP explainer
                 if feature_names and SHAPExplainer is not None:
                     shap_explainer = SHAPExplainer(model, preprocessor, feature_names)
                 else:
@@ -214,7 +242,7 @@ class ModelService:
                 shap_explainer = None
                 print(f"Warning: Could not initialize SHAP explainer: {str(e)}")
 
-        # Store loaded artifacts
+        # Register version artifacts in cache dictionary
         self.models[version] = {
             "model": model,
             "preprocessor": preprocessor,
@@ -223,6 +251,7 @@ class ModelService:
             "feature_names": feature_names
         }
 
+        # Set champion mappings if flagged as champion
         if as_champion:
             self.champion_version = version
             print(f"Successfully loaded champion model version '{version}'.")
@@ -235,7 +264,7 @@ class ModelService:
             print(f"Successfully loaded challenger model version '{version}'.")
 
     def get_ab_test_status(self) -> Dict:
-        """Get status of the A/B test and loaded models."""
+        """Helper to check the active status of A/B split versions and metrics mapping."""
         return {
             "is_active": self.ab_test_config["is_active"],
             "champion_version": self.champion_version,
@@ -245,7 +274,10 @@ class ModelService:
         }
 
     def get_model_version_for_request(self, customer_id: Union[int, str]) -> Optional[str]:
-        """Determine which model version to use for a given customer based on A/B test config."""
+        """
+        Calculates a hash bucket for the customer ID. Determines deterministically 
+        if this customer request gets the champion version or the challenger version.
+        """
         with self._lock:
             if not self.is_ready:
                 return None
@@ -253,11 +285,9 @@ class ModelService:
             if not self.ab_test_config["is_active"] or not self.ab_test_config["challenger_version"]:
                 return self.champion_version
 
-            # Deterministic split based on customer_id hash
             try:
                 cid = int(customer_id)
             except (ValueError, TypeError):
-                # Fallback to simple hash of string
                 import hashlib
                 cid = int(hashlib.md5(str(customer_id).encode()).hexdigest(), 16)
 
@@ -267,8 +297,8 @@ class ModelService:
             return self.champion_version
 
     def _shap_values(self, processed_features: pd.DataFrame) -> np.ndarray:
+        """Runs the active SHAP explainer to calculate baseline feature scores."""
         if self.explainer is None:
-            # Return an array of zeros if explainer is not available
             num_features = len(self.feature_names) if self.feature_names else processed_features.shape[1]
             return np.zeros((processed_features.shape[0], num_features))
 
@@ -288,7 +318,10 @@ class ModelService:
         return np.array(shap_values)
 
     def predict_and_explain(self, raw_features: pd.DataFrame, model_version: Optional[str] = None) -> Dict[str, Any]:
-        """Legacy method for backward compatibility."""
+        """
+        Synchronously calculates churn prediction probability, standard confidence
+        intervals, and basic local SHAP explanation mappings for a single customer row.
+        """
         with self._lock:
             version = model_version or self.champion_version
             if not version or version not in self.models:
@@ -300,10 +333,12 @@ class ModelService:
             explainer = artifacts["explainer"]
             feature_names = artifacts["feature_names"]
 
+            # Transform raw features using cached preprocessing pipeline
             processed = preprocessor.transform(raw_features)
             probabilities = model.predict_proba(processed)[:, 1]
             probability = float(probabilities[0])
 
+            # Extract local SHAP explanations
             if explainer is not None:
                 if hasattr(explainer, "shap_values"):
                     raw_values = explainer.shap_values(processed)
@@ -328,9 +363,8 @@ class ModelService:
             else:
                 explainability = {}
             
-            # Calculate confidence interval (95% CI approximation)
-            # Using binomial proportion confidence interval
-            z_score = 1.96  # 95% confidence
+            # Formulate a 95% Confidence Interval using standard Binomial proportion margins
+            z_score = 1.96  
             margin_of_error = z_score * np.sqrt((probability * (1 - probability)) / 100)
             confidence_lower = max(0.0, probability - margin_of_error)
             confidence_upper = min(1.0, probability + margin_of_error)
@@ -343,7 +377,7 @@ class ModelService:
             }
 
     def predict_with_advanced_explanation(self, raw_features: pd.DataFrame, model_version: Optional[str] = None) -> Dict[str, Any]:
-        """Enhanced prediction with detailed SHAP explanations."""
+        """Runs the enhanced SHAP explainability calculations, yielding base value shifts."""
         with self._lock:
             version = model_version or self.champion_version
             if not version or version not in self.models:
@@ -353,18 +387,16 @@ class ModelService:
             shap_explainer = artifacts["shap_explainer"]
             
             if shap_explainer is None:
-                # Fallback to legacy method
                 return self.predict_and_explain(raw_features, model_version=version)
             
             return shap_explainer.explain_prediction(raw_features, return_base_value=True)
 
     def get_global_importance(self, processed_features: Optional[pd.DataFrame] = None, top_n: int = 10) -> Dict:
-        """Get global feature importance using SHAP."""
+        """Aggregates absolute SHAP values across a batch of customers to yield global feature priorities."""
         with self._lock:
             if not self.is_ready or self.shap_explainer is None:
                 raise RuntimeError("Model artifacts are not available or SHAP explainer not initialized.")
             
-            # If no data provided, return empty but valid structure
             if processed_features is None:
                 return {
                     "global_importance": [],
@@ -381,7 +413,7 @@ class ModelService:
         feature1: str, 
         feature2: str
     ) -> Dict:
-        """Analyze interaction between two features."""
+        """Runs interaction analysis to check if changes in feature1 modify the SHAP impact of feature2."""
         with self._lock:
             if not self.is_ready or self.shap_explainer is None:
                 raise RuntimeError("Model artifacts are not available or SHAP explainer not initialized.")
@@ -389,7 +421,7 @@ class ModelService:
             return self.shap_explainer.feature_interaction_analysis(raw_features, feature1, feature2)
 
     def get_shap_summary_statistics(self, processed_features: pd.DataFrame) -> Dict:
-        """Get SHAP statistics for dataset."""
+        """Yields mean, max, and min SHAP metrics for standard audits."""
         with self._lock:
             if not self.is_ready or self.shap_explainer is None:
                 raise RuntimeError("Model artifacts are not available or SHAP explainer not initialized.")
@@ -397,13 +429,15 @@ class ModelService:
             return self.shap_explainer.summary_statistics(processed_features)
 
     def reload_model(self, version: str):
-        """Thread-safe method to reload model artifacts."""
+        """Reloads active model artifacts at runtime. Thread-safe."""
         with self._lock:
             print(f"Acquired lock to reload model. Attempting to load version '{version}'...")
             self.load_artifacts(version, as_champion=True)
             if not self.is_ready or self.champion_version != version:
                 print(f"Failed to reload to version '{version}'. Restoring latest available model.")
-                self.load_latest_model() # Attempt to restore a working model
+                self.load_latest_model() 
 
 
+# Instantiates singleton instance for application importing
 model_service = ModelService()
+

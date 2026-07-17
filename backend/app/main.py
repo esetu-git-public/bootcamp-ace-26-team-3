@@ -1,3 +1,10 @@
+# ==============================================================================
+# FASTAPI MAIN SERVICE ENTRY POINT
+# ==============================================================================
+# This module initializes the FastAPI app instance, configures CORS middleware,
+# triggers the database schema creations and initialization/seeding loops on startup,
+# and registers all endpoint routers under the '/api/v1' namespace.
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -8,6 +15,7 @@ from .db_init import initialize_database
 from .routers import analytics, auth, customers, dashboard, model, predictions, reports, retention
 from .api.endpoints import explainability
 
+# Initialize the main FastAPI application with custom Swagger documentation paths
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version="1.0.0",
@@ -15,6 +23,7 @@ app = FastAPI(
     redoc_url="/api/redoc",
 )
 
+# CORS middleware configuration allowing frontend origins to access API endpoints
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -23,6 +32,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Build physical database tables and seed initial admin credentials on application launch
 try:
     Base.metadata.create_all(bind=engine)
 
@@ -34,6 +44,7 @@ try:
 except Exception as exc:
     print(f"Database initialization/seeding failed: {exc}")
 
+# Register API version 1 routers
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(dashboard.router, prefix="/api/v1")
 app.include_router(analytics.router, prefix="/api/v1")
@@ -47,4 +58,6 @@ app.include_router(explainability.router, prefix="/api/v1")
 
 @app.get("/")
 def health_check():
+    """Health check endpoint utilized by load balancers and deployment checkers."""
     return {"status": "healthy", "service": settings.PROJECT_NAME}
+

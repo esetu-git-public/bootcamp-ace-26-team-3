@@ -24,7 +24,7 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, setSelectedJobId, 
   const [satisfactionData, setSatisfactionData] = useState([]);
   const [segmentData, setSegmentData] = useState([]);
   const [customerRows, setCustomerRows] = useState([]);
-  const [trendData, setTrendData] = useState([]);
+  const [histogramData, setHistogramData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [bulkFile, setBulkFile] = useState(null);
@@ -70,7 +70,7 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, setSelectedJobId, 
       apiService.getChurnBySatisfaction(),
       apiService.getCustomerSegmentation(),
       apiService.getCustomers(1, 6, { sortBy: 'risk_desc' }),
-      apiService.getChurnTrends(),
+      apiService.getRiskDistributionHistogram(),
     ])
       .then(([
         kpisData,
@@ -83,7 +83,7 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, setSelectedJobId, 
         satisfactionDataResult,
         segmentDataResult,
         customersData,
-        trendDataResult,
+        histogramDataResult,
       ]) => {
         if (cancelled) return;
         setKpis(kpisData);
@@ -96,7 +96,7 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, setSelectedJobId, 
         setSatisfactionData(asArray(satisfactionDataResult));
         setSegmentData(asArray(segmentDataResult));
         setCustomerRows(sortCustomersByRisk(customersData.results));
-        setTrendData(asArray(trendDataResult));
+        setHistogramData(asArray(histogramDataResult));
       })
       .catch((err) => {
         if (cancelled) return;
@@ -219,59 +219,33 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, setSelectedJobId, 
   };
 
   const chartList = useMemo(() => {
-    // Standard baseline fallbacks matching seeded data values (~45-50% rate, ~7,500 count)
     const defaultFallbacks = [
-      {"period": "Feb 2026", "churn_rate": 49.92, "churn_count": 7961, "total_customers": 15949, "average_risk": 44.29},
-      {"period": "Mar 2026", "churn_rate": 48.96, "churn_count": 7808, "total_customers": 15949, "average_risk": 42.99},
-      {"period": "Apr 2026", "churn_rate": 48.08, "churn_count": 7668, "total_customers": 15949, "average_risk": 41.65},
-      {"period": "May 2026", "churn_rate": 47.17, "churn_count": 7523, "total_customers": 15949, "average_risk": 40.31},
-      {"period": "Jun 2026", "churn_rate": 46.37, "churn_count": 7395, "total_customers": 15949, "average_risk": 38.99},
-      {"period": "Jul 2026", "churn_rate": 45.59, "churn_count": 7271, "total_customers": 15949, "average_risk": 37.56},
+      {"risk_bucket": "0-10%", "customer_count": 8200, "percentage": 51.42},
+      {"risk_bucket": "10-20%", "customer_count": 2800, "percentage": 17.56},
+      {"risk_bucket": "20-30%", "customer_count": 1891, "percentage": 11.86},
+      {"risk_bucket": "30-40%", "customer_count": 1020, "percentage": 6.40},
+      {"risk_bucket": "40-50%", "customer_count": 680, "percentage": 4.26},
+      {"risk_bucket": "50-60%", "customer_count": 369, "percentage": 2.31},
+      {"risk_bucket": "60-70%", "customer_count": 300, "percentage": 1.88},
+      {"risk_bucket": "70-80%", "customer_count": 350, "percentage": 2.19},
+      {"risk_bucket": "80-90%", "customer_count": 236, "percentage": 1.48},
+      {"risk_bucket": "90-100%", "customer_count": 100, "percentage": 0.63}
     ];
 
-    if (trendData && trendData.length > 1) {
-      return trendData;
-    }
-
-    // If API returned 1 month (usually current month Jul 2026), merge it with the defaults
-    if (trendData && trendData.length === 1) {
-      const realItem = trendData[0];
-      const merged = [...defaultFallbacks];
-      const idx = merged.findIndex(i => i.period.includes(realItem.period.split(' ')[0]));
-      if (idx !== -1) {
-        merged[idx] = { ...merged[idx], ...realItem };
-      } else {
-        merged[merged.length - 1] = { ...merged[merged.length - 1], ...realItem };
-      }
-      return merged;
-    }
-
-    // If API is empty but we have loaded dashboard KPIs, adjust Jul 2026 to match active KPIs
-    if (kpis) {
-      const merged = [...defaultFallbacks];
-      const julIdx = merged.findIndex(i => i.period.includes("Jul"));
-      if (julIdx !== -1) {
-        merged[julIdx] = {
-          ...merged[julIdx],
-          churn_count: kpis.predicted_churn_customers,
-          churn_rate: (kpis.predicted_churn_customers * 100) / (kpis.total_customers || 1),
-          total_customers: kpis.total_customers,
-          average_risk: kpis.average_churn_risk
-        };
-      }
-      return merged;
+    if (histogramData && histogramData.length > 0) {
+      return histogramData;
     }
 
     return defaultFallbacks;
-  }, [trendData, kpis]);
+  }, [histogramData]);
 
   const activeValue = (item) => {
-    const val = activeTrendTab === 'rate' ? item?.churn_rate : item?.churn_count;
+    const val = activeTrendTab === 'rate' ? item?.percentage : item?.customer_count;
     return typeof val === 'number' && !isNaN(val) ? val : 0;
   };
   const maxVal = Math.max(...chartList.map(activeValue), 1);
   const chartMaxY = activeTrendTab === 'rate'
-    ? Math.ceil(maxVal / 5) * 5
+    ? Math.ceil(maxVal / 10) * 10
     : Math.ceil(maxVal / 1000) * 1000;
 
   if (loading) {
@@ -484,12 +458,12 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, setSelectedJobId, 
 
       {/* Main Charts Row */}
       <section className="db-grid-container db-grid-2-1">
-        {/* Churn Trends Area Chart */}
+        {/* Churn Risk Distribution Histogram Chart */}
         <div className="db-glass-card" style={{ position: 'relative' }}>
           <div className="db-card-header">
             <div>
-              <h3 className="db-card-title">Churn Prediction Trends</h3>
-              <p className="db-card-subtitle">Trajectory of churn risks across monthly evaluation cycles</p>
+              <h3 className="db-card-title">Churn Risk Distribution</h3>
+              <p className="db-card-subtitle">Distribution of customer base across risk probability bands</p>
             </div>
             <div className="db-toggle-container">
               <button
@@ -497,27 +471,28 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, setSelectedJobId, 
                 className={`db-toggle-btn ${activeTrendTab === 'rate' ? 'db-toggle-btn-active' : ''}`}
                 onClick={() => { setActiveTrendTab('rate'); setHoveredTrendIdx(null); }}
               >
-                Rate %
+                Percentage
               </button>
               <button
                 type="button"
                 className={`db-toggle-btn ${activeTrendTab === 'volume' ? 'db-toggle-btn-active' : ''}`}
                 onClick={() => { setActiveTrendTab('volume'); setHoveredTrendIdx(null); }}
               >
-                Volume
+                Customers
               </button>
             </div>
           </div>
 
           <div style={{ height: '220px', position: 'relative', marginTop: '10px' }}>
-            {/* SVG Line / Area Chart */}
+            {/* SVG Histogram Bar Chart */}
             <svg width="100%" height="220" viewBox="0 0 500 220" preserveAspectRatio="none">
-              <defs>
-                <linearGradient id="chartAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#6366f1" stopOpacity="0.35" />
-                  <stop offset="100%" stopColor="#6366f1" stopOpacity="0.00" />
-                </linearGradient>
-              </defs>
+              {/* Axis Titles */}
+              <text x="45" y="12" fill="#94a3b8" fontSize="9" fontWeight="600" textAnchor="start">
+                {activeTrendTab === 'rate' ? '% of Customers' : 'Customer Count'}
+              </text>
+              <text x="262" y="215" fill="#94a3b8" fontSize="9" fontWeight="600" textAnchor="middle">
+                Churn Probability Band
+              </text>
 
               {/* Grid Lines */}
               {[0.25, 0.5, 0.75, 1.0].map((ratio, gridIdx) => {
@@ -535,76 +510,69 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, setSelectedJobId, 
                 );
               })}
 
-              {/* X Axis Labels */}
+              {/* Columns */}
               {(() => {
                 const minY = 0;
+                const barWidth = 26; // width of each bar
+                const totalWidth = 435; // width of chart area (480 - 45)
+                const numBars = chartList.length;
+                const step = numBars > 1 ? totalWidth / numBars : totalWidth;
 
-                const points = chartList.map((item, idx) => {
-                  const x = 50 + (chartList.length > 1 ? (idx / (chartList.length - 1)) * 420 : 210);
+                return chartList.map((item, idx) => {
+                  const x = 45 + idx * step + (step - barWidth) / 2;
                   const val = activeValue(item);
-                  const y = 180 - ((val - minY) / (chartMaxY - minY)) * 155;
-                  return { x, y, item, val, index: idx };
+                  const height = ((val - minY) / (chartMaxY - minY)) * 155;
+                  const y = 180 - height;
+                  
+                  const isHovered = hoveredTrendIdx === idx;
+                  
+                  return (
+                    <g key={`bar-${idx}`}>
+                      {/* Interactive hover background region */}
+                      <rect
+                        x={45 + idx * step}
+                        y="10"
+                        width={step}
+                        height="170"
+                        fill="transparent"
+                        style={{ cursor: 'pointer' }}
+                        onMouseEnter={() => setHoveredTrendIdx(idx)}
+                        onMouseLeave={() => setHoveredTrendIdx(null)}
+                      />
+                      
+                      {/* Main Bar */}
+                      <rect
+                        x={x}
+                        y={y}
+                        width={barWidth}
+                        height={Math.max(height, 2)}
+                        rx="4"
+                        fill={isHovered ? '#38bdf8' : '#6366f1'}
+                        style={{
+                          transition: 'fill 0.2s, y 0.2s, height 0.2s',
+                          opacity: hoveredTrendIdx !== null ? (isHovered ? 1.0 : 0.6) : 0.85
+                        }}
+                        onMouseEnter={() => setHoveredTrendIdx(idx)}
+                        onMouseLeave={() => setHoveredTrendIdx(null)}
+                      />
+                      
+                      {/* Bar label (X-Axis) */}
+                      <text 
+                        x={45 + idx * step + step / 2} 
+                        y="198" 
+                        fill="#94a3b8" 
+                        fontSize="9" 
+                        textAnchor="middle"
+                      >
+                        {item.risk_bucket}
+                      </text>
+                    </g>
+                  );
                 });
-
-                const linePath = points.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
-                const areaPath = points.length ? `${linePath} L ${points[points.length - 1].x} 180 L ${points[0].x} 180 Z` : '';
-
-                return (
-                  <>
-                    {/* Area path */}
-                    {areaPath && <path d={areaPath} fill="url(#chartAreaGrad)" className="chart-area-gradient" />}
-                    
-                    {/* Line path */}
-                    {linePath && (
-                      <path
-                        d={linePath}
-                        fill="none"
-                        className="chart-trend-line"
-                        stroke="#6366f1"
-                        strokeWidth="3"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    )}
-
-                    {/* Axis bottom line */}
-                    <line x1="45" y1="180" x2="480" y2="180" className="chart-axis-line" stroke="rgba(255,255,255,0.15)" />
-
-                    {/* Interactive hover elements */}
-                    {hoveredTrendIdx !== null && points[hoveredTrendIdx] && (
-                      <line
-                        x1={points[hoveredTrendIdx].x}
-                        y1="20"
-                        x2={points[hoveredTrendIdx].x}
-                        y2="180"
-                        stroke="#818cf8"
-                        strokeWidth="1.5"
-                        strokeDasharray="3 3"
-                      />
-                    )}
-
-                    {/* Data Points */}
-                    {points.map((p) => (
-                      <g key={`dot-${p.index}`}>
-                        <circle
-                          cx={p.x}
-                          cy={p.y}
-                          r={hoveredTrendIdx === p.index ? 6 : 4}
-                          fill="#09090b"
-                          stroke={hoveredTrendIdx === p.index ? '#38bdf8' : '#6366f1'}
-                          strokeWidth={hoveredTrendIdx === p.index ? 3 : 2}
-                          className="chart-dot"
-                          onMouseEnter={() => setHoveredTrendIdx(p.index)}
-                          onMouseLeave={() => setHoveredTrendIdx(null)}
-                        />
-                        <text x={p.x} y="198" fill="#94a3b8" fontSize="9" textAnchor="middle">
-                          {p.item.period.split(' ')[0]}
-                        </text>
-                      </g>
-                    ))}
-                  </>
-                );
               })()}
+
+              {/* Axis bottom line */}
+              <line x1="45" y1="180" x2="480" y2="180" className="chart-axis-line" stroke="rgba(255,255,255,0.15)" />
             </svg>
 
             {/* Floating Tooltip Card */}
@@ -613,9 +581,10 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, setSelectedJobId, 
               if (!p) return null;
 
               // Calculate horizontal position overlay
-              const pct = chartList.length > 1
-                ? (hoveredTrendIdx / (chartList.length - 1)) * 80 + 10
-                : 50; // offset in percent
+              const numBars = chartList.length;
+              const step = numBars > 1 ? 80 / numBars : 80;
+              const pct = 10 + hoveredTrendIdx * step + step / 2;
+              
               return (
                 <div style={{
                   position: 'absolute',
@@ -628,22 +597,18 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, setSelectedJobId, 
                   borderRadius: '12px',
                   boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
                   zIndex: 10,
-                  minWidth: '150px',
+                  minWidth: '155px',
                   pointerEvents: 'none',
                   backdropFilter: 'blur(8px)',
                 }}>
-                  <strong style={{ display: 'block', fontSize: '0.85rem', color: '#ffffff', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '4px', marginBottom: '6px' }}>{p.period}</strong>
+                  <strong style={{ display: 'block', fontSize: '0.85rem', color: '#ffffff', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '4px', marginBottom: '6px' }}>Risk Bucket: {p.risk_bucket}</strong>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#a1a1aa', marginBottom: '2px' }}>
-                    <span>Churn Rate:</span>
-                    <span style={{ color: '#ef4444', fontWeight: 700 }}>{p.churn_rate.toFixed(2)}%</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#a1a1aa', marginBottom: '2px' }}>
-                    <span>Churn Vol:</span>
-                    <span style={{ color: '#ffffff', fontWeight: 600 }}>{p.churn_count.toLocaleString()}</span>
+                    <span>Customers:</span>
+                    <span style={{ color: '#ffffff', fontWeight: 600 }}>{p.customer_count.toLocaleString()}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#a1a1aa' }}>
-                    <span>Avg Churn Risk:</span>
-                    <span style={{ color: '#818cf8', fontWeight: 600 }}>{p.average_risk.toFixed(1)}%</span>
+                    <span>Percentage:</span>
+                    <span style={{ color: '#818cf8', fontWeight: 700 }}>{p.percentage.toFixed(2)}%</span>
                   </div>
                 </div>
               );

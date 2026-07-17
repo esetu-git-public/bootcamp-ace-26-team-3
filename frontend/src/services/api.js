@@ -172,6 +172,13 @@ export async function getRiskVelocity() {
   return request('/analytics/risk-velocity');
 }
 
+/**
+ * Churn risk distribution histogram data
+ */
+export async function getRiskDistributionHistogram() {
+  return request('/analytics/churn-risk-distribution-histogram');
+}
+
 
 /**
  * List customers with pagination and filtering

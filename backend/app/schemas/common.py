@@ -37,6 +37,12 @@ class RiskBucket(BaseModel):
     percentage: float
 
 
+class RiskHistogramBucket(BaseModel):
+    risk_bucket: str
+    customer_count: int
+    percentage: float
+
+
 class IncomeChurnRate(BaseModel):
     income_level: str
     total_customers: int

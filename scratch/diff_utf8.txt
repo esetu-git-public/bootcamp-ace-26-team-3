@@ -1,0 +1,232 @@
+﻿diff --git a/frontend/src/pages/AnalyticsDashboard.js b/frontend/src/pages/AnalyticsDashboard.js
+index 0483a0c..3a6decd 100644
+--- a/frontend/src/pages/AnalyticsDashboard.js
++++ b/frontend/src/pages/AnalyticsDashboard.js
+@@ -25,6 +25,7 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, setSelectedJobId,
+   const [segmentData, setSegmentData] = useState([]);
+   const [customerRows, setCustomerRows] = useState([]);
+   const [trendData, setTrendData] = useState([]);
++  const [velocityData, setVelocityData] = useState([]);
+   const [loading, setLoading] = useState(true);
+   const [error, setError] = useState('');
+   const [bulkFile, setBulkFile] = useState(null);
+@@ -34,7 +35,7 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, setSelectedJobId,
+   const [bulkPreview, setBulkPreview] = useState([]);
+   const [bulkJobs, setBulkJobs] = useState([]);
+   const [downloadingType, setDownloadingType] = useState(null);
+-  const [activeTrendTab, setActiveTrendTab] = useState('rate'); // 'rate' or 'volume'
++  const [activeTrendTab, setActiveTrendTab] = useState('volume'); // 'volume' or 'spend'
+   const [hoveredTrendIdx, setHoveredTrendIdx] = useState(null);
+   const [hoveredDonutIdx, setHoveredDonutIdx] = useState(null);
+ 
+@@ -71,6 +72,7 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, setSelectedJobId,
+       apiService.getCustomerSegmentation(),
+       apiService.getCustomers(1, 6, { sortBy: 'risk_desc' }),
+       apiService.getChurnTrends(),
++      apiService.getRiskVelocity(),
+     ])
+       .then(([
+         kpisData,
+@@ -84,6 +86,7 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, setSelectedJobId,
+         segmentDataResult,
+         customersData,
+         trendDataResult,
++        velocityDataResult,
+       ]) => {
+         if (cancelled) return;
+         setKpis(kpisData);
+@@ -97,6 +100,7 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, setSelectedJobId,
+         setSegmentData(asArray(segmentDataResult));
+         setCustomerRows(sortCustomersByRisk(customersData.results));
+         setTrendData(asArray(trendDataResult));
++        setVelocityData(asArray(velocityDataResult));
+       })
+       .catch((err) => {
+         if (cancelled) return;
+@@ -219,60 +223,29 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, setSelectedJobId,
+   };
+ 
+   const chartList = useMemo(() => {
+-    // Standard baseline fallbacks matching seeded data values (~45-50% rate, ~7,500 count)
+     const defaultFallbacks = [
+-      {"period": "Feb 2026", "churn_rate": 49.92, "churn_count": 7961, "total_customers": 15949, "average_risk": 44.29},
+-      {"period": "Mar 2026", "churn_rate": 48.96, "churn_count": 7808, "total_customers": 15949, "average_risk": 42.99},
+-      {"period": "Apr 2026", "churn_rate": 48.08, "churn_count": 7668, "total_customers": 15949, "average_risk": 41.65},
+-      {"period": "May 2026", "churn_rate": 47.17, "churn_count": 7523, "total_customers": 15949, "average_risk": 40.31},
+-      {"period": "Jun 2026", "churn_rate": 46.37, "churn_count": 7395, "total_customers": 15949, "average_risk": 38.99},
+-      {"period": "Jul 2026", "churn_rate": 45.59, "churn_count": 7271, "total_customers": 15949, "average_risk": 37.56},
++      {"category": "Significant Deceleration", "customer_count": 890, "total_spend": 17800.0, "average_change": -11.5},
++      {"category": "Moderate Deceleration", "customer_count": 4890, "total_spend": 97800.0, "average_change": -4.2},
++      {"category": "Stable", "customer_count": 8200, "total_spend": 164000.0, "average_change": 0.1},
++      {"category": "Moderate Acceleration", "customer_count": 1420, "total_spend": 28400.0, "average_change": 3.8},
++      {"category": "Significant Acceleration", "customer_count": 549, "total_spend": 10980.0, "average_change": 12.1}
+     ];
+ 
+-    if (trendData && trendData.length > 1) {
+-      return trendData;
+-    }
+-
+-    // If API returned 1 month (usually current month Jul 2026), merge it with the defaults
+-    if (trendData && trendData.length === 1) {
+-      const realItem = trendData[0];
+-      const merged = [...defaultFallbacks];
+-      const idx = merged.findIndex(i => i.period.includes(realItem.period.split(' ')[0]));
+-      if (idx !== -1) {
+-        merged[idx] = { ...merged[idx], ...realItem };
+-      } else {
+-        merged[merged.length - 1] = { ...merged[merged.length - 1], ...realItem };
+-      }
+-      return merged;
+-    }
+-
+-    // If API is empty but we have loaded dashboard KPIs, adjust Jul 2026 to match active KPIs
+-    if (kpis) {
+-      const merged = [...defaultFallbacks];
+-      const julIdx = merged.findIndex(i => i.period.includes("Jul"));
+-      if (julIdx !== -1) {
+-        merged[julIdx] = {
+-          ...merged[julIdx],
+-          churn_count: kpis.predicted_churn_customers,
+-          churn_rate: (kpis.predicted_churn_customers * 100) / (kpis.total_customers || 1),
+-          total_customers: kpis.total_customers,
+-          average_risk: kpis.average_churn_risk
+-        };
+-      }
+-      return merged;
++    if (velocityData && velocityData.length > 0) {
++      return velocityData;
+     }
+ 
+     return defaultFallbacks;
+-  }, [trendData, kpis]);
++  }, [velocityData]);
+ 
+   const activeValue = (item) => {
+-    const val = activeTrendTab === 'rate' ? item?.churn_rate : item?.churn_count;
++    const val = activeTrendTab === 'volume' ? item?.customer_count : item?.total_spend;
+     return typeof val === 'number' && !isNaN(val) ? val : 0;
+   };
+   const maxVal = Math.max(...chartList.map(activeValue), 1);
+-  const chartMaxY = activeTrendTab === 'rate'
+-    ? Math.ceil(maxVal / 5) * 5
+-    : Math.ceil(maxVal / 1000) * 1000;
++  const chartMaxY = activeTrendTab === 'volume'
++    ? Math.ceil(maxVal / 1000) * 1000
++    : Math.ceil(maxVal / 10000) * 10000;
+ 
+   if (loading) {
+     return <div style={styles.center}>Loading analytics dashboard...</div>;
+@@ -488,23 +461,23 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, setSelectedJobId,
+         <div className="db-glass-card" style={{ position: 'relative' }}>
+           <div className="db-card-header">
+             <div>
+-              <h3 className="db-card-title">Churn Prediction Trends</h3>
+-              <p className="db-card-subtitle">Trajectory of churn risks across monthly evaluation cycles</p>
++              <h3 className="db-card-title">Churn Risk Velocity</h3>
++              <p className="db-card-subtitle">Real-time momentum showing change in customer churn probability</p>
+             </div>
+             <div className="db-toggle-container">
+               <button
+                 type="button"
+-                className={`db-toggle-btn ${activeTrendTab === 'rate' ? 'db-toggle-btn-active' : ''}`}
+-                onClick={() => { setActiveTrendTab('rate'); setHoveredTrendIdx(null); }}
++                className={`db-toggle-btn ${activeTrendTab === 'volume' ? 'db-toggle-btn-active' : ''}`}
++                onClick={() => { setActiveTrendTab('volume'); setHoveredTrendIdx(null); }}
+               >
+-                Rate %
++                Customers
+               </button>
+               <button
+                 type="button"
+-                className={`db-toggle-btn ${activeTrendTab === 'volume' ? 'db-toggle-btn-active' : ''}`}
+-                onClick={() => { setActiveTrendTab('volume'); setHoveredTrendIdx(null); }}
++                className={`db-toggle-btn ${activeTrendTab === 'spend' ? 'db-toggle-btn-active' : ''}`}
++                onClick={() => { setActiveTrendTab('spend'); setHoveredTrendIdx(null); }}
+               >
+-                Volume
++                Spend ($)
+               </button>
+             </div>
+           </div>
+@@ -522,9 +495,9 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, setSelectedJobId,
+               {/* Grid Lines */}
+               {[0.25, 0.5, 0.75, 1.0].map((ratio, gridIdx) => {
+                 const yVal = 180 - ratio * 155;
+-                const label = activeTrendTab === 'rate' 
+-                  ? `${(ratio * chartMaxY).toFixed(0)}%` 
+-                  : `${(ratio * chartMaxY).toLocaleString()}`;
++                const label = activeTrendTab === 'volume' 
++                  ? `${(ratio * chartMaxY).toLocaleString()}` 
++                  : `$${(ratio * chartMaxY).toLocaleString()}`;
+                 return (
+                   <g key={`grid-${gridIdx}`}>
+                     <text x="35" y={yVal + 4} fill="#64748b" fontSize="9" textAnchor="end">
+@@ -549,6 +522,17 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, setSelectedJobId,
+                 const linePath = points.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+                 const areaPath = points.length ? `${linePath} L ${points[points.length - 1].x} 180 L ${points[0].x} 180 Z` : '';
+ 
++                const getShortCategoryName = (cat) => {
++                  const map = {
++                    "Significant Deceleration": "Sig Decel",
++                    "Moderate Deceleration": "Mod Decel",
++                    "Stable": "Stable",
++                    "Moderate Acceleration": "Mod Accel",
++                    "Significant Acceleration": "Sig Accel"
++                  };
++                  return map[cat] || cat;
++                };
++
+                 return (
+                   <>
+                     {/* Area path */}
+@@ -598,7 +582,7 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, setSelectedJobId,
+                           onMouseLeave={() => setHoveredTrendIdx(null)}
+                         />
+                         <text x={p.x} y="198" fill="#94a3b8" fontSize="9" textAnchor="middle">
+-                          {p.item.period.split(' ')[0]}
++                          {getShortCategoryName(p.item.category)}
+                         </text>
+                       </g>
+                     ))}
+@@ -616,6 +600,10 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, setSelectedJobId,
+               const pct = chartList.length > 1
+                 ? (hoveredTrendIdx / (chartList.length - 1)) * 80 + 10
+                 : 50; // offset in percent
++              
++              const changeColor = p.average_change < 0 ? '#10b981' : (p.average_change > 0 ? '#ef4444' : '#cbd5e1');
++              const changeSign = p.average_change > 0 ? '+' : '';
++
+               return (
+                 <div style={{
+                   position: 'absolute',
+@@ -628,22 +616,22 @@ function AnalyticsDashboard({ onViewChange, onSelectCustomer, setSelectedJobId,
+                   borderRadius: '12px',
+                   boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+                   zIndex: 10,
+-                  minWidth: '150px',
++                  minWidth: '170px',
+                   pointerEvents: 'none',
+                   backdropFilter: 'blur(8px)',
+                 }}>
+-                  <strong style={{ display: 'block', fontSize: '0.85rem', color: '#ffffff', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '4px', marginBottom: '6px' }}>{p.period}</strong>
++                  <strong style={{ display: 'block', fontSize: '0.85rem', color: '#ffffff', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '4px', marginBottom: '6px' }}>{p.category}</strong>
+                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#a1a1aa', marginBottom: '2px' }}>
+-                    <span>Churn Rate:</span>
+-                    <span style={{ color: '#ef4444', fontWeight: 700 }}>{p.churn_rate.toFixed(2)}%</span>
++                    <span>Avg Risk Change:</span>
++                    <span style={{ color: changeColor, fontWeight: 700 }}>{changeSign}{p.average_change.toFixed(1)}%</span>
+                   </div>
+                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#a1a1aa', marginBottom: '2px' }}>
+-                    <span>Churn Vol:</span>
+-                    <span style={{ color: '#ffffff', fontWeight: 600 }}>{p.churn_count.toLocaleString()}</span>
++                    <span>Customers:</span>
++                    <span style={{ color: '#ffffff', fontWeight: 600 }}>{p.customer_count.toLocaleString()}</span>
+                   </div>
+                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#a1a1aa' }}>
+-                    <span>Avg Churn Risk:</span>
+-                    <span style={{ color: '#818cf8', fontWeight: 600 }}>{p.average_risk.toFixed(1)}%</span>
++                    <span>At-Risk Spend:</span>
++                    <span style={{ color: '#818cf8', fontWeight: 600 }}>${p.total_spend.toLocaleString()}</span>
+                   </div>
+                 </div>
+               );

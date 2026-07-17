@@ -18,7 +18,7 @@ jest.mock('../services/api', () => ({
   uploadBulkPredictions: jest.fn(),
   getBulkPredictionStatus: jest.fn(),
   getBulkJobs: jest.fn(),
-  getChurnTrends: jest.fn(),
+  getRiskDistributionHistogram: jest.fn(),
 }));
 
 // Import the mocked service after the mock setup
@@ -45,13 +45,17 @@ describe('AnalyticsDashboard', () => {
     apiService.getCustomers.mockResolvedValue({ results: [{ customer_id: '1001', risk_category: 'High', monthly_total_spend: 80, tenure_months: 8, satisfaction_score: 6 }] });
     apiService.uploadBulkPredictions.mockResolvedValue({ job_id: 'job-1', status: 'QUEUED', total_records: 2 });
     apiService.getBulkJobs.mockResolvedValue([]);
-    apiService.getChurnTrends.mockResolvedValue([
-      {"period": "Feb 2026", "churn_rate": 15.42, "churn_count": 2458, "total_customers": 15946, "average_risk": 20.30},
-      {"period": "Mar 2026", "churn_rate": 14.85, "churn_count": 2368, "total_customers": 15946, "average_risk": 18.90},
-      {"period": "Apr 2026", "churn_rate": 13.91, "churn_count": 2218, "total_customers": 15946, "average_risk": 16.40},
-      {"period": "May 2026", "churn_rate": 13.10, "churn_count": 2089, "total_customers": 15946, "average_risk": 14.80},
-      {"period": "Jun 2026", "churn_rate": 12.82, "churn_count": 2045, "total_customers": 15946, "average_risk": 13.50},
-      {"period": "Jul 2026", "churn_rate": 12.40, "churn_count": 1977, "total_customers": 15946, "average_risk": 12.40},
+    apiService.getRiskDistributionHistogram.mockResolvedValue([
+      {"risk_bucket": "0-10%", "customer_count": 8200, "percentage": 51.42},
+      {"risk_bucket": "10-20%", "customer_count": 2800, "percentage": 17.56},
+      {"risk_bucket": "20-30%", "customer_count": 1891, "percentage": 11.86},
+      {"risk_bucket": "30-40%", "customer_count": 1020, "percentage": 6.40},
+      {"risk_bucket": "40-50%", "customer_count": 680, "percentage": 4.26},
+      {"risk_bucket": "50-60%", "customer_count": 369, "percentage": 2.31},
+      {"risk_bucket": "60-70%", "customer_count": 300, "percentage": 1.88},
+      {"risk_bucket": "70-80%", "customer_count": 350, "percentage": 2.19},
+      {"risk_bucket": "80-90%", "customer_count": 236, "percentage": 1.48},
+      {"risk_bucket": "90-100%", "customer_count": 100, "percentage": 0.63}
     ]);
   });
 
@@ -92,7 +96,7 @@ describe('AnalyticsDashboard', () => {
     // Customer Segments list
     expect(await screen.findByText('Loyal')).toBeInTheDocument();
     expect(screen.getByText('45 customers')).toBeInTheDocument();
-    expect(screen.getByText('5%')).toBeInTheDocument();
+    expect(screen.getByText('5% of total base')).toBeInTheDocument();
   });
 
   it('renders the high-risk customer queue ordered by risk level', async () => {
